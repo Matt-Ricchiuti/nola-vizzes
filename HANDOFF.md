@@ -1,5 +1,15 @@
 # Handoff: set up the GitHub repo and daily pipeline
 
+## Status (2026-11-18): tasks 1–7 done
+
+- Repo: https://github.com/Matt-Ricchiuti/nola-vizzes (public). Site: https://matt-ricchiuti.github.io/nola-vizzes/
+- `pipeline/fetch.py` reproduces the snapshots (geo, hist, drone, cfs exact; cpc exact apart from newly scheduled hearings). `daily.yml` runs it at 10:30 UTC, commits, and deploys. First run succeeded.
+- Page copy, dates, axis limits and year rollover are data-driven. Trees page ported (`site/trees.html`, static data). About page added.
+- Candidate datasets for new pages: `pipeline/DATASETS.md`.
+- **Still open:** add a Socrata app token as the `SOCRATA_APP_TOKEN` repo secret (optional; steps in README). Write a new drone headline once the 2027 story is clear (the page goes neutral on Jan 1).
+
+The original brief follows.
+
 Paste this into a new Claude Code session opened in this folder, or tell it "read HANDOFF.md and start."
 
 ## Context
