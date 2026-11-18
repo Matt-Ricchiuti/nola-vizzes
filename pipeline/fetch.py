@@ -244,6 +244,20 @@ def build_geo(api):
     return geo, Polys(nbg['features']), Polys(pdg['features'])
 
 
+POP_ALIAS = {'FILMORE': 'FILLMORE', 'MARLYVILLE - FONTAINEBLEAU': 'MARLYVILLE - FONTAINBLEAU'}  # population table spelling -> boundary spelling
+
+
+def add_population(api, geo):
+    """2020 Census population per neighborhood (2w4d-xaw2, sum_pop100), stored as geo['pop'] in neighborhood order."""
+    api.require_columns('2w4d-xaw2', ['gnocdc_lab', 'sum_pop100'], 'Neighborhood demographics 2020')
+    rows = api.get('/resource/2w4d-xaw2.json', {'$select': 'gnocdc_lab,sum_pop100', '$limit': 500})
+    pop = {POP_ALIAS.get(r['gnocdc_lab'], r['gnocdc_lab']): int(float(r['sum_pop100'])) for r in rows if r.get('gnocdc_lab') and r.get('sum_pop100')}
+    missing = [f['n'] for f in geo['nb'] if f['n'] not in pop]
+    need(not missing, f'Neighborhood population: no 2020 count for {missing}. Add the spelling to POP_ALIAS.')
+    geo['pop'] = [pop[f['n']] for f in geo['nb']]
+    need(300000 < sum(geo['pop']) < 450000, f"Neighborhood population: total {sum(geo['pop'])} looks wrong")
+
+
 STREET_TIER = {'Freeway': 0, 'Ramp': 1, 'Major Arterial': 2, 'Minor Arterial': 2, 'Local': 3}
 STREET_Q = 4  # street coordinates are stored at 4x the map grid (about 5 m) so they stay sharp when zoomed in
 
@@ -630,6 +644,7 @@ def main():
 
     print('geo ...', flush=True)
     geo, nbp, pdp = build_geo(api)
+    add_population(api, geo)
     print('streets ...', flush=True)
     streets = build_streets(api)
 

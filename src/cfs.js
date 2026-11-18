@@ -103,12 +103,16 @@
 
   // ---------- neighborhood map ----------
   const st = { metric: 'res' }, nb = C.nb;
-  const metricVal = i => { const r = nb[i], mt = st.metric;
+  const isTime = () => st.metric === 'r2' || st.metric === 'r1';
+  const rawVal = i => { const r = nb[i], mt = st.metric;
     if (mt === 'res') return r[0]; if (mt === 'self') return r[1];
     if (mt === 'r2') return r[4] >= 30 ? r[2] : null; if (mt === 'r1') return r[3];
     return r[5][+mt.slice(1)]; };
-  const isTime = () => st.metric === 'r2' || st.metric === 'r1';
-  const metricLabel = () => ({ res: 'Calls from the public', self: 'Calls started by officers', r2: 'Median minutes to arrive, emergency', r1: 'Median minutes to arrive, non-emergency' })[st.metric] || (tcase(C.TOP[+st.metric.slice(1)]) + ' calls');
+  const perRes = () => st.basis === 'pc' && !isTime(); // counts can be shown per 1,000 residents; arrival times can't
+  const metricVal = i => perRes() ? NOLA.perK(rawVal(i), NOLA.popOf(i)) : rawVal(i);
+  const metricLabel = () => (({ res: 'Calls from the public', self: 'Calls started by officers', r2: 'Median minutes to arrive, emergency', r1: 'Median minutes to arrive, non-emergency' })[st.metric] || (tcase(C.TOP[+st.metric.slice(1)]) + ' calls')) + (perRes() ? ' per 1,000 residents' : '');
+  st.basis = 'n';
+  NOLA.basisChips(document.getElementById('basisChips'), v => { st.basis = v; V.refresh(); });
   const msel = document.getElementById('metric');
   msel.innerHTML = [['res', 'Calls from the public'], ['self', 'Calls started by officers'], ['r2', 'Arrival time: emergency (P2)'], ['r1', 'Arrival time: non-emergency (P1)']].map(([v, l]) => `<option value="${v}">${l}</option>`).join('') +
     '<optgroup label="Call type">' + C.TOP.map((t, k) => unmappable(k) ? '' : `<option value="t${k}">${tcase(t)}</option>`).join('') + '</optgroup>';
@@ -116,17 +120,21 @@
   let m;
   function drawMap(el, first) {
     if (first) {
-      el.innerHTML = '<div class="legend"></div><div class="map"></div>';
+      el.innerHTML = '<div class="legend"></div><div></div><div class="map"></div>';
       m = NOLA.map(el.lastChild, { height: 600, extent: [-70, 700, 1250, 1730], label: 'Map of calls by neighborhood',
         tip: i => { const r = nb[i];
-          return `<b>${NOLA.GEO.nb[i].name}</b>` + (st.metric.startsWith('t') ? row(metricLabel(), fmt(metricVal(i))) : '') + row('Calls from the public', fmt(r[0])) + row('Started by officers', fmt(r[1]))
+          const pop = NOLA.popOf(i), rate = NOLA.perK(r[0], pop);
+          return `<b>${NOLA.GEO.nb[i].name}</b>` + (st.metric.startsWith('t') ? row(metricLabel(), perRes() ? NOLA.fmtRate(metricVal(i)) : fmt(rawVal(i))) : '') + row('Calls from the public', fmt(r[0])) + row('Started by officers', fmt(r[1]))
+            + row('Residents (2020)', pop == null ? '—' : fmt(pop)) + (rate != null ? row('Public calls per 1,000 residents', NOLA.fmtRate(rate)) : '')
             + row('Median arrival, emergency', r[4] >= 30 ? r[2] + ' min' : 'too few calls') + row('Median arrival, non-emergency', r[3] == null ? '—' : Math.round(r[3]) + ' min'); } });
       NOLA.mapButtons(el.lastChild, m, [['Core city', [-70, 950, 800, 1680]], ['Whole city', [-70, 130, 2110, 1730]]]);
     }
     const vals = nb.map((r, i) => metricVal(i)).filter(v => v != null).sort(d3.ascending);
     const lo = isTime() ? d3.quantile(vals, .05) : 0, hi = d3.quantile(vals, .95);
     m.setFill(i => { const v = metricVal(i); return v == null ? 'var(--none)' : NOLA.seqVar((v - lo) / (hi - lo)); });
-    NOLA.seqLegend(el.firstChild, [lo, hi], v => isTime() ? Math.round(v) + ' min' : fmt(Math.round(v)), metricLabel() + ':');
+    NOLA.seqLegend(el.firstChild, [lo, hi], v => isTime() ? Math.round(v) + ' min' : perRes() ? NOLA.fmtRate(v) : fmt(Math.round(v)), metricLabel() + ':');
+    el.children[1].innerHTML = perRes() ? NOLA.POP_NOTE : '';
+    document.getElementById('basisChips').hidden = isTime();
   }
 
   // ---------- arrival time by district ----------

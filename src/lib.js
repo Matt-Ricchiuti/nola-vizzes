@@ -26,6 +26,15 @@ const NOLA = (() => {
   const pathOf = rings => rings.map(r => 'M' + decode(r).map(p => p.join(',')).join('L') + 'Z').join('');
   const title = s => s.toLowerCase().replace(/(^|[\s\-\/.(&])([a-z])/g, (m, a, b) => a + b.toUpperCase()).replace(/\bMcdonogh\b/, 'McDonogh').replace(/\bB\. W\./, 'B.W.').replace(/\bSt\.\s+/g, 'St. ').replace(/\bDev\b/, 'Development');
   let GEO = null;
+  // ---------- per-resident rates (2020 Census population per neighborhood, GEO.pop) ----------
+  // Use only for things residents generate (e.g. calls for service), not for land- or street-based counts.
+  const MIN_POP = 1000; // rates for neighborhoods smaller than this swing wildly, so they're left out
+  const popOf = i => GEO.pop ? GEO.pop[i] : null;
+  const perK = (n, pop) => n != null && pop >= MIN_POP ? 1000 * n / pop : null;
+  const fmtRate = v => v == null ? '—' : v >= 100 ? d3.format(',')(Math.round(v)) : v >= 10 ? v.toFixed(0) : v.toFixed(1);
+  const POP_NOTE = '<div class="legend popnote">Per 1,000 residents (2020 Census). Visitors, workers and highway traffic also generate calls, so rates run high where few people live, like the CBD, French Quarter and Viavant–Venetian Isles. Neighborhoods under 1,000 residents are left out.</div>';
+  // Total / Per 1,000 residents switch
+  const basisChips = (el, onSel) => chips(el, [{ label: 'Total', value: 'n' }, { label: 'Per 1,000 residents', value: 'pc' }], onSel, { sel: 'n' });
   function setGeo(g) {
     GEO = g;
     GEO.nb.forEach(f => { f.d = pathOf(f.r); f.name = title(f.n); });
@@ -156,6 +165,6 @@ const NOLA = (() => {
   }
   const legendHTML = items => '<div class="legend">' + items.map(([c, l, round]) => `<span><i style="background:${c}${round ? ';border-radius:50%' : ''}"></i>${l}</span>`).join('') + '</div>';
 
-  return { css, S, fmt, pct, tip, row, setGeo, views, legendHTML, get GEO() { return GEO; }, map, mapButtons, seqVar, seqLegend, frame, yGrid, chips, months, monthsLong,
+  return { css, S, fmt, pct, tip, row, setGeo, views, legendHTML, popOf, perK, fmtRate, POP_NOTE, basisChips, get GEO() { return GEO; }, map, mapButtons, seqVar, seqLegend, frame, yGrid, chips, months, monthsLong,
     setYear, get YEAR() { return YEAR; }, doyTime, doyDate, doyMonth, monthStarts, isoDate, share, numWord, cap, setText, setHTML, title };
 })();

@@ -25,8 +25,11 @@ Y(lat) = round((30.20 - lat) * 111000 / 20)      # y grows southward, like SVG
 
 ```
 geo.json = { "nb": [ {"n": NAME, "r": [ring, ...]}, ...72 ],   # order = feature order from the API
-             "pd": [ {"n": DISTRICT, "r": [...]}, ...8 ] }
+             "pd": [ {"n": DISTRICT, "r": [...]}, ...8 ],
+             "pop": [2020 population per nb, ...72] }
 ```
+
+**Population.** `pop` is `sum_pop100` from "Neighborhood Statistical Areas Demographics 2020" (`2w4d-xaw2`), matched on `gnocdc_lab` (two spellings differ; see `POP_ALIAS` in `fetch.py`). It's used only for the calls-for-service map's "Per 1,000 residents" option. Planning cases and street trees aren't shown per resident: cases follow parcels and trees follow streets, so population is the wrong denominator for them. Neighborhoods under 1,000 residents get no rate.
 
 **Neighborhood index.** Every `nb` index in the other files is a position in this array. It's assigned by point-in-polygon against the **unsimplified** API geometry in lon/lat, with a bbox prefilter. Use -1 when the point is outside every polygon. **geo.json and the other files must be regenerated together** so the indices stay aligned.
 
