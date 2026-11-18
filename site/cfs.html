@@ -28,11 +28,38 @@ h1,.viewsel,.cards h2{font-family:"Young Serif",Georgia,"Times New Roman",serif;
 .eyebrow,.flist .ct,.scalebar,.src,.tip .r span:last-child{font-family:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace}
 a{color:var(--accent)}
 .wrap{max-width:1120px;margin:0 auto;padding:28px 24px 64px}
-.site{display:flex;justify-content:space-between;align-items:baseline;gap:16px;flex-wrap:wrap;border-bottom:1px solid var(--grid);padding-bottom:12px;margin-bottom:28px}
+.site{display:flex;align-items:center;gap:22px;border-bottom:1px solid var(--grid);padding-bottom:12px;margin-bottom:28px;position:relative;z-index:30}
 .site b{font-size:13px;letter-spacing:.08em;text-transform:uppercase}
-.site nav{display:flex;gap:16px;font-size:13px;flex-wrap:wrap}
-.site nav a{color:var(--ink2);text-decoration:none}
-.site nav a.on{color:var(--ink);font-weight:600}
+/* header menu: "Visualizations" opens down to the pages; each page opens right to its views */
+.topnav{display:flex;align-items:center;gap:18px;flex:1;font-size:13px}
+.topnav .xlink{margin-left:auto;color:var(--ink2);text-decoration:none}
+.topnav .xlink.on{color:var(--ink);font-weight:600}
+.dd{position:relative}
+.ddbtn{font:inherit;font-size:13px;color:var(--ink2);background:none;border:0;padding:4px 0;cursor:pointer;display:inline-flex;align-items:center;gap:5px}
+.ddbtn.on,.dd:hover .ddbtn,.dd.open .ddbtn{color:var(--ink)}
+.ddbtn span{font-size:10px;transition:transform .15s}
+.dd:hover .ddbtn span,.dd.open .ddbtn span{transform:rotate(180deg)}
+.dd1,.dd2{list-style:none;margin:0;padding:6px;background:var(--surface);border:1px solid var(--ring);border-radius:10px;box-shadow:0 10px 30px rgb(0 0 0 / .14);display:none}
+.dd1{position:absolute;top:100%;left:-10px;min-width:230px;margin-top:6px}
+.dd1::before{content:"";position:absolute;left:0;right:0;top:-10px;height:10px} /* hover bridge */
+.dd:hover .dd1,.dd:focus-within .dd1,.dd.open .dd1{display:block}
+.dd1 li{position:relative}
+.dd1 a{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:7px 10px;border-radius:7px;color:var(--ink);text-decoration:none;white-space:nowrap}
+.dd1 a:hover,.dd1 a:focus-visible,.dd1 .sub:hover>a,.dd1 .sub:focus-within>a{background:var(--chip);outline:none}
+.dd1 .sub>a span{color:var(--muted)}
+.dd1 .sub.on>a{font-weight:600}
+.dd2{position:absolute;top:-7px;left:100%;margin-left:6px;min-width:250px}
+.dd2::before{content:"";position:absolute;top:0;bottom:0;left:-10px;width:10px} /* hover bridge */
+.dd1 .sub:hover>.dd2,.dd1 .sub:focus-within>.dd2,.dd1 .sub.open>.dd2{display:block}
+.dd2 a{color:var(--ink2)}
+.dd2 a:hover,.dd2 a:focus-visible{color:var(--ink)}
+@media(max-width:640px){
+  .site{flex-wrap:wrap;gap:8px 18px}
+  .dd{position:static}
+  .dd1{left:0;right:0;top:100%;min-width:0;max-height:75vh;overflow:auto}
+  .dd2{position:static;margin:2px 0 6px 10px;box-shadow:none;border:0;border-left:2px solid var(--grid);border-radius:0;padding:0 0 0 6px;min-width:0}
+  .dd2 a{white-space:normal}
+}
 h1{font-size:30px;line-height:1.15;margin:0 0 6px;letter-spacing:0}
 h2{font-size:19px;margin:0 0 4px}
 .src{font-size:11.5px;color:var(--muted);margin:0 0 22px}
@@ -172,7 +199,7 @@ tbody tr:hover td{background:var(--chip)}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script><script src="streets.js"></script>
 </head><body><div class="wrap">
-<div class="site"><b><a href="index.html" style="color:inherit;text-decoration:none">Nola Vizzes</a></b><nav><a class="" href="drone.html">NOPD drone flights</a><a class="on" href="cfs.html">Calls for service</a><a class="" href="cpc.html">Planning cases</a><a class="" href="trees.html">Street trees</a><a class="" href="about.html">About</a></nav></div>
+<div class="site"><b><a href="index.html" style="color:inherit;text-decoration:none">Nola Vizzes</a></b><nav class="topnav" aria-label="Site"><div class="dd"><button type="button" class="ddbtn on" aria-haspopup="true" aria-expanded="false">Visualizations<span aria-hidden="true">▾</span></button><ul class="dd1"><li class="sub"><a href="drone.html" aria-haspopup="true">NOPD drone flights<span aria-hidden="true">›</span></a><ul class="dd2"><li><a href="drone.html#week">Flights per week, by purpose</a></li><li><a href="drone.html#map">Launch points</a></li><li><a href="drone.html#purpose">Flights by purpose</a></li><li><a href="drone.html#hour">Takeoffs by hour (Central time)</a></li><li><a href="drone.html#fleet">Flights by drone</a></li></ul></li><li class="sub on"><a href="cfs.html" aria-haspopup="true">Calls for service<span aria-hidden="true">›</span></a><ul class="dd2"><li><a href="cfs.html#trend">Calls per month since 2014</a></li><li><a href="cfs.html#daily">Calls per day, 2026</a></li><li><a href="cfs.html#heat">Calls by weekday and hour</a></li><li><a href="cfs.html#types">Call types</a></li><li><a href="cfs.html#map">Calls by neighborhood</a></li><li><a href="cfs.html#dist">Officer arrival time by police district</a></li></ul></li><li class="sub"><a href="cpc.html" aria-haspopup="true">Planning cases<span aria-hidden="true">›</span></a><ul class="dd2"><li><a href="cpc.html#upcoming">Upcoming hearings</a></li><li><a href="cpc.html#recent">Cases filed in the past 12 months</a></li><li><a href="cpc.html#years">Cases filed per year, by type</a></li><li><a href="cpc.html#topics">Cases per year mentioning each topic</a></li></ul></li><li class="sub"><a href="trees.html" aria-haspopup="true">Street trees<span aria-hidden="true">›</span></a><ul class="dd2"><li><a href="trees.html#map">Map of every tree</a></li><li><a href="trees.html#species">Most common species</a></li><li><a href="trees.html#hoods">Trees by neighborhood</a></li></ul></li></ul></div><a class="xlink" href="about.html">About</a></nav><script>(()=>{const dd=document.currentScript.closest(".site").querySelector(".dd"),b=dd.querySelector(".ddbtn");const set=o=>{dd.classList.toggle("open",o);b.setAttribute("aria-expanded",o)};b.onclick=e=>{e.stopPropagation();set(!dd.classList.contains("open"))};dd.querySelectorAll(".sub>a").forEach(a=>a.addEventListener("click",e=>{if(!matchMedia("(hover:hover)").matches){const li=a.parentNode;if(!li.classList.contains("open")){e.preventDefault();dd.querySelectorAll(".sub").forEach(x=>x.classList.toggle("open",x===li))}}}));document.addEventListener("click",e=>{if(!dd.contains(e.target))set(false)});dd.addEventListener("keydown",e=>{if(e.key==="Escape"){set(false);b.focus()}});addEventListener("hashchange",()=>set(false))})()</script></div>
 <h1>NOPD calls for service, 2026</h1>
 <div class="src"><a href="https://data.nola.gov/d/es9j-6y5d">Calls for Service 2026</a> and earlier yearly files · data.nola.gov · Calls through Nov 17, 2026 · Updated Nov 18, 2026</div>
 <div class="viewbar"><select id="view" class="viewsel" aria-label="Chart"></select></div>

@@ -61,11 +61,26 @@ TOKENS = {'{{PULLED}}': fdate(pulled),
           '{{DRONE_YEAR}}': str(drone_year),
           '{{FOOT}}': '<div class="foot">Data: <a id="dataLink" href="https://data.nola.gov">data.nola.gov</a> · Not affiliated with the City of New Orleans · <a href="about.html">About</a></div>'}
 
+# Header: the site name, then one "Visualizations" menu. It opens downward to the four pages; each page opens to the
+# right with its views (read from src/<page>.js, like the home-page menu). Hover, keyboard (Tab / Escape) and tap all work.
+NAV_JS = ('<script>(()=>{const dd=document.currentScript.closest(".site").querySelector(".dd"),b=dd.querySelector(".ddbtn");'
+          'const set=o=>{dd.classList.toggle("open",o);b.setAttribute("aria-expanded",o)};'
+          'b.onclick=e=>{e.stopPropagation();set(!dd.classList.contains("open"))};'
+          'dd.querySelectorAll(".sub>a").forEach(a=>a.addEventListener("click",e=>{if(!matchMedia("(hover:hover)").matches){const li=a.parentNode;'
+          'if(!li.classList.contains("open")){e.preventDefault();dd.querySelectorAll(".sub").forEach(x=>x.classList.toggle("open",x===li))}}}));'
+          'document.addEventListener("click",e=>{if(!dd.contains(e.target))set(false)});'
+          'dd.addEventListener("keydown",e=>{if(e.key==="Escape"){set(false);b.focus()}});addEventListener("hashchange",()=>set(false))})()</script>')
 def nav(key):
-    return ('<div class="site"><b><a href="index.html" style="color:inherit;text-decoration:none">Nola Vizzes</a></b><nav>'
-            + ''.join(f'<a class="{"on" if k == key else ""}" href="{k}.html">{l}</a>' for k, (l, _) in PAGES.items())
-            + ''.join(f'<a class="{"on" if k == key else ""}" href="{k}.html">{l}</a>' for k, l in EXTRA.items())
-            + '</nav></div>')
+    e = html.escape
+    pages = ''.join(
+        f'<li class="sub{" on" if k == key else ""}"><a href="{k}.html" aria-haspopup="true">{e(l)}<span aria-hidden="true">›</span></a>'
+        f'<ul class="dd2">' + ''.join(f'<li><a href="{k}.html#{i}">{e(t)}</a></li>' for i, t in page_views(k)) + '</ul></li>'
+        for k, (l, _) in PAGES.items())
+    extra = ''.join(f'<a class="xlink{" on" if k == key else ""}" href="{k}.html">{e(l)}</a>' for k, l in EXTRA.items())
+    return ('<div class="site"><b><a href="index.html" style="color:inherit;text-decoration:none">Nola Vizzes</a></b>'
+            '<nav class="topnav" aria-label="Site"><div class="dd">'
+            f'<button type="button" class="ddbtn{" on" if key in PAGES else ""}" aria-haspopup="true" aria-expanded="false">Visualizations<span aria-hidden="true">▾</span></button>'
+            f'<ul class="dd1">{pages}</ul></div>{extra}</nav>' + NAV_JS + '</div>')
 
 # The home-page menu lists every view of every page. It is read straight from the NOLA.views([...]) call in
 # src/<page>.js (one `{ id: '...', label: '...', ... },` per line), so a new view shows up in the menu by itself.
