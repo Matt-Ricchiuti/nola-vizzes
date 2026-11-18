@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NOLA Open Data, visualized</title>
+<style>:root{
+  color-scheme: light;
+  --page:#f9f9f7; --surface:#fcfcfb; --ink:#0b0b0b; --ink2:#52514e; --muted:#898781;
+  --grid:#e1e0d9; --axis:#c3c2b7; --ring:rgba(11,11,11,.10); --land:#efeee9; --landline:#d7d5cc;
+  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100; --s5:#e87ba4; --s6:#008300; --s7:#6250d6; --s8:#e34948;
+  --q1:#cde2fb; --q2:#9ec5f4; --q3:#6da7ec; --q4:#3987e5; --q5:#256abf; --q6:#184f95; --q7:#0d366b;
+  --none:#d9d8d2; --accent:#2a78d6; --chip:#efeee9;
+}
+@media (prefers-color-scheme: dark){
+  :root:where(:not([data-theme="light"])){
+    color-scheme: dark;
+    --page:#0d0d0d; --surface:#1a1a19; --ink:#f0efec; --ink2:#c3c2b7; --muted:#898781;
+    --grid:#2c2c2a; --axis:#383835; --ring:rgba(255,255,255,.10); --land:#232321; --landline:#3a3a37;
+    --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --s5:#d55181; --s6:#0ca30c; --s7:#9085e9; --s8:#e66767;
+    --q1:#0d366b; --q2:#104281; --q3:#184f95; --q4:#1c5cab; --q5:#2a78d6; --q6:#5598e7; --q7:#9ec5f4;
+    --none:#2f2f2c; --accent:#3987e5; --chip:#262624;
+  }
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--page);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",sans-serif;font-size:15px;line-height:1.5}
+a{color:var(--accent)}
+.wrap{max-width:1120px;margin:0 auto;padding:28px 24px 64px}
+.site{display:flex;justify-content:space-between;align-items:baseline;gap:16px;flex-wrap:wrap;border-bottom:1px solid var(--grid);padding-bottom:12px;margin-bottom:28px}
+.site b{font-size:13px;letter-spacing:.08em;text-transform:uppercase}
+.site nav{display:flex;gap:16px;font-size:13px;flex-wrap:wrap}
+.site nav a{color:var(--ink2);text-decoration:none}
+.site nav a.on{color:var(--ink);font-weight:600}
+h1{font-size:34px;line-height:1.15;margin:0 0 10px;letter-spacing:-.01em;max-width:900px}
+.dek{font-size:18px;color:var(--ink2);max-width:780px;margin:0 0 8px}
+.meta{font-size:13px;color:var(--muted);margin-bottom:28px}
+h2{font-size:21px;margin:0 0 4px}
+.sub{color:var(--ink2);margin:0 0 14px;max-width:760px}
+section{margin:44px 0}
+.card{background:var(--surface);border:1px solid var(--ring);border-radius:12px;padding:18px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin:8px 0 8px}
+.tile{background:var(--surface);border:1px solid var(--ring);border-radius:12px;padding:14px 16px}
+.tile .v{font-size:30px;font-weight:650;line-height:1.1}
+.tile .l{font-size:13px;color:var(--ink2);margin-top:4px}
+.grid2{display:grid;grid-template-columns:1.4fr 1fr;gap:16px}
+.grid2b{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:860px){.grid2,.grid2b{grid-template-columns:1fr} h1{font-size:27px}}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px}
+.chip{border:1px solid var(--ring);background:var(--chip);color:var(--ink);border-radius:999px;padding:4px 11px;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;font-family:inherit}
+.chip.on{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.chip i{width:9px;height:9px;border-radius:50%;display:inline-block}
+select{font:inherit;font-size:13px;padding:4px 8px;border-radius:8px;border:1px solid var(--ring);background:var(--surface);color:var(--ink)}
+.legend{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:var(--ink2);margin:6px 0 8px}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.legend i{width:10px;height:10px;border-radius:3px;display:inline-block}
+.note{font-size:13px;color:var(--ink2);border-left:3px solid var(--grid);padding:2px 0 2px 12px;margin:10px 0;max-width:780px}
+svg{display:block;max-width:100%}
+svg text{fill:var(--muted);font-size:11px;font-family:inherit}
+.axis path,.axis line{stroke:var(--axis)}
+.gridl line{stroke:var(--grid)}
+.gridl path{display:none}
+.map svg{background:var(--surface);border-radius:10px;cursor:grab;touch-action:none}
+.nbpath{fill:var(--land);stroke:var(--landline);stroke-width:.8;vector-effect:non-scaling-stroke}
+.nbpath.hot:hover{stroke:var(--ink);stroke-width:1.6}
+.tip{position:fixed;pointer-events:none;background:var(--surface);color:var(--ink);border:1px solid var(--ring);box-shadow:0 6px 24px rgba(0,0,0,.14);border-radius:10px;padding:9px 11px;font-size:12.5px;max-width:300px;z-index:20;opacity:0;transition:opacity .08s}
+.tip b{font-size:13px}
+.tip .r{display:flex;justify-content:space-between;gap:14px;color:var(--ink2)}
+.tip .r span:last-child{color:var(--ink);font-variant-numeric:tabular-nums}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th{font-weight:600;text-align:left;color:var(--ink2);border-bottom:1px solid var(--axis);padding:6px 8px;cursor:pointer;white-space:nowrap;user-select:none}
+td{border-bottom:1px solid var(--grid);padding:6px 8px;font-variant-numeric:tabular-nums}
+tr.sel td{background:var(--chip)}
+tbody tr{cursor:pointer}
+tbody tr:hover td{background:var(--chip)}
+.num{text-align:right}
+.bar{height:8px;border-radius:0 4px 4px 0;background:var(--s1);display:inline-block;vertical-align:middle}
+.zoomhint{font-size:12px;color:var(--muted);margin-top:6px}
+.btn{font:inherit;font-size:12px;border:1px solid var(--ring);background:var(--surface);color:var(--ink2);border-radius:8px;padding:3px 9px;cursor:pointer}
+.foot{margin-top:56px;border-top:1px solid var(--grid);padding-top:16px;font-size:13px;color:var(--ink2)}
+.foot h3{font-size:14px;margin:0 0 6px;color:var(--ink)}
+.foot ul{margin:0;padding-left:18px}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.sr{position:absolute;left:-9999px}
+.halo{paint-order:stroke;stroke:var(--surface);stroke-width:5px;stroke-linejoin:round}
+.maplab{font-weight:600;letter-spacing:.02em}
+
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}
+.cards a{display:block;text-decoration:none;color:inherit}
+.cards a:hover .card{border-color:var(--accent)}
+.cards h2{font-size:18px}
+</style></head><body><div class="wrap">
+<div class="site"><b>NOLA Open Data, visualized</b></div>
+<h1>The City of New Orleans publishes hundreds of datasets. Here's what's in them.</h1>
+<p class="dek">Hand-built visualizations of data from data.nola.gov, refreshed daily from the City's API.</p>
+<div class="cards" style="margin-top:28px">
+<a href="cfs.html"><div class="card"><h2>Calls for service</h2><p class="sub">What people call NOPD about, when and where, how long it takes an officer to arrive, and twelve years of history.</p></div></a>
+<a href="drone.html"><div class="card"><h2>NOPD drone flights</h2><p class="sub">Every logged police drone flight in 2026, and October's shift to daily dispatch flights.</p></div></a>
+<a href="cpc.html"><div class="card"><h2>Planning cases</h2><p class="sub">What's on upcoming City Planning agendas, and twenty years of zoning and land-use requests.</p></div></a>
+<a href="https://claude.ai/artifact/7EZEot1PFcKtp6mDzDMrFZ"><div class="card"><h2>Street trees</h2><p class="sub">All 106,820 inventoried trees in the city, by species and neighborhood.</p></div></a>
+</div>
+<div class="foot">Data: <a href="https://data.nola.gov">data.nola.gov</a>. This site is an independent project and is not affiliated with the City of New Orleans.</div>
+</div></body></html>

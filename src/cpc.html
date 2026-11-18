@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>City Planning Commission cases · NOLA Open Data</title>
+<style>{{CSS}}
+.upwrap{display:grid;grid-template-columns:1.25fr 1fr;gap:16px;align-items:start}
+@media(max-width:860px){.upwrap{grid-template-columns:1fr}}
+#uplist{max-height:640px;overflow:auto;padding:4px 10px}
+.day{margin-bottom:10px}
+.dh{position:sticky;top:0;background:var(--surface);font-weight:650;font-size:13px;padding:8px 0 6px;border-bottom:1px solid var(--grid)}
+.ui{display:flex;gap:10px;padding:8px 6px;border-bottom:1px solid var(--grid);cursor:pointer;border-radius:6px}
+.ui i{flex:0 0 10px;height:10px;border-radius:50%;margin-top:5px}
+.ui.on,.ui:hover{background:var(--chip)}
+.ui b{font-size:13.5px}
+.ty{font-size:12px;color:var(--ink2)}
+.ds{font-size:12.5px;color:var(--ink2);margin-top:2px}
+.nb{font-size:11.5px;color:var(--muted);margin-top:2px}
+.sms{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.sm{padding:12px 14px 6px}
+.smh{font-size:13px}
+.smh span{display:block;color:var(--muted);font-size:12px}
+</style>
+{{D3}}
+</head><body><div class="wrap">
+{{NAV}}
+<h1>What's going before the City Planning Commission, and what New Orleans has been asking it for</h1>
+<p class="dek">Every variance, subdivision, zoning change and conditional use in the city goes through a City Planning case. This page shows what's on upcoming agendas, where recent requests are concentrated, and which topics come up most over twenty years of filings.</p>
+<div class="meta">Source: <a href="https://data.nola.gov/Housing-Land-Use-and-Blight/CPC-Projects/xxb5-5azv/about_data">CPC Projects</a>, data.nola.gov · 15,671 cases filed Dec 2003 – Nov 17, 2026 · Data pulled Nov 18, 2026</div>
+
+<div class="tiles" id="tiles"></div>
+
+<section>
+<h2>Coming up</h2>
+<p class="sub">Cases with a City Planning Commission, Board of Zoning Adjustments or Planning Advisory Committee meeting scheduled after today. Hover over a case to find it on the map, or click to zoom in.</p>
+<div class="legend" id="upLeg"></div>
+<div class="upwrap">
+<div class="map card" id="upmap" style="padding:6px"></div>
+<div class="card" id="uplist"></div>
+</div>
+<p class="note">Agendas change. Check the City Planning Commission's meeting page before you go. Descriptions are cut off where the City's record is long.</p>
+</section>
+
+<section>
+<h2>The past 12 months, mapped</h2>
+<p class="sub">Every case filed since Nov 18, 2025. Filter by case type or by topic. Topics come from keywords in each case's description, so "Short-term rentals" includes any case that mentions them.</p>
+<div class="chips" id="typeChips"></div>
+<div class="chips" id="themeChips"></div>
+<div class="grid2">
+<div><div class="map card" id="recmap" style="padding:6px"></div></div>
+<div><div class="card"><div style="font-size:13px;color:var(--ink2);margin-bottom:8px" id="recCount"></div><b style="font-size:14px">Neighborhoods with the most matching cases</b><table id="rank" style="margin-top:6px"></table></div></div>
+</div>
+</section>
+
+<section>
+<h2>Twenty years of filings</h2>
+<p class="sub">Cases filed per year, by type. Neighborhood notices (NPP) first appear in 2016. Variances have dropped since the late 2000s. Hover over a bar for its breakdown.</p>
+<div class="legend" id="yearLeg"></div>
+<div class="card"><div id="years"></div></div>
+</section>
+
+<section>
+<h2>What the requests are about</h2>
+<p class="sub">Number of cases each year whose description mentions each topic, 2010–2026, all on the same scale. Short-term rental cases spiked in 2022 and are climbing again in 2026. Hotel and guest house cases peaked in 2023.</p>
+<div class="sms" id="themes"></div>
+</section>
+
+<div class="foot">
+<h3>About this data</h3>
+<ul>
+<li>The City publishes one row per case, with its type, address, status, last and next meeting, and a free-text description.</li>
+<li>Some cases list several types, for example "Zoning Change, Conditional Use." We grouped each case under its most consequential type: zoning change, then master plan, text amendment, major subdivision, conditional use, NPP, appeal, design review, variance, minor subdivision.</li>
+<li>Topic tags come from keyword matches in descriptions, so a case can have more than one topic or be missed if it's worded differently. An NPP notice and the case it leads to are separate records, so one project can count twice.</li>
+<li>The approval rate counts cases since 2016 whose last-meeting status says approved or denied. Most cases don't record a decision in that field, so treat the rate as a rough indicator.</li>
+<li>About 7,700 cases are still marked "Open," including many from years ago. That status doesn't appear to be cleaned up consistently.</li>
+</ul>
+</div>
+</div>
+<script>const DATA={{DATA}};</script>
+<script>{{LIB}}</script>
+<script>{{JS}}</script>
+</body></html>

@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NOPD Calls for Service, 2026 · NOLA Open Data</title>
+<style>{{CSS}}</style>
+{{D3}}
+</head><body><div class="wrap">
+{{NAV}}
+<h1>Calls to NOPD in 2026: about a third fewer calls from residents than in the late 2010s</h1>
+<p class="dek">Every 911 call, report and officer-initiated stop gets logged as a "call for service." This page covers what people call about, when and where, how long it takes an officer to arrive, and how 2026 compares with the past twelve years.</p>
+<div class="meta">Source: <a href="https://data.nola.gov/Public-Safety-and-Preparedness/Calls-for-Service-2026/es9j-6y5d/about_data">Calls for Service 2026</a> and the 2014–2025 yearly files, data.nola.gov · Through Nov 17, 2026 · Data pulled Nov 18, 2026</div>
+
+<div class="tiles" id="tiles"></div>
+
+<section>
+<h2>Twelve years of calls</h2>
+<p class="sub">Monthly calls since 2014. Calls from the public averaged about 26,000 a month from 2014 to 2019 and have held near 17,500 since 2024. Calls started by officers rise and fall with enforcement priorities and staffing.</p>
+<div class="legend"><span><i style="background:var(--s1)"></i>From the public</span><span><i style="background:var(--s2)"></i>Started by officers</span></div>
+<div class="card"><div id="trend"></div></div>
+<p class="note">Calls aren't crimes. Call volume also moves with how people report (for example, online reports instead of phone calls), how NOPD categorizes calls, and how many officers are on patrol. Treat this chart as a measure of demand on the police, not a crime rate.</p>
+</section>
+
+<section>
+<div class="grid2b">
+<div>
+<h2>2026, day by day</h2>
+<p class="sub">Dots are single days. Lines are 7-day averages.</p>
+<div class="card"><div id="daily"></div></div>
+</div>
+<div>
+<h2>When people call</h2>
+<p class="sub">Calls from the public by weekday and hour. Weekday calls ramp up at 7 a.m. Friday and Saturday stay busy past midnight.</p>
+<div class="card"><div id="heat"></div><div class="legend" id="heatLeg" style="margin-top:8px"></div></div>
+</div>
+</div>
+</section>
+
+<section>
+<h2>What the calls are about</h2>
+<p class="sub">The 24 most common call types, which make up most of the year's calls. Click a column to sort, or click a row to map that call type.</p>
+<div class="card" style="overflow-x:auto"><table id="ttable"></table></div>
+<p class="note">"Median arrival" is the time from when a call is created to when the first officer arrives, for calls from the public only. "Gone on arrival" means the officer found no one there. Area and business checks are almost all patrol activity started by officers.</p>
+</section>
+
+<section id="mapSec">
+<div class="row" style="justify-content:space-between"><h2>Where</h2><select id="metric" aria-label="Map measure"></select></div>
+<p class="sub">Neighborhoods shaded by the selected measure. Hover over a neighborhood for its numbers. Lakeview and Mid-City log more officer-started calls than almost anywhere else, mostly area checks and traffic stops.</p>
+<div class="legend" id="mapLeg"></div>
+<div class="map card" id="map" style="padding:6px"></div>
+<p class="note">Counts are totals, not per resident, so large or busy neighborhoods like the CBD and French Quarter rank high. NOPD withholds locations for medical and mental-health calls, so those types can't be mapped. About 15,000 calls have no location.</p>
+</section>
+
+<section>
+<h2>How long until an officer arrives, by police district</h2>
+<p class="sub">Calls from the public only. The blue dot is the median for emergency (priority 2) calls. The open circle marks the slowest 10%. The orange dot is the median for non-emergency (priority 1) calls. Hover over a row for details.</p>
+<div class="legend"><span><i style="background:var(--s1);border-radius:50%"></i>Emergency, median</span><span><i style="border:2px solid var(--s1);border-radius:50%;width:8px;height:8px"></i>Emergency, 90th percentile</span><span><i style="background:var(--s2);border-radius:50%"></i>Non-emergency, median</span></div>
+<div class="card"><div id="dist"></div></div>
+<p class="note">District 7 (New Orleans East) covers by far the most ground. One in ten emergency calls there waits more than an hour for an officer.</p>
+</section>
+
+<div class="foot">
+<h3>About this data</h3>
+<ul>
+<li>The Orleans Parish Communication District (911) publishes one row per incident. NOPD can reclassify a call's type for up to 36 hours.</li>
+<li>Calls "started by officers" are marked self-initiated in the data. Everything else counts as from the public, including alarms and calls from other agencies.</li>
+<li>Response times exclude calls with no recorded arrival and arrivals over 24 hours. Priority codes come from the data's priority field. NOPD treats priority 2 as emergency and priority 1 as non-emergency.</li>
+<li>We assigned neighborhoods and districts from each call's mapped point, using the City's Neighborhood Statistical Area boundaries.</li>
+<li>The 2014–2025 history comes from the City's separate yearly Calls for Service datasets. November 2026 is left off the trend chart because the month is incomplete.</li>
+</ul>
+</div>
+</div>
+<script>const DATA={{DATA}};</script>
+<script>{{LIB}}</script>
+<script>{{JS}}</script>
+</body></html>

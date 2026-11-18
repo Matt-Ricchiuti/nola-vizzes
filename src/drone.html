@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NOPD Drone Flights, 2026 · NOLA Open Data</title>
+<style>{{CSS}}</style>
+{{D3}}
+</head><body><div class="wrap">
+{{NAV}}
+<h1>NOPD drone flights in 2026: a long year of parades, then a sudden shift to daily dispatch flights</h1>
+<p class="dek">For most of the year, police drones mostly flew over big events. Since mid-October, new drones have been launching from fixed downtown sites several times a day to respond to 911 calls, in shorter, more frequent flights.</p>
+<div class="meta">Source: <a href="https://data.nola.gov/dataset/NOPD-Drone-Flights/ay9z-ynxz/about_data">NOPD Drone Flights</a>, data.nola.gov · 742 flights from Jan 1 to Nov 5, 2026 · Data pulled Nov 18, 2026</div>
+
+<div class="tiles" id="tiles"></div>
+
+<section>
+<h2>Flights per week, by purpose</h2>
+<p class="sub">Each bar is one week. Event spikes (Mardi Gras, French Quarter Fest, Essence) dominated until October, when dispatch flights took over. Hover over a bar for its breakdown.</p>
+<div class="legend" id="legend"></div>
+<div class="card"><div id="timeline"></div></div>
+<p class="note">More than a third of flights (268 of 742) have no purpose recorded. Where the free-text summary made the purpose clear, such as "photogrammetry for vehicle crash investigation," we assigned it (126 flights). The remaining 142 are shown in gray as "Not recorded."</p>
+</section>
+
+<section>
+<h2>Filter the rest of the page</h2>
+<div class="chips" id="catChips"></div>
+<div class="chips" id="perChips"></div>
+</section>
+
+<section>
+<div class="grid2">
+<div>
+<h2>Where they take off</h2>
+<p class="sub">Circles are launch points, sized by number of flights and colored by their most common purpose. Since October, two downtown spots account for most launches.</p>
+<div class="map card" id="map" style="padding:6px"></div>
+</div>
+<div>
+<h2>Purpose breakdown</h2>
+<p class="sub">Click a row to filter. Dispatch flights are short, about 7 minutes at the median. Event overwatch flights typically last about 20.</p>
+<div class="card"><table id="ptable"></table></div>
+<h2 style="margin-top:26px">Time of day</h2>
+<p class="sub">Takeoff hour, Central time.</p>
+<div class="card"><div id="hours"></div></div>
+</div>
+</div>
+</section>
+
+<section>
+<h2>The fleet</h2>
+<p class="sub">Each row is one drone and each tick is one flight. Five drones first appear on or after Oct 13, the same week the dispatch flights begin.</p>
+<div class="card"><div id="fleet"></div></div>
+</section>
+
+<div class="foot">
+<h3>About this data</h3>
+<ul>
+<li>NOPD publishes one row per flight. The dataset description links to NOPD's drone policy and Skydio's public flight dashboard.</li>
+<li>Takeoff times in the dataset appear to be in UTC. For example, the first "January 1" flights are logged at 6–7 a.m., which is just after midnight local time on New Year's. We converted all times to Central time.</li>
+<li>Purposes come from a free-text field with many spellings. We grouped them into the categories above, for example combining "Bourbon St barricade check" variants into "Barricade & patrol checks."</li>
+<li>Launch points are where the drone took off, not where it flew. Five flights have no location.</li>
+</ul>
+</div>
+</div>
+<script>const DATA={{DATA}};</script>
+<script>{{LIB}}</script>
+<script>{{JS}}</script>
+</body></html>
