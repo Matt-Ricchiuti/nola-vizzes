@@ -10,13 +10,14 @@
   for (let i = 0; i < N; i++) { wx[i] = D.x[i] * 1e-5 * COS; wy[i] = -D.y[i] * 1e-5; }
   const toW = (lon, lat) => [(lon - D.lon0) * COS, -(lat - D.lat0)];
 
-  // ---------- coverage: same rule as the other maps (neighborhoods under 100 residents per sq mi are left out) ----------
+  // ---------- coverage: every tree is counted; like the other maps, the opening view leaves out the marsh to the east
+  // (neighborhoods under 100 residents per sq mi), which you can still zoom out to or pick from the menu ----------
   NOLA.setGeo(DATA.geo);
   const normN = s => s.toUpperCase().replace(/[^A-Z0-9]/g, '');
   const geoSkip = new Map(NOLA.GEO.nb.map(f => [normN(f.n), f.skip]));
   const hoodSkip = D.hoods.map(h => { const k = normN(h.n); return geoSkip.get(k) ?? [...geoSkip].some(([g, sk]) => sk && g.startsWith(k)); });
   const valid = new Uint8Array(N);
-  for (let i = 0; i < N; i++) valid[i] = D.h[i] >= 0 && !hoodSkip[D.h[i]] ? 1 : 0;
+  for (let i = 0; i < N; i++) valid[i] = D.h[i] >= 0 ? 1 : 0;
 
   // ---------- species groups: top 9, stumps, everything else ----------
   const TOP_COLORS = ['#d9418c', '#3a9a5b', '#c46a28', '#c23a3a', '#178f8f', '#7a68d8', '#d4a017', '#7f9a2e', '#3f7fd6'];
@@ -45,12 +46,14 @@
       const r = poly[0].map(([lo, la]) => toW(lo, la)), a = Math.abs(d3.polygonArea(r));
       if (a > bestA) { bestA = a; const c = d3.polygonCentroid(r); best = { x: c[0], y: c[1], w: d3.max(r, q => q[0]) - d3.min(r, q => q[0]) }; }
     }
-    return { name: h.n, path: p, c: best, n: 0, sp: new Map(), sqmi: area * 69.05 * 69.05, bbox: [bx0, by0, bx1, by1], skip: hoodSkip[hi] };
+    return { name: NOLA.title(h.n), path: p, c: best, n: 0, sp: new Map(), sqmi: area * 69.05 * 69.05, bbox: [bx0, by0, bx1, by1], skip: hoodSkip[hi] };
   });
   for (let i = 0; i < N; i++) { if (!valid[i]) continue; const H = hoods[D.h[i]]; H.n++; H.sp.set(D.s[i], (H.sp.get(D.s[i]) || 0) + 1); }
   hoods.forEach(h => h.dens = h.sqmi > 0 ? h.n / h.sqmi : 0);
-  const densHi = d3.quantile(hoods.filter(h => !h.skip).map(h => h.dens).sort(d3.ascending), .95);
-  const hoodList = hoods.map((h, i) => [h, i]).filter(([h]) => !h.skip).sort((a, b) => a[0].name.localeCompare(b[0].name));
+  // trees per sq mi in seven equal-count classes (same scheme as the calls map)
+  const densQ = d3.scaleQuantile().domain(hoods.filter(h => h.n > 0).map(h => h.dens)).range(d3.range(7));
+  const densEdges = [d3.min(densQ.domain()), ...densQ.quantiles(), d3.max(densQ.domain())];
+  const hoodList = hoods.map((h, i) => [h, i]).filter(([h]) => h.n > 0).sort((a, b) => a[0].name.localeCompare(b[0].name));
   const shapePath = geoms => { const p = new Path2D(); for (const g of geoms) for (const part of g) for (const ring of part) { ring.forEach(([lo, la], k) => { const [x, y] = toW(lo, la); k ? p.lineTo(x, y) : p.moveTo(x, y); }); p.closePath(); } return p; };
   const landPath = shapePath(D.land), lakePath = shapePath(D.lakes), waterPath = shapePath(D.water);
 
@@ -77,7 +80,7 @@
   // where each tree grows: 0 along streets, 1 neutral ground, 2 park, 3 other green space
   const tset = new Uint8Array(N); for (let i = 0; i < N; i++) { const k = D.tg[i]; tset[i] = k < 0 ? 0 : GS[k].c === 0 ? 1 : GS[k].c === 1 ? 2 : 3; }
   const SETTINGS = [{ name: 'Along streets', sub: 'Easements and tree pits', sw: 'road-fwy' }, { name: 'Neutral grounds', sub: 'Mapped medians', sw: 't-park-line' },
-    { name: 'Parks', sub: 'Parks, squares, golf courses', sw: 't-park-line' }, { name: 'Other green space', sub: 'Cemeteries, nature areas, lots', sw: 't-cem' }];
+    { name: 'Parks', sub: 'Parks, squares, golf courses', sw: 't-park-ink' }, { name: 'Other green space', sub: 'Cemeteries, nature areas, lots', sw: 't-cem' }];
   const acres = g => g.a * 1e-10 * (111320 * COS) * 111320 / 4046.86;
 
   // ---------- street names (from the inventory's street export) and the shared City street map ----------
@@ -96,6 +99,9 @@
   // ---------- spatial grid for hover ----------
   const CELL = 0.0012; let gx0 = Infinity, gy0 = Infinity, gx1 = -Infinity, gy1 = -Infinity;
   for (let i = 0; i < N; i++) { if (!valid[i]) continue; if (wx[i] < gx0) gx0 = wx[i]; if (wx[i] > gx1) gx1 = wx[i]; if (wy[i] < gy0) gy0 = wy[i]; if (wy[i] > gy1) gy1 = wy[i]; }
+  // the opening view: trees outside the eastern marsh neighborhoods
+  const home = [Infinity, Infinity, -Infinity, -Infinity];
+  for (let i = 0; i < N; i++) { if (!valid[i] || hoodSkip[D.h[i]]) continue; home[0] = Math.min(home[0], wx[i]); home[1] = Math.min(home[1], wy[i]); home[2] = Math.max(home[2], wx[i]); home[3] = Math.max(home[3], wy[i]); }
   const GW = Math.ceil((gx1 - gx0) / CELL) + 1, GH = Math.ceil((gy1 - gy0) / CELL) + 1;
   const cellStart = new Uint32Array(GW * GH + 1), cellOf = new Uint32Array(N);
   for (let i = 0; i < N; i++) { const c = Math.max(0, Math.min(GW * GH - 1, Math.floor((wy[i] - gy0) / CELL) * GW + Math.floor((wx[i] - gx0) / CELL))); cellOf[i] = c; cellStart[c + 1]++; }
@@ -162,7 +168,7 @@
   function shadeSection(panel) {
     const sec = NOLA.fsec(panel, 'Neighborhood shading');
     NOLA.seg(sec, [[0, 'None'], [1, 'Trees per sq. mi.']], dens ? 1 : 0, v => { dens = !!v; refresh(); });
-    if (dens) { const l = document.createElement('div'); l.className = 'legend'; sec.appendChild(l); NOLA.seqLegend(l, [0, densHi], v => fmt(Math.round(v)), ''); }
+    if (dens) { const l = document.createElement('div'); l.className = 'legend'; sec.appendChild(l); NOLA.stepLegend(l, densEdges, NOLA.short); }
   }
 
   // ---------- canvas map ----------
@@ -173,7 +179,7 @@
     const L = insetL(), w = W - L - 2 * padPx, h = H - 2 * padPx, s = Math.min(w / (x1 - x0), h / (y1 - y0));
     view.s = s; view.tx = L + padPx + (w - (x1 - x0) * s) / 2 - x0 * s; view.ty = padPx + (h - (y1 - y0) * s) / 2 - y0 * s;
   }
-  function zoomToHood() { if (selNb < 0) fitBox([gx0, gy0, gx1, gy1], 16); else fitBox(hoods[selNb].bbox, 40); req(); }
+  function zoomToHood() { if (selNb < 0) fitBox(home, 16); else fitBox(hoods[selNb].bbox, 40); req(); }
   function resize() { DPR = Math.min(devicePixelRatio || 1, 2); W = cv.clientWidth; H = cv.clientHeight; cv.width = W * DPR; cv.height = H * DPR; }
   function readColors() {
     const cs = getComputedStyle(document.documentElement);
@@ -187,8 +193,8 @@
     ctx.setTransform(DPR * s, 0, 0, DPR * s, DPR * view.tx, DPR * view.ty);
     ctx.fillStyle = C['t-land']; ctx.fill(landPath, 'evenodd');
     ctx.fillStyle = C.water; ctx.fill(lakePath, 'evenodd');
-    if (dens) hoods.forEach(h => { if (h.skip) return; ctx.fillStyle = C['q' + (1 + Math.max(0, Math.min(6, Math.floor(h.dens / densHi * 7))))]; ctx.fill(h.path); });
-    else { ctx.fillStyle = C['t-hood']; hoods.forEach(h => { if (!h.skip) ctx.fill(h.path); }); }
+    if (dens) hoods.forEach(h => { ctx.fillStyle = h.n ? C['q' + (1 + densQ(h.dens))] : C['t-hood']; ctx.fill(h.path); });
+    else { ctx.fillStyle = C['t-hood']; hoods.forEach(h => ctx.fill(h.path)); }
     GCAT.forEach(c => { if (c.on && s >= c.minS) { ctx.fillStyle = C[c.fill]; ctx.fill(c.path); } });
     if (s > 6000) { ctx.strokeStyle = C['t-park-line']; ctx.lineWidth = 0.8 / s; GCAT.forEach((c, ci) => { if (c.on && s >= c.minS && ci !== 4) ctx.stroke(c.path); }); }
     ctx.fillStyle = C.water; ctx.fill(waterPath);
@@ -197,7 +203,7 @@
       ctx.strokeStyle = C.road; ctx.lineWidth = Math.max(0.4, base * Math.min(1, s / 12000)) / s; ctx.stroke(roadPaths[2]);
       ctx.strokeStyle = C['road-major']; ctx.lineWidth = Math.max(0.7, base * 1.6) / s; ctx.stroke(roadPaths[3]); ctx.stroke(roadPaths[1]);
       ctx.strokeStyle = C['road-fwy']; ctx.lineWidth = Math.max(1.2, base * 2.4) / s; ctx.stroke(roadPaths[0]); }
-    ctx.strokeStyle = C.landline; ctx.lineWidth = 1 / s; hoods.forEach(h => { if (!h.skip) ctx.stroke(h.path); });
+    ctx.strokeStyle = C.landline; ctx.lineWidth = 1 / s; hoods.forEach(h => ctx.stroke(h.path));
     if (hoverGS >= 0) { ctx.strokeStyle = C['t-park-ink']; ctx.lineWidth = 2 / s; ctx.stroke(GS[hoverGS].path); }
     // hover is an outline only, so streets and shading underneath stay visible
     if (hoverHood >= 0) { ctx.strokeStyle = C.ink; ctx.lineWidth = 1.5 / s; ctx.stroke(hoods[hoverHood].path); }
@@ -236,7 +242,7 @@
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
     if (s > 9000 && s < 90000) {
       ctx.font = `600 ${s > 30000 ? 12 : 11}px ${ff}`; ctx.lineWidth = 3; ctx.strokeStyle = C['t-hood']; ctx.fillStyle = C.muted;
-      hoods.forEach(h => { if (h.skip || !h.c || h.c.w * s < 70) return; const x = h.c.x * s + view.tx, y = h.c.y * s + view.ty; if (x < -50 || x > W + 50 || y < -20 || y > H + 20) return;
+      hoods.forEach(h => { if (!h.c || h.c.w * s < 70) return; const x = h.c.x * s + view.tx, y = h.c.y * s + view.ty; if (x < -50 || x > W + 50 || y < -20 || y > H + 20) return;
         const t = h.name.toUpperCase(), w = ctx.measureText(t).width, b = [x - w / 2 - pad, y - 9, x + w / 2 + pad, y + 9]; if (hit(...b)) return; add(...b);
         ctx.strokeText(t, x, y); ctx.fillText(t, x, y); });
     }
@@ -291,7 +297,7 @@
     let gh = -1;
     if (view.s > 6000) for (let k = 0; k < GS.length; k++) { const g = GS[k], c = GCAT[g.c]; if (!c.on || view.s < c.minS) continue;
       if (wxp < g.bb[0] || wxp > g.bb[2] || wyp < g.bb[1] || wyp > g.bb[3]) continue; if (ctx.isPointInPath(g.path, x, y)) { gh = k; break; } }
-    let hh = -1; for (let k = 0; k < hoods.length; k++) if (!hoods[k].skip && ctx.isPointInPath(hoods[k].path, x, y)) { hh = k; break; }
+    let hh = -1; for (let k = 0; k < hoods.length; k++) if (ctx.isPointInPath(hoods[k].path, x, y)) { hh = k; break; }
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     if (t !== hoverTree || hh !== hoverHood || gh !== hoverGS) { hoverTree = t; hoverHood = hh; hoverGS = gh; req(); }
     if (t >= 0) {
@@ -310,7 +316,7 @@
   // A click doesn't move the map; choosing from the Neighborhood menu zooms to it.
   function clickHood(x, y) {
     ctx.setTransform(view.s, 0, 0, view.s, view.tx, view.ty);
-    let hh = -1; for (let k = 0; k < hoods.length; k++) if (!hoods[k].skip && ctx.isPointInPath(hoods[k].path, x, y)) { hh = k; break; }
+    let hh = -1; for (let k = 0; k < hoods.length; k++) if (ctx.isPointInPath(hoods[k].path, x, y)) { hh = k; break; }
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     selNb = hh < 0 || hh === selNb ? -1 : hh;
     lastNb = selNb; // already where we want to be: no zoom
@@ -319,7 +325,7 @@
   function initMap(plot) {
     plot.innerHTML = '<canvas class="tmap" aria-label="Map of street trees in New Orleans, colored by species"></canvas><div class="scalebar"><span></span><i></i></div><div class="mapctl"></div>';
     cv = plot.querySelector('canvas'); ctx = cv.getContext('2d'); scaleEl = plot.querySelector('.scalebar');
-    const zoomAt = (f, x, y) => { const ns = Math.max(1500, Math.min(600000, view.s * f)); f = ns / view.s; view.tx = x - (x - view.tx) * f; view.ty = y - (y - view.ty) * f; view.s = ns; req(); };
+    const zoomAt = (f, x, y) => { const ns = Math.max(700, Math.min(600000, view.s * f)); f = ns / view.s; view.tx = x - (x - view.tx) * f; view.ty = y - (y - view.ty) * f; view.s = ns; req(); };
     const ctl = plot.querySelector('.mapctl');
     [['+', 'Zoom in', () => zoomAt(1.8, (insetL() + W) / 2, H / 2)], ['−', 'Zoom out', () => zoomAt(1 / 1.8, (insetL() + W) / 2, H / 2)], ['⤢', 'Reset view', () => zoomToHood()]].forEach(([t, l, fn]) => {
       const b = document.createElement('button'); b.type = 'button'; b.textContent = t; b.title = l; b.setAttribute('aria-label', l); b.onclick = fn; ctl.appendChild(b); });
@@ -360,14 +366,18 @@
   }
 
   // ---------- bar charts ----------
-  function hbars(el, items, { color = 'var(--s1)', label = 'Trees' } = {}) {
-    el.innerHTML = '';
+  function hbars(el, items, { color = 'var(--s1)', label = 'Trees', caption = '' } = {}) {
+    el.innerHTML = caption ? `<div class="legend" style="margin:0 0 6px">${esc(caption)}</div>` : '';
     const f = NOLA.frame(el, { h: 24 + items.length * 20, m: { t: 4, r: 56, b: 20, l: Math.min(230, el.clientWidth * 0.42) } });
     const x = d3.scaleLinear().domain([0, d3.max(items, d => d.v) || 1]).range([0, f.iw]);
     const y = d3.scaleBand().domain(items.map((d, i) => i)).range([0, f.ih]).paddingInner(.25);
     f.g.selectAll('rect.b').data(items).join('rect').attr('class', 'b').attr('x', 0).attr('y', (d, i) => y(i)).attr('width', d => Math.max(1, x(d.v))).attr('height', y.bandwidth()).attr('rx', 2).attr('fill', d => d.color || color);
     f.g.selectAll('text.l').data(items).join('text').attr('class', 'l').attr('x', -8).attr('y', (d, i) => y(i) + y.bandwidth() / 2 + 4).attr('text-anchor', 'end').style('fill', 'var(--ink2)')
-      .text(d => d.name.length > 34 ? d.name.slice(0, 33) + '…' : d.name);
+      .text(d => d.name)
+      .each(function () { // shorten names that don't fit the label margin (narrow screens)
+        const t = d3.select(this), full = t.text(); let n = full.length;
+        while (n > 4 && this.getComputedTextLength() > f.m.l - 10) t.text(full.slice(0, --n).trimEnd() + '…');
+      });
     f.g.selectAll('text.v').data(items).join('text').attr('class', 'v').attr('x', d => x(d.v) + 5).attr('y', (d, i) => y(i) + y.bandwidth() / 2 + 4).text(d => fmt(d.v));
     f.g.selectAll('rect.h').data(items).join('rect').attr('class', 'h').attr('x', -f.m.l).attr('y', (d, i) => y(i) - 2).attr('width', f.iw + f.m.l).attr('height', y.step()).attr('fill', 'transparent')
       .style('cursor', d => d.onClick ? 'pointer' : null)
@@ -392,7 +402,8 @@
       return { name: h.name, v, color: hi === selNb ? 'var(--ink)' : null, extra: (dens ? row('Trees', fmt(n)) : row('Per sq. mi.', fmt(Math.round(n / h.sqmi)))) + row('All trees here', fmt(h.n)),
         onClick: () => { selNb = hi; location.hash = 'map'; } }; }).filter(d => d.v > 0).sort((a, b) => b.v - a.v);
     const col = selSp >= 0 ? (spGroup[selSp] < 9 ? groups[spGroup[selSp]].color : TOP_COLORS[0]) : 'var(--s3)';
-    hbars(plot, items, { color: col, label: (selSp >= 0 ? D.species[selSp][0] : 'Trees') + (dens ? ' per sq. mi.' : '') });
+    const what = (selSp >= 0 ? D.species[selSp][0] : 'Trees') + (dens ? ' per sq. mi.' : '');
+    hbars(plot, items, { color: col, label: what, caption: what + (setF >= 0 ? ' · ' + SETTINGS[setF].name.toLowerCase() : '') });
   }
 
   // ---------- CSV downloads ----------

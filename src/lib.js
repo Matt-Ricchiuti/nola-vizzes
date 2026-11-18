@@ -35,9 +35,10 @@ const NOLA = (() => {
   const POP_NOTE = '<div class="legend popnote">Per 1,000 residents (2020 Census). Visitors, workers and highway traffic also generate calls, so rates run high where few people live, like the CBD and French Quarter. Neighborhoods under 1,000 residents are left out.</div>';
   // Total / Per 1,000 residents switch
   const basisChips = (el, onSel, sel = 'n') => chips(el, [{ label: 'Total', value: 'n' }, { label: 'Per 1,000 residents', value: 'pc' }], onSel, { sel });
-  // ---------- neighborhoods with dependable data ----------
-  // Neighborhoods that are mostly uninhabited marsh (under 100 residents per square mile) have too little data
-  // in any dataset to map, so maps leave them out and open on the rest of the city.
+  // ---------- the opening view ----------
+  // Every neighborhood is mapped and counted. Maps open on the populated city, leaving out the mostly
+  // uninhabited marsh to the east (under 100 residents per square mile: Lake Catherine, Viavant–Venetian Isles),
+  // which would otherwise shrink everything else. Zoom out or pick one from the menu to see it.
   const MIN_DENSITY = 100;
   const SQMI = 400 / 2589988; // one map unit is about 20 m
   let FULL = [-70, 130, 2110, 1730];
@@ -54,8 +55,8 @@ const NOLA = (() => {
     const kept = GEO.nb.filter(f => !f.skip).map(f => f.bbox);
     FULL = pad([d3.min(kept, b => b[0]), d3.min(kept, b => b[1]), d3.max(kept, b => b[2]), d3.max(kept, b => b[3])], 0.03);
   }
-  const shown = i => i >= 0 && !GEO.nb[i].skip; // a record in neighborhood i appears on maps
-  const nbList = () => GEO.nb.filter(f => !f.skip).slice().sort((a, b) => a.name.localeCompare(b.name));
+  const shown = i => i >= 0; // a record in neighborhood i appears on maps
+  const nbList = () => GEO.nb.slice().sort((a, b) => a.name.localeCompare(b.name));
   // neighborhood picker: <select> with "All neighborhoods" (-1) and every mapped neighborhood
   function nbSelect(el, onSel, sel = -1, label = 'All neighborhoods') {
     el.innerHTML = `<option value="-1">${label}</option>` + nbList().map(f => `<option value="${f.idx}">${f.name}</option>`).join('');
@@ -74,7 +75,7 @@ const NOLA = (() => {
     const svg = d3.select(el).append('svg').attr('viewBox', `0 0 ${W} ${H}`).attr('role', 'img').attr('aria-label', o.label || 'Map of New Orleans');
     const root = svg.append('g');
     const base = root.append('g');
-    const nbs = GEO.nb.filter(f => !f.skip);
+    const nbs = GEO.nb;
     const nbSel = base.selectAll('path').data(nbs).join('path').attr('class', 'nbpath' + (o.tip ? ' hot' : '')).attr('d', f => f.d);
     // street base map (City centerlines, in streets.js), clipped to the mapped neighborhoods; local streets fade in as you zoom
     const ST = window.STREETS;
@@ -134,7 +135,8 @@ const NOLA = (() => {
       scaleEl.lastChild.style.width = (m * pxPerMile).toFixed(0) + 'px';
       scaleEl.firstChild.textContent = m < 1 ? (m * 5280 >= 1000 ? m + ' mi' : Math.round(m * 5280) + ' ft') : m + ' mi';
     }
-    const zoom = d3.zoom().scaleExtent([0.6, 40]).on('zoom', ev => {
+    // the opening view is about k = 0.45; allow zooming out far enough to see the whole parish, east marsh included
+    const zoom = d3.zoom().scaleExtent([0.25, 40]).on('zoom', ev => {
       root.attr('transform', ev.transform); k = ev.transform.k; streetZoom(k); drawScale();
       stLabG.selectAll('text').style('font-size', d => (d.fs / k) + 'px').style('stroke-width', (3 / k) + 'px');
       listeners.forEach(f => f(k)); clearTimeout(lt); lt = setTimeout(layoutLabels, 90);
@@ -172,13 +174,14 @@ const NOLA = (() => {
 
   // ---------- filters on the chart ----------
   // stage(el, { map }) turns a view's pane into a filter panel + plot area. On maps the panel floats over the map.
-  function stage(el, { map: isMap = false } = {}) {
+  function stage(el, { map: isMap = false, open = false } = {}) {
     el.classList.add('stage', isMap ? 'mapstage' : 'chartstage');
     el.innerHTML = '<div class="fpanel"></div><div class="plot"></div>';
     const panel = el.firstChild;
     if (isMap) { // on phones the map's filters fold away behind a button, so the map shows first
       const b = document.createElement('button'); b.type = 'button'; b.className = 'btn ftoggle'; b.textContent = 'Filters';
-      panel.classList.add('collapsed'); b.onclick = () => { panel.classList.toggle('collapsed'); b.textContent = panel.classList.contains('collapsed') ? 'Filters' : 'Hide filters'; };
+      if (open) b.textContent = 'Hide filters'; else panel.classList.add('collapsed');
+      b.onclick = () => { panel.classList.toggle('collapsed'); b.textContent = panel.classList.contains('collapsed') ? 'Filters' : 'Hide filters'; };
       el.insertBefore(b, panel);
     }
     return { panel, plot: el.lastChild };
@@ -224,13 +227,28 @@ const NOLA = (() => {
   // sequential color for a value in [0,1]
   const SEQ = ['--q1', '--q2', '--q3', '--q4', '--q5', '--q6', '--q7'];
   const seqVar = t => `var(${SEQ[Math.max(0, Math.min(6, Math.floor(t * 7)))]})`;
-  function seqLegend(el, breaks, fmtf, label) {
-    el.innerHTML = `<span>${label}</span>` + SEQ.map((s, i) => `<span><i style="background:var(${s})"></i>${i === 0 ? fmtf(breaks[0]) : i === 6 ? fmtf(breaks[1]) + '+' : ''}</span>`).join('');
+  // breaks = [low, high]; the top swatch gets a "+" only when values run past `high` (open = true)
+  function seqLegend(el, breaks, fmtf, label, open = true) {
+    el.innerHTML = `<span>${label}</span>` + SEQ.map((s, i) => `<span><i style="background:var(${s})"></i>${i === 0 ? fmtf(breaks[0]) : i === 6 ? fmtf(breaks[1]) + (open ? '+' : '') : ''}</span>`).join('');
   }
+  // Seven equal-count classes, so each color holds about the same number of areas and differences across most of
+  // the city stay visible even when a few places are far above the rest. classes(values) -> { color(v), edges }
+  function classes(vals) {
+    const v = vals.filter(x => x != null && isFinite(x)).sort(d3.ascending);
+    const q = d3.scaleQuantile().domain(v).range(d3.range(7));
+    return { color: x => x == null ? 'var(--none)' : `var(${SEQ[q(x)]})`, edges: [v[0], ...q.quantiles(), v[v.length - 1]] };
+  }
+  // legend for classes(): a stepped bar with the value where each color starts, and a swatch for areas with no value
+  function stepLegend(el, edges, fmtf, none) {
+    el.innerHTML = '<div class="steps">' + SEQ.map((s, i) => `<span><i style="background:var(${s})"></i><em>${fmtf(edges[i])}</em></span>`).join('')
+      + `<span class="end"><em>${fmtf(edges[7])}</em></span></div>` + (none ? `<span class="nonekey"><i style="background:var(--none)"></i>${none}</span>` : '');
+  }
+  // compact numbers for legends: 950, 1.3k, 12k
+  const short = v => v >= 1000 ? d3.format('.2~s')(v).replace('G', 'B') : fmtRate(v);
 
   // ---------- small chart helpers ----------
   function frame(el, { h = 260, m = { t: 12, r: 16, b: 28, l: 44 } } = {}) {
-    const W = el.clientWidth || 600;
+    const W = Math.max(320, el.clientWidth || 600); // never narrower than a phone, even if drawn while hidden
     const svg = d3.select(el).append('svg').attr('viewBox', `0 0 ${W} ${h}`);
     return { svg, W, H: h, m, iw: W - m.l - m.r, ih: h - m.t - m.b, g: svg.append('g').attr('transform', `translate(${m.l},${m.t})`) };
   }
@@ -260,6 +278,12 @@ const NOLA = (() => {
   const doyISO = (d, y = YEAR) => doyTime(d, y).toISOString().slice(0, 10);
   // first doy of each month (only months that start on or before `last`, if given)
   const monthStarts = (y = YEAR, last = 400) => d3.range(12).map(m => (Date.UTC(y, m, 1) - Date.UTC(y, 0, 1)) / 864e5).filter(d => d <= last);
+  // month labels for a time axis: every month when there's room, every other month on narrow charts,
+  // and never one that would run off the right edge. starts: first doy of each month; x: doy -> px
+  const monthTicks = (starts, x, iw) => {
+    const step = iw / Math.max(1, starts.length) < 34 ? 2 : 1;
+    return starts.map((d, i) => ({ x: x(d), label: months[i], i })).filter(t => t.i % step === 0 && t.x + 22 <= iw);
+  };
   // 'YYYY-MM-DD' -> 'Nov 18, 2026'
   const isoDate = s => { const [y, m, d] = s.slice(0, 10).split('-').map(Number); return `${months[m - 1]} ${d}, ${y}`; };
   // plain-language share: .33 -> 'about a third'
@@ -313,7 +337,14 @@ const NOLA = (() => {
       tip.hide(); draw();
     }
     sel.onchange = () => show(sel.value);
-    addEventListener('hashchange', () => show(hashState().view));
+    // a link with filters opened on this same page (only the hash changes) reloads, so its filters apply;
+    // the pages' own jumps between views set a bare view id and keep the current filters
+    addEventListener('hashchange', () => {
+      const h = hashState(), st = opts.state ? opts.state() : {};
+      const want = Object.entries(h).filter(([k]) => k !== 'view'), have = Object.entries(st).filter(([, v]) => v != null && v !== '');
+      if (want.length && (want.length !== have.length || want.some(([k, v]) => String(st[k]) !== v))) return location.reload();
+      show(h.view);
+    });
     let rt; addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => { if (!cur.keep) draw(); }, 150); });
     linkB.onclick = async () => {
       try { await navigator.clipboard.writeText(location.href); linkB.textContent = 'Link copied'; }
@@ -335,6 +366,6 @@ const NOLA = (() => {
   }
   const legendHTML = items => '<div class="legend">' + items.map(([c, l, round]) => `<span><i style="background:${c}${round ? ';border-radius:50%' : ''}"></i>${l}</span>`).join('') + '</div>';
 
-  return { css, S, fmt, pct, tip, row, setGeo, views, hashState, legendHTML, stage, fsec, flist, seg, nbPick, phoneToggle, popOf, perK, fmtRate, POP_NOTE, basisChips, shown, nbList, nbSelect, lonlat, get FULL() { return FULL; }, get GEO() { return GEO; }, map, mapButtons, seqVar, seqLegend, frame, yGrid, chips, months, monthsLong,
-    setYear, get YEAR() { return YEAR; }, doyTime, doyDate, doyISO, doyMonth, monthStarts, isoDate, share, numWord, cap, setText, setHTML, title };
+  return { css, S, fmt, pct, tip, row, setGeo, views, hashState, legendHTML, stage, fsec, flist, seg, nbPick, phoneToggle, popOf, perK, fmtRate, POP_NOTE, basisChips, shown, nbList, nbSelect, lonlat, get FULL() { return FULL; }, get GEO() { return GEO; }, map, mapButtons, seqVar, seqLegend, classes, stepLegend, short, frame, yGrid, chips, months, monthsLong,
+    setYear, get YEAR() { return YEAR; }, monthTicks, doyTime, doyDate, doyISO, doyMonth, monthStarts, isoDate, share, numWord, cap, setText, setHTML, title };
 })();

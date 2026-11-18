@@ -77,7 +77,7 @@
       const pk = d3.range(Math.max(0, fat - 6), fat + 1).reduce((a, b) => C.daily[b][0] > C.daily[a][0] ? b : a);
       f.g.append('text').attr('class', 'halo').attr('x', x(pk) + 6).attr('y', y(C.daily[pk][0]) + 4).style('fill', 'var(--ink2)').text('Mardi Gras');
     }
-    f.g.append('g').selectAll('text').data(mStarts).join('text').attr('x', d => x(d)).attr('y', f.ih + 18).text((d, i) => NOLA.months[i]);
+    f.g.append('g').selectAll('text').data(NOLA.monthTicks(mStarts, x, f.iw)).join('text').attr('x', d => d.x).attr('y', f.ih + 18).text(d => d.label);
     f.g.append('line').attr('x1', 0).attr('x2', f.iw).attr('y1', f.ih).attr('y2', f.ih).attr('stroke', 'var(--axis)');
     crosshair(f, x, n, i => `<b>${NOLA.doyDate(i)}</b>` + row('From the public', fmt(C.daily[i][0])) + row('Started by officers', fmt(C.daily[i][1])) + (r0[i] ? row('7-day avg, public', Math.round(r0[i])) : ''));
   }
@@ -97,12 +97,12 @@
     }));
     order.forEach(d => f.g.append('text').attr('x', -6).attr('y', y(d) + y.bandwidth() / 2 + 4).attr('text-anchor', 'end').text(names[d]));
     [0, 6, 12, 18].forEach(h => f.g.append('text').attr('x', x(h)).attr('y', f.ih + 16).text(hl(h)));
-    NOLA.seqLegend(leg, [mn, mx], v => fmt(v), '');
+    NOLA.seqLegend(leg, [mn, mx], v => fmt(v), '', false);
   }
 
   // ---------- call types table ----------
   let sortK = 1, sortDir = -1;
-  const cols = [['Call type', r => r.name, 0], ['Calls', r => r.n, 1], ['Started by officers', r => r.selfP, 1], ['Median arrival', r => r.med, 1], ['Gone on arrival', r => r.goaP, 1], ['Report filed', r => r.rtfP, 1]];
+  const cols = [['Call type', r => r.name, 0], ['Calls', r => r.n, 1], ['Started by officers', r => r.selfP, 1], ['Median arrival, public calls', r => r.med, 1], ['Gone on arrival', r => r.goaP, 1], ['Report filed', r => r.rtfP, 1]];
   const rows = C.TOP.map((t, k) => { const v = C.types[k]; return { k, name: tcase(t), n: v[0], selfP: v[1] / v[0], med: v[2], goaP: v[4] / v[0], rtfP: v[5] / v[0] }; });
   function drawTypes(pane, first) {
     const { panel, plot } = staged(pane, first); const el = plot; panel.innerHTML = '';
@@ -140,7 +140,7 @@
     ts.innerHTML = '<option value="">Or one call type…</option>' + C.TOP.map((t, k) => unmappable(k) ? '' : `<option value="t${k}">${tcase(t)}</option>`).join('');
     ts.value = st.metric.startsWith('t') ? st.metric : ''; ts.onchange = () => { st.metric = ts.value || 'res'; V.refresh(); }; ms.appendChild(ts);
     if (!isTime()) NOLA.seg(NOLA.fsec(panel, 'Count'), [['n', 'Total'], ['pc', 'Per 1,000 residents']], st.basis, v => { st.basis = v; V.refresh(); });
-    const ls = NOLA.fsec(panel, 'Legend'), leg = document.createElement('div'); leg.className = 'legend'; ls.appendChild(leg);
+    const ls = NOLA.fsec(panel, isTime() ? 'Legend · minutes' : 'Legend'), leg = document.createElement('div'); leg.className = 'legend'; ls.appendChild(leg);
     if (perRes()) ls.insertAdjacentHTML('beforeend', NOLA.POP_NOTE);
     return leg;
   }
@@ -153,13 +153,19 @@
           const pop = NOLA.popOf(i), rate = NOLA.perK(r[0], pop);
           return `<b>${NOLA.GEO.nb[i].name}</b>` + (st.metric.startsWith('t') ? row(metricLabel(), perRes() ? NOLA.fmtRate(metricVal(i)) : fmt(rawVal(i))) : '') + row('Calls from the public', fmt(r[0])) + row('Started by officers', fmt(r[1]))
             + row('Residents (2020)', pop == null ? '—' : fmt(pop)) + (rate != null ? row('Public calls per 1,000 residents', NOLA.fmtRate(rate)) : '')
-            + row('Median arrival, emergency', r[4] >= 30 ? r[2] + ' min' : 'too few calls') + row('Median arrival, non-emergency', r[3] == null ? '—' : Math.round(r[3]) + ' min'); } });
+            + row('Median arrival, emergency', r[4] >= 30 ? r[2] + ' min' : 'too few calls') + row('Median arrival, non-emergency', r[3] == null ? '—' : r[3] + ' min'); } });
       m.lastNb = -1;
     }
-    const vals = nb.map((r, i) => metricVal(i)).filter(v => v != null).sort(d3.ascending);
-    const lo = isTime() ? d3.quantile(vals, .05) : 0, hi = d3.quantile(vals, .95);
-    m.setFill(i => { const v = metricVal(i); return v == null ? 'var(--none)' : NOLA.seqVar((v - lo) / (hi - lo)); });
-    NOLA.seqLegend(leg, [lo, hi], v => isTime() ? Math.round(v) + ' min' : perRes() ? NOLA.fmtRate(v) : fmt(Math.round(v)), '');
+    // seven equal-count classes: each shade holds about ten neighborhoods
+    const cl = NOLA.classes(nb.map((r, i) => metricVal(i)));
+    m.setFill(i => cl.color(metricVal(i)));
+    const none = nb.some((r, i) => metricVal(i) == null) ? (perRes() ? 'Under 1,000 residents' : isTime() ? 'Too few calls' : 'No data') : null;
+    const lf = v => isTime() ? v.toFixed(1) : NOLA.short(v);
+    NOLA.stepLegend(leg, cl.edges, lf, none);
+    // on phones the panel folds away, so the map carries its own copy of the legend
+    if (first) plot.insertAdjacentHTML('beforeend', '<div class="maplegend"></div>');
+    NOLA.stepLegend(plot.querySelector('.maplegend'), cl.edges, lf, none);
+    plot.querySelector('.maplegend').insertAdjacentHTML('afterbegin', `<div class="mlh">${metricLabel()}${isTime() ? ' (min)' : ''}</div>`);
     if (m.lastNb !== st.nb) { m.focus(st.nb, first ? 0 : 450); m.lastNb = st.nb; }
   }
 
@@ -177,9 +183,10 @@
       const cy = y(d[0]) + y.bandwidth() / 2;
       f.g.append('text').attr('x', -8).attr('y', cy + 4).attr('text-anchor', 'end').style('fill', 'var(--ink2)').text(`District ${d[0]}`);
       f.g.append('line').attr('x1', x(d[3])).attr('x2', x(d[4])).attr('y1', cy).attr('y2', cy).attr('stroke', 'var(--s1)').attr('stroke-width', 2).attr('opacity', .5);
-      f.g.append('circle').attr('cx', x(d[4])).attr('cy', cy).attr('r', 5).attr('fill', 'var(--surface)').attr('stroke', 'var(--s1)').attr('stroke-width', 2);
       f.g.append('circle').attr('cx', x(d[5])).attr('cy', cy).attr('r', 5).attr('fill', 'var(--s2)').attr('stroke', 'var(--surface)').attr('stroke-width', 2);
       f.g.append('circle').attr('cx', x(d[3])).attr('cy', cy).attr('r', 6).attr('fill', 'var(--s1)').attr('stroke', 'var(--surface)').attr('stroke-width', 2);
+      // the slowest-10% ring goes on top, hollow, so it stays visible when it lands on another marker
+      f.g.append('circle').attr('cx', x(d[4])).attr('cy', cy).attr('r', 6.5).attr('fill', 'none').attr('stroke', 'var(--s1)').attr('stroke-width', 2);
       f.g.append('rect').attr('width', f.iw).attr('y', y(d[0]) - 4).attr('height', y.bandwidth() + 8).attr('fill', 'transparent')
         .on('mousemove', ev => tip.show(`<b>NOPD District ${d[0]}</b>` + row('Calls from the public', fmt(d[1])) + row('Started by officers', fmt(d[2])) + row('Emergency: median arrival', d[3] + ' min') + row('Emergency: 1 in 10 waits over', Math.round(d[4]) + ' min') + row('Non-emergency: median', Math.round(d[5]) + ' min'), ev)).on('mouseleave', tip.hide);
     });
@@ -190,7 +197,7 @@
   const csvTrend = () => { const o = []; Object.keys(HIST).sort().forEach(y => HIST[y].forEach((v, m) => { if (!(+y === YEAR && m >= cutMonth)) o.push({ month: `${y}-${String(m + 1).padStart(2, '0')}`, from_public: v[0], started_by_officers: v[1] }); })); return o; };
   const csvDaily = () => C.daily.map((d, i) => ({ date: NOLA.doyISO(i), from_public: d[0], started_by_officers: d[1] }));
   const csvHeat = () => { const names = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'], o = []; C.heat.forEach((r, d) => r.forEach((v, h) => o.push({ weekday: names[d], hour: hrsLab(h), calls_from_public: v }))); return o; };
-  const csvTypes = () => rows.map(r => ({ call_type: r.name, calls: r.n, pct_started_by_officers: Math.round(100 * r.selfP), median_arrival_minutes: r.med == null ? '' : r.med, pct_gone_on_arrival: Math.round(100 * r.goaP), pct_report_filed: Math.round(100 * r.rtfP) }));
+  const csvTypes = () => rows.map(r => ({ call_type: r.name, calls: r.n, pct_started_by_officers: Math.round(100 * r.selfP), median_arrival_public_calls_min: r.med == null ? '' : r.med, pct_gone_on_arrival: Math.round(100 * r.goaP), pct_report_filed: Math.round(100 * r.rtfP) }));
   const csvMap = () => NOLA.nbList().map(f => { const r = nb[f.idx], pop = NOLA.popOf(f.idx);
     return Object.assign({ neighborhood: f.name, residents_2020: pop, from_public: r[0], started_by_officers: r[1], public_per_1000_residents: NOLA.perK(r[0], pop) == null ? '' : +NOLA.perK(r[0], pop).toFixed(1),
       median_arrival_emergency_min: r[4] >= 30 ? r[2] : '', median_arrival_nonemergency_min: r[3] == null ? '' : r[3] }, ...C.TOP.map((t, k) => unmappable(k) ? {} : { [tcase(t)]: r[5][k] })); });

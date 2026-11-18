@@ -140,6 +140,17 @@ tbody tr:hover td{background:var(--chip)}
 .ftoggle{display:none}
 .stlab{font-weight:500;pointer-events:none;paint-order:stroke;stroke:var(--surface);stroke-linejoin:round}
 .stlab.major{font-weight:650}
+/* stepped legend for equal-count classes (NOLA.stepLegend): the value under each boundary is where that color starts */
+.legend .steps{flex:1 1 100%;display:flex;max-width:290px;padding:0 14px 0 0}
+.legend .steps span,.steps span{flex:1;display:flex;flex-direction:column;align-items:stretch;gap:3px;min-width:0}
+.steps i{width:auto!important;height:10px;border-radius:0!important}
+.steps span:first-child i{border-radius:3px 0 0 3px!important}
+.steps span:nth-child(7) i{border-radius:0 3px 3px 0!important}
+.steps em{align-self:flex-start;font-style:normal;font-size:10.5px;color:var(--ink2);white-space:nowrap;font-variant-numeric:tabular-nums;transform:translateX(-50%)}
+.steps span:first-child em{transform:none}
+.steps .end{flex:0 0 0;padding-top:13px}
+.nonekey{font-size:11.5px}
+.maplegend{display:none}
 @media(max-width:760px){
   .stage.chartstage{grid-template-columns:1fr}
   .stage.chartstage>.fpanel{position:static}
@@ -147,6 +158,11 @@ tbody tr:hover td{background:var(--chip)}
   .stage.mapstage>.fpanel{position:static;width:auto;max-height:none;box-shadow:none;margin-bottom:10px}
   .stage.mapstage .plot{position:relative;height:min(560px,70vh);border:1px solid var(--ring);border-radius:12px;overflow:hidden;background:var(--surface)}
   .ftoggle{display:block;margin-bottom:8px}
+  .maplegend{display:block;position:absolute;left:10px;bottom:10px;width:min(250px,calc(100% - 100px));background:var(--surface);border:1px solid var(--ring);border-radius:8px;padding:6px 8px 4px;z-index:2;font-size:11px;color:var(--ink2)}
+  .maplegend .steps{display:flex;padding-right:12px}
+  .maplegend .nonekey{display:flex;align-items:center;gap:5px;margin-top:3px}
+  .maplegend .nonekey i{width:10px;height:10px;border-radius:3px;display:inline-block}
+  .mlh{margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .fpanel.collapsed{display:none}
   .viewsel{font-size:16px;width:100%}
 }

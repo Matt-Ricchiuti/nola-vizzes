@@ -1,12 +1,41 @@
 # Data reference: how each `data/*.json` file was produced
 
-The first snapshot in `data/` was pulled on **2026-11-18** with JavaScript in a browser. `pipeline/fetch.py` now reproduces it: run against that day's data it matches `geo`, `hist`, `drone` and `cfs` exactly and `cpc` apart from hearings scheduled since. GitHub Actions runs it every morning (`.github/workflows/daily.yml`). It also adds a few fields the pages use: `drone.year`, `cfs.year`, `cfs.ds`, `cpc.windowStart`, `cpc.total`, `cpc.firstFiled`, `cpc.lastFiled`, and `data/meta.json` (`pulled` date).
+The first snapshot in `data/` was pulled on **2026-11-18** with JavaScript in a browser. `pipeline/fetch.py` now reproduces it: run against that day's data it matches `geo`, `hist`, `drone` and `cfs` exactly and `cpc` apart from hearings scheduled since. GitHub Actions runs it every morning (`.github/workflows/daily.yml`). It also adds a few fields the pages use: `drone.year`, `cfs.year`, `cfs.ds`, `cpc.windowStart`, `cpc.total`, `cpc.firstFiled`, `cpc.lastFiled`, and `data/sources.json` (see below; it replaced `data/meta.json`).
 
 The front-end expects exactly the shapes documented below. If you change a shape, change the matching `src/*.js`.
 
 API basics: `https://data.nola.gov/resource/<id>.json?$select=...&$where=...&$group=...&$limit=...` (SoQL). CSV is also available at `/resource/<id>.csv`. Metadata is at `/api/views/<id>.json`. A free Socrata app token (header `X-App-Token`) avoids throttling. Store it as a GitHub Actions secret.
 
 ---
+
+## The daily refresh: what gets downloaded and committed
+
+The workflow runs at 10:30 UTC. The City loads CPC Projects at about 06:00 UTC, Calls for Service at about 09:00 UTC (3 a.m. Central), and drone flights in occasional batches. `fetch.py` reads each dataset's metadata (`/api/views/<id>.json`, which it needs anyway to check the schema) and rebuilds a data file only when one of its inputs changed:
+
+| File | Rebuilt when | Notes |
+|---|---|---|
+| `geo.json` | every run, from cached downloads | Boundaries (`7fw3-kdpf`, `evki-aju8`) and population (`2w4d-xaw2`) are kept in `.cache/raw/` under their `rowsUpdatedAt`, so they are downloaded again only when the City changes them. Features are kept in the order of the last good `geo.json`, because every `nb`/`pd` index (including the hand-built `trees.json`) points into it. |
+| `streets.json` | the centerline's segment count or newest `lastupdate` changed | The centerline is re-synced from the City's GIS often without edits, so its `rowsUpdatedAt` isn't used. |
+| `drone.json` | `ay9z-ynxz`'s `rowsUpdatedAt`, `geo.json` or the calendar year changed | |
+| `cfs.json` | the current year's dataset id or `rowsUpdatedAt`, or `geo.json`, changed | |
+| `hist.json` | with `cfs.json` (current year); a past year when its dataset's `rowsUpdatedAt` moved | Past years are checked daily for last year in January–February, and all years on the 1st of the month. The City loads each year's final rows on January 1. |
+| `cpc.json` | `xxb5-5azv`'s `rowsUpdatedAt` or `geo.json` changed | "Today" for upcoming hearings and the 365-day window is the day the City loaded the data. |
+
+On the 1st of every month (and with `--full`, or the workflow's "full" checkbox) everything is downloaded and rebuilt regardless. Queries are ordered (`:id` as the tie-breaker), so the same City data always produces byte-identical files. Rebuilt files are written only when their content changed, and pages embed only the date their own data last changed, so a day without new City data changes nothing and the workflow commits and deploys nothing.
+
+`data/sources.json` is the pipeline's memory, rewritten only along with a data change:
+
+```
+{ "files": { "cfs.json": {"key": "<inputs it was built from>", "changed": "2026-11-18"}, ... },
+  "histVersions": { "2026": "<rowsUpdatedAt when hist.json last counted that year>", ... },
+  "cfsIds": { "2027": "<id found in the catalog>" } }        # years not in CFS_IDS, so the catalog is searched once
+```
+
+`build.py` shows each data page's "Updated" date as the latest `changed` of that page's files (and `geo.json`), and passes it to the page as `DATA.meta.pulled`. The About page shows the latest date of any page.
+
+**When something fails.** A file that fails to fetch or validate keeps its last good version, and the other files still refresh and publish. The run then ends failed (the `report` job), so GitHub emails the owner. If the boundaries fail, nothing is published. Datasets that stop updating (no calls for 7 days, no flights for 45, no filings for 30) show as warnings on the run.
+
+**The schedule.** GitHub switches off scheduled workflows after 60 days without commits. If 45 days pass without a commit, the workflow re-enables itself through the API.
 
 ## Shared: coordinates and neighborhoods (`data/geo.json`)
 
@@ -30,6 +59,8 @@ geo.json = { "nb": [ {"n": NAME, "r": [ring, ...]}, ...72 ],   # order = feature
 ```
 
 **Population.** `pop` is `sum_pop100` from "Neighborhood Statistical Areas Demographics 2020" (`2w4d-xaw2`), matched on `gnocdc_lab` (two spellings differ; see `POP_ALIAS` in `fetch.py`). It's used only for the calls-for-service map's "Per 1,000 residents" option. Planning cases and street trees aren't shown per resident: cases follow parcels and trees follow streets, so population is the wrong denominator for them. Neighborhoods under 1,000 residents get no rate.
+
+**Opening view.** Every neighborhood is drawn, counted and listed in the pickers. `NOLA.setGeo` marks neighborhoods under 100 residents per square mile (`f.skip`: Lake Catherine, Viavant–Venetian Isles) only so maps *open* on the rest of the city; they're one zoom-out or menu pick away. Shaded maps use seven equal-count classes (`NOLA.classes`, legend `NOLA.stepLegend`).
 
 **Neighborhood index.** Every `nb` index in the other files is a position in this array. It's assigned by point-in-polygon against the **unsimplified** API geometry in lon/lat, with a bbox prefilter. Use -1 when the point is outside every polygon. **geo.json and the other files must be regenerated together** so the indices stay aligned.
 
@@ -61,7 +92,7 @@ Fetch every row (742 as of the pull): `$select=serial,longitude,latitude,takeoff
   "recs": [[doy, hourUTC, durSec, cat, droneIdx, nbIdx, x, y, eventCode, inferredFlag], ...] }
 ```
 
-- `doy` is days since 2026-01-01 using the timestamp **as given**. `hourUTC` is hour plus minute/60, rounded to 0.1. The timestamps look like UTC, and the front end converts them to Central time (CDT from 2026-03-08 08:00 UTC to 2026-11-01 07:00 UTC). **When the year rolls over, update the hard-coded 2026 dates and DST dates in `src/drone.js` and `src/lib.js` (`doyDate`).**
+- `doy` is days since 2026-01-01 using the timestamp **as given**. `hourUTC` is hour plus minute/60, rounded to 4 decimals (to the minute, so a 10:58 takeoff stays in the 10 o'clock hour). The timestamps look like UTC, and the front end converts them to Central time (CDT from 2026-03-08 08:00 UTC to 2026-11-01 07:00 UTC). **When the year rolls over, update the hard-coded 2026 dates and DST dates in `src/drone.js` and `src/lib.js` (`doyDate`).**
 - When a flight has no lon/lat, store x = y = 0 and nb = -1.
 - `cat`: classify `deployment_purpose`. When that's blank, classify `activity_summary`. A blank purpose with an informative summary counts as inferred (`inferredFlag` = 1). A blank purpose whose summary is also blank or doesn't match a rule gets cat 8 ("not recorded"). Rules are case-insensitive, checked in this order:
   - 6 barricade/patrol: `barricade|bourbon`
@@ -111,13 +142,13 @@ Yearly dataset ids: 2014 `jsyu-nz5r`, 2015 `w68y-xmk6`, 2016 `wgrp-d3ma`, 2017 `
 - **Calendar-date years**: `$select=date_trunc_ym(timecreate) as m,selfinitiated,count(*) as n&$group=m,selfinitiated`
 - **Text-time years (2025, 2026)**: run one query per month: `$where=timecreate>='YYYY-MM-01' AND timecreate<'next month'&$group=selfinitiated`
 
-Past years never change. The daily job only recomputes the current year (from the rows it already fetched for `cfs.json`) and refetches last year during January and February. `src/cfs.js` leaves the current month off the trend chart until the data reaches the month's last day.
+Past years are closed. The daily job recomputes the current year from the rows it already fetched for `cfs.json`, and recounts a past year only when its dataset's `rowsUpdatedAt` moved (see "The daily refresh" above). `src/cfs.js` leaves the current month off the trend chart until the data reaches the month's last day.
 
 **New year:** the City publishes a new dataset id each January ("Calls for Service 2027"). `fetch.py` looks it up in `/api/catalog/v1?domains=data.nola.gov&q=calls%20for%20service%20YYYY` by exact name. Until it exists (or while it's empty) the page keeps showing last year. If it still isn't found by March the job fails: add the id to `CFS_IDS` in `fetch.py`.
 
 ## `data/cpc.json`: CPC Projects (`xxb5-5azv`)
 
-Fetch every row (15,671 as of the pull): `case_type,case_num,address,filing_date,current_status,open_closed,previous_meeting_status,next_meeting,next_meeting_date,description,longitude,latitude`
+Fetch every row (15,671 as of the pull; 15,579 after dropping rows the dataset repeats exactly, which `fetch.py` counts once): `case_type,case_num,address,filing_date,current_status,open_closed,previous_meeting_status,next_meeting,next_meeting_date,description,longitude,latitude`
 
 ```
 { "TYP": [11 type names], "TH": [7 topic names],
@@ -153,7 +184,7 @@ Fetch every row (15,671 as of the pull): `case_type,case_num,address,filing_date
 - **`dec`**: since 2016, `previous_meeting_status` starting with approv (or containing "modified approval") counts as appr. Starting with deni/denial counts as den. Exactly "withdrawn" counts as wd.
 - `typeY` and `themeY` start at 2004 (the few December 2003 filings are left off). `pts` is in API (`:id`) order.
 - The `pts` window starts 365 days before the pull date and is stored as `windowStart`.
-- `up` has duplicate rows. The front end dedupes them on date + case number.
+- `up` can still list a case twice (rows that differ only in other fields). The front end dedupes them on date + case number, and flags dates that fall on a weekend or holiday as "date as listed".
 
 ## Page copy that mentions specific numbers
 

@@ -143,6 +143,17 @@ tbody tr:hover td{background:var(--chip)}
 .ftoggle{display:none}
 .stlab{font-weight:500;pointer-events:none;paint-order:stroke;stroke:var(--surface);stroke-linejoin:round}
 .stlab.major{font-weight:650}
+/* stepped legend for equal-count classes (NOLA.stepLegend): the value under each boundary is where that color starts */
+.legend .steps{flex:1 1 100%;display:flex;max-width:290px;padding:0 14px 0 0}
+.legend .steps span,.steps span{flex:1;display:flex;flex-direction:column;align-items:stretch;gap:3px;min-width:0}
+.steps i{width:auto!important;height:10px;border-radius:0!important}
+.steps span:first-child i{border-radius:3px 0 0 3px!important}
+.steps span:nth-child(7) i{border-radius:0 3px 3px 0!important}
+.steps em{align-self:flex-start;font-style:normal;font-size:10.5px;color:var(--ink2);white-space:nowrap;font-variant-numeric:tabular-nums;transform:translateX(-50%)}
+.steps span:first-child em{transform:none}
+.steps .end{flex:0 0 0;padding-top:13px}
+.nonekey{font-size:11.5px}
+.maplegend{display:none}
 @media(max-width:760px){
   .stage.chartstage{grid-template-columns:1fr}
   .stage.chartstage>.fpanel{position:static}
@@ -150,6 +161,11 @@ tbody tr:hover td{background:var(--chip)}
   .stage.mapstage>.fpanel{position:static;width:auto;max-height:none;box-shadow:none;margin-bottom:10px}
   .stage.mapstage .plot{position:relative;height:min(560px,70vh);border:1px solid var(--ring);border-radius:12px;overflow:hidden;background:var(--surface)}
   .ftoggle{display:block;margin-bottom:8px}
+  .maplegend{display:block;position:absolute;left:10px;bottom:10px;width:min(250px,calc(100% - 100px));background:var(--surface);border:1px solid var(--ring);border-radius:8px;padding:6px 8px 4px;z-index:2;font-size:11px;color:var(--ink2)}
+  .maplegend .steps{display:flex;padding-right:12px}
+  .maplegend .nonekey{display:flex;align-items:center;gap:5px;margin-top:3px}
+  .maplegend .nonekey i{width:10px;height:10px;border-radius:3px;display:inline-block}
+  .mlh{margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .fpanel.collapsed{display:none}
   .viewsel{font-size:16px;width:100%}
 }
@@ -161,17 +177,18 @@ tbody tr:hover td{background:var(--chip)}
 </style></head><body><div class="wrap">
 <div class="site"><b><a href="index.html" style="color:inherit;text-decoration:none">Nola Vizzes</a></b><nav><a class="" href="drone.html">NOPD drone flights</a><a class="" href="cfs.html">Calls for service</a><a class="" href="cpc.html">Planning cases</a><a class="" href="trees.html">Street trees</a><a class="on" href="about.html">About</a></nav></div>
 <h1>About</h1>
-<div class="src">Updated daily from <a href="https://data.nola.gov">data.nola.gov</a> · Last pulled Nov 18, 2026</div>
+<div class="src">Updated daily from <a href="https://data.nola.gov">data.nola.gov</a> · Data last updated Nov 18, 2026</div>
 <div class="prose">
 <p>An independent project, not affiliated with the City of New Orleans. Every page links to the City dataset it uses. The street map under every map is the City's <a href="https://data.nola.gov/d/22q2-dqpb">Centerline</a> dataset. Source code: <a href="https://github.com/Matt-Ricchiuti/nola-vizzes">GitHub</a>.</p>
 
 <h2>Notes on the data</h2>
 <ul>
-<li><b>Calls for service.</b> "Started by officers" means self-initiated. Arrival time runs from call creation to the first officer's arrival, for calls from the public only. The current month is left off the monthly chart until it's complete. NOPD withholds locations for medical and mental-health calls. The neighborhood map can show calls per 1,000 residents, using 2020 Census population.</li>
+<li><b>Calls for service.</b> "Started by officers" means self-initiated. Arrival time runs from call creation to the first officer's arrival, for calls from the public only. The current month is left off the monthly chart until it's complete. NOPD withholds locations for medical and mental-health calls. The neighborhood map can show calls per 1,000 residents, using 2020 Census population. Counts include calls the City closed as duplicate or void (about 6%). NOPD cautions against comparing its call data over time, since classifications and systems change.</li>
 <li><b>Drone flights.</b> Takeoff times appear to be UTC and are shown in Central time. Purposes are grouped from a free-text field; when it's blank, the activity summary is used. Locations are takeoff points, not flight paths.</li>
-<li><b>Planning cases.</b> Cases with several types are grouped under the most consequential one. Topics come from keywords in case descriptions. A neighborhood notice (NPP) and the case it leads to are separate records.</li>
-<li><b>Street trees.</b> A one-time inventory export from October 2026, not refreshed daily.</li>
-<li>Maps leave out neighborhoods with under 100 residents per square mile (Lake Catherine and Viavant–Venetian Isles), where there is too little data to show.</li>
+<li><b>Planning cases.</b> Cases with several types are grouped under the most consequential one. Topics come from keywords in case descriptions. A neighborhood notice (NPP) and the case it leads to are separate records; NPP notices start in 2016, which raises yearly totals from then on. Rows the City's file repeats exactly are counted once. Hearing dates are the next meeting dates the City lists; a few fall on weekends or holidays and are flagged as listed.</li>
+<li><b>Street trees.</b> The City's tree inventory as last updated on April 17, 2025, exported once and not refreshed daily.</li>
+<li>Every neighborhood is counted. Maps open on the populated city, so Lake Catherine and Viavant–Venetian Isles (under 100 residents per square mile) start out of view: zoom out or pick them from the menu.</li>
+<li>Shaded maps use seven shades with about the same number of neighborhoods in each; the legend shows where each shade starts.</li>
 <li>Other neighborhood figures are totals, not per resident.</li>
 </ul>
 </div>

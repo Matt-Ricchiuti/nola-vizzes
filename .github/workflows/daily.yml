@@ -1,18 +1,27 @@
-# Every morning: pull fresh data from data.nola.gov, rebuild the pages, commit, and publish.
-# If anything looks wrong (empty fetch, missing column, counts collapsing), pipeline/fetch.py
-# exits with an error, nothing is committed, and the site keeps its last good version.
-# GitHub emails the repo owner when a scheduled run fails.
+# Every morning: check data.nola.gov for new data, rebuild what changed, commit, and publish.
+# pipeline/fetch.py downloads a dataset only when the City has changed it, and rewrites a data file only
+# when its content changed, so on a day without new data nothing is committed or deployed.
+# If a dataset looks wrong (empty fetch, missing column, counts collapsing), that page keeps its last good
+# version, the rest still publish, and the run ends failed. GitHub emails the repo owner when a scheduled
+# run fails.
 name: Daily data refresh
 
 on:
   schedule:
+    # The City loads CPC Projects around 06:00 UTC and Calls for Service around 09:00 UTC (3 a.m. Central).
     - cron: '30 10 * * *'   # 10:30 UTC = 4:30 a.m. Central (5:30 a.m. during daylight time)
   workflow_dispatch:         # "Run workflow" button on the Actions tab
+    inputs:
+      full:
+        description: 'Download and rebuild everything, even datasets the City has not changed'
+        type: boolean
+        default: false
 
 permissions:
   contents: write
   pages: write
   id-token: write
+  actions: write   # only to keep the schedule switched on, see the last step of refresh
 
 concurrency:
   group: daily-refresh
@@ -24,6 +33,7 @@ jobs:
     timeout-minutes: 30
     outputs:
       changed: ${{ steps.commit.outputs.changed }}
+      failed: ${{ steps.fetch.outputs.failed }}
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
@@ -32,10 +42,18 @@ jobs:
           cache: pip
           cache-dependency-path: pipeline/requirements.txt
       - run: pip install -r pipeline/requirements.txt
+      # Downloads that rarely change (boundaries, population), kept between runs so they aren't fetched daily.
+      # A miss only means downloading them again.
+      - uses: actions/cache@v5
+        with:
+          path: .cache/raw
+          key: raw-${{ github.run_id }}
+          restore-keys: raw-
       - name: Fetch data and rebuild pages
+        id: fetch
         env:
           SOCRATA_APP_TOKEN: ${{ secrets.SOCRATA_APP_TOKEN }}
-        run: python pipeline/fetch.py
+        run: python pipeline/fetch.py ${{ inputs.full && '--full' || '' }}
       - name: Commit if anything changed
         id: commit
         run: |
@@ -50,6 +68,18 @@ jobs:
           git commit -m "Data refresh $(TZ=America/Chicago date +%F)"
           git push
           echo "changed=true" >> "$GITHUB_OUTPUT"
+      # GitHub switches off scheduled workflows after 60 days without commits. Data normally changes daily,
+      # but if the City stops publishing, re-enabling the workflow before then keeps it running.
+      - name: Keep the schedule switched on
+        if: github.event_name == 'schedule'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          idle=$(( ( $(date +%s) - $(git log -1 --format=%ct) ) / 86400 ))
+          echo "Last commit $idle days ago."
+          if [ "$idle" -ge 45 ]; then
+            gh api -X PUT "repos/${{ github.repository }}/actions/workflows/daily.yml/enable"
+          fi
 
   # Pushes made by this workflow don't trigger pages.yml, so deploy here.
   deploy:
@@ -72,3 +102,14 @@ jobs:
           path: site
       - id: deployment
         uses: actions/deploy-pages@v4
+
+  # A dataset that failed kept its last good version while the rest published. Fail the run now, so GitHub
+  # emails the owner.
+  report:
+    needs: [refresh, deploy]
+    if: always() && needs.refresh.outputs.failed != ''
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "::error::Not refreshed today (last good version still on the site): ${{ needs.refresh.outputs.failed }}. See the refresh job's log for why."
+          exit 1

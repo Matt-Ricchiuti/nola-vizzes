@@ -5,9 +5,11 @@
 
 Templates can use these placeholders, filled in at build time:
     {{CSS}} {{NAV}} {{DATA}} {{LIB}} {{JS}} {{D3}}
-    {{PULLED}}      date the data was pulled, e.g. "Nov 18, 2026"
+    {{PULLED}}      on a data page, the date that page's data last changed (data/sources.json), e.g. "Nov 18, 2026";
+                    elsewhere the latest of those dates
     {{CFS_YEAR}} {{CFS_DS}} {{CFS_PREV}}   year, dataset id and previous year of the Calls for Service page
     {{DRONE_YEAR}}  year covered by the drone page
+    {{DRONE_THRU}} {{CFS_THRU}} {{CPC_THRU}}   last day each page's data reaches, e.g. "Nov 5, 2026"
     {{MENU}}        home-page menu of every view on every page, read from each page's NOLA.views([...]) list
 """
 import json, sys, os, re, html, datetime as dt
@@ -31,11 +33,30 @@ EXTRA = {'about': 'About'}
 css = open(P('src', 'lib.css'), encoding='utf-8').read()
 lib = open(P('src', 'lib.js'), encoding='utf-8').read()
 geo = load('geo.json')
-meta = load('meta.json') if os.path.exists(P('data', 'meta.json')) else {'pulled': '2026-11-18'}
-pulled = dt.date.fromisoformat(meta['pulled'])
+# Each page shows the date its own data last changed, from data/sources.json (written by pipeline/fetch.py).
+# A page's HTML then only changes when its data does, so days without new City data commit nothing.
+sources = load('sources.json').get('files', {}) if os.path.exists(P('data', 'sources.json')) else {}
+def changed(names):
+    ds = [sources[n]['changed'] for n in names if sources.get(n, {}).get('changed')]
+    return dt.date.fromisoformat(max(ds)) if ds else None
+page_date = {k: changed(['geo.json', *files.values()]) for k, (_, files) in PAGES.items()
+             if all(f in sources for f in files.values())}  # trees.json isn't built by the pipeline, so trees gets no date
+pulled = max(page_date.values(), default=None) or dt.date.fromisoformat(
+    load('meta.json')['pulled'] if os.path.exists(P('data', 'meta.json')) else '2026-11-18')
 cfs_meta, drone_meta = load('cfs.json'), load('drone.json')
 cfs_year, drone_year = cfs_meta.get('year', 2026), drone_meta.get('year', 2026)
-TOKENS = {'{{PULLED}}': pulled.strftime('%b ') + str(pulled.day) + pulled.strftime(', %Y'),
+def fdate(d): return d.strftime('%b ') + str(d.day) + d.strftime(', %Y')
+def central(utc):  # UTC datetime -> Central (DST: second Sunday in March to first Sunday in November, 2 a.m. local)
+    y = utc.year
+    sun = lambda m, n: dt.date(y, m, 1) + dt.timedelta(days=(6 - dt.date(y, m, 1).weekday()) % 7 + 7 * (n - 1))
+    on, off = dt.datetime.combine(sun(3, 2), dt.time(8)), dt.datetime.combine(sun(11, 1), dt.time(7))
+    return utc - dt.timedelta(hours=5 if on <= utc < off else 6)
+# last day each page's data reaches, shown next to the pull date so a dataset the City stopped updating is visible
+drone_last = max(central(dt.datetime(drone_year, 1, 1) + dt.timedelta(days=r[0], hours=r[1])) for r in drone_meta['recs']).date()
+cfs_last = dt.date(cfs_year, 1, 1) + dt.timedelta(days=cfs_meta['last'])
+cpc_last = dt.date.fromisoformat(load('cpc.json').get('lastFiled', pulled.isoformat())[:10])
+TOKENS = {'{{PULLED}}': fdate(pulled),
+          '{{DRONE_THRU}}': fdate(drone_last), '{{CFS_THRU}}': fdate(cfs_last), '{{CPC_THRU}}': fdate(cpc_last),
           '{{CFS_YEAR}}': str(cfs_year), '{{CFS_PREV}}': str(cfs_year - 1), '{{CFS_DS}}': cfs_meta.get('ds', 'es9j-6y5d'),
           '{{DRONE_YEAR}}': str(drone_year),
           '{{FOOT}}': '<div class="foot">Data: <a id="dataLink" href="https://data.nola.gov">data.nola.gov</a> · Not affiliated with the City of New Orleans · <a href="about.html">About</a></div>'}
@@ -81,6 +102,7 @@ if os.path.exists(P('data', 'streets.json')):
 
 def fill(h, key):
     h = h.replace('{{CSS}}', css).replace('{{NAV}}', nav(key)).replace('{{D3}}', d3_tag() + STREETS_TAG)
+    h = h.replace('{{PULLED}}', fdate(page_date.get(key) or pulled))  # a data page shows when its own data last changed
     for k, v in TOKENS.items(): h = h.replace(k, v)
     return h
 
@@ -88,7 +110,8 @@ os.makedirs(P('site'), exist_ok=True)
 for key, (label, files) in PAGES.items():
     h = open(P('src', f'{key}.html'), encoding='utf-8').read()
     if files:
-        data = {'geo': geo, 'meta': meta}
+        data = {'geo': geo}
+        if key in page_date: data['meta'] = {'pulled': page_date[key].isoformat()}  # cpc.js reads this as "today"
         for k, f in files.items(): data[k] = load(f)
         js = open(P('src', f'{key}.js'), encoding='utf-8').read()
         # data/lib/js last, so placeholder-looking text inside the data is never touched

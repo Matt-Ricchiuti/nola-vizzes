@@ -12,7 +12,9 @@
     { n: 'Barricade & patrol checks', codes: [6] },
     { n: 'Training, test & other', codes: [2, 7] },
     { n: 'Not recorded', codes: [8] }];
-  CATS.forEach((c, i) => c.color = i < 7 ? NOLA.S(i) : 'var(--none)');
+  // palette order, except barricade uses red so it isn't a second green next to investigation, and "not recorded"
+  // is a mid grey that reads on both light and dark backgrounds
+  CATS.forEach((c, i) => c.color = i === 5 ? NOLA.S(7) : i < 7 ? NOLA.S(i) : 'var(--muted)');
   const catOf = code => CATS.findIndex(c => c.codes.includes(code));
   // Oct 13, 2026: new drones and daily dispatch flights from fixed launch points begin.
   // DFR is that day as a day-of-year; 0 for later years (no before/after split).
@@ -62,6 +64,8 @@
     const { panel, plot } = staged(pane, first); filters(panel, { period: false });
     plot.innerHTML = '<div></div>'; const el = plot; // the purpose rows double as the color key
     const nW = Math.floor(LAST / 7) + 1;
+    // the last week is drawn lighter when the data stops before it ends
+    const partial = (LAST + 1) % 7 !== 0 ? nW - 1 : -1;
     const weeks = d3.range(nW).map(() => CATS.map(() => 0));
     flights.filter(inNb).forEach(f => weeks[Math.floor(f.day / 7)][f.cat]++);
     const tl = NOLA.frame(el.lastChild, { h: 300, m: { t: 34, r: 12, b: 28, l: 36 } });
@@ -72,11 +76,11 @@
     weeks.forEach((w, wi) => { let y0 = 0; w.forEach((v, ci) => { if (v) segs.push({ wi, ci, y0, y1: y0 + v }); y0 += v; }); });
     tl.g.append('g').selectAll('rect').data(segs).join('rect')
       .attr('x', d => xw(d.wi)).attr('width', xw.bandwidth()).attr('y', d => yw(d.y1) + 1).attr('height', d => Math.max(0.5, yw(d.y0) - yw(d.y1) - 1))
-      .attr('fill', d => CATS[d.ci].color).attr('rx', 1.5).attr('opacity', d => st.cat < 0 || d.ci === st.cat ? 1 : .18);
+      .attr('fill', d => CATS[d.ci].color).attr('rx', 1.5).attr('opacity', d => (st.cat < 0 || d.ci === st.cat ? 1 : .18) * (d.wi === partial ? .45 : 1));
     tl.g.append('g').selectAll('rect').data(weeks).join('rect').attr('x', (d, i) => xw(i) - 1).attr('width', xw.step()).attr('height', tl.ih).attr('fill', 'transparent')
-      .on('mousemove', (ev, w) => tip.show(`<b>Week of ${NOLA.doyDate(weeks.indexOf(w) * 7)}</b>` + row('Flights', d3.sum(w)) + CATS.map((c, ci) => w[ci] ? row(sw(c.color) + c.n, w[ci]) : '').join(''), ev))
+      .on('mousemove', (ev, w) => tip.show(`<b>Week of ${NOLA.doyDate(weeks.indexOf(w) * 7)}</b>` + (weeks.indexOf(w) === partial ? `<div style="color:var(--ink2)">Partial week: data ends ${NOLA.doyDate(LAST)}</div>` : '') + row('Flights', d3.sum(w)) + CATS.map((c, ci) => w[ci] ? row(sw(c.color) + c.n, w[ci]) : '').join(''), ev))
       .on('mouseleave', tip.hide);
-    tl.g.append('g').selectAll('text').data(mStarts).join('text').attr('x', d => xw(Math.floor(d / 7))).attr('y', tl.ih + 18).text((d, i) => NOLA.months[i]);
+    tl.g.append('g').selectAll('text').data(NOLA.monthTicks(mStarts, d => xw(Math.floor(d / 7)), tl.iw)).join('text').attr('x', d => d.x).attr('y', tl.ih + 18).text(d => d.label);
     tl.g.append('line').attr('x1', 0).attr('x2', tl.iw).attr('y1', tl.ih).attr('y2', tl.ih).attr('stroke', 'var(--axis)');
     // labels: busiest week of each big event (4+ tagged flights) and the Oct 13 shift, in two rows; ones that don't fit are skipped
     const EVN = { 1: 'Mardi Gras', 2: 'French Quarter Fest', 3: 'Jazz Fest', 4: 'Essence', 7: 'Southern Decadence' };
@@ -88,10 +92,12 @@
     });
     ann.sort((a, b) => a[0] - b[0]);
     if (SPLIT && DFR <= LAST) ann.unshift([Math.floor(DFR / 7), `${dfrLabel}: daily dispatch flights begin`, 'end']);
+    if (partial >= 0) ann.unshift([partial, `Data ends ${NOLA.doyDate(LAST)}`, 'end']);
     const ROWS = [-6, -20], used = [[], []];
+    const lineG = tl.g.append('g'), textG = tl.g.append('g'); // labels sit above every leader line
     ann.forEach(([w, t, anc]) => {
       const top = yw(d3.sum(weeks[w])), cx = xw(w) + xw.bandwidth() / 2;
-      const txt = tl.g.append('text').attr('class', 'halo').attr('x', cx + (anc === 'end' ? 4 : anc === 'start' ? -2 : 0)).attr('text-anchor', anc).style('fill', 'var(--ink2)').text(t);
+      const txt = textG.append('text').attr('class', 'halo').attr('x', cx + (anc === 'end' ? 4 : anc === 'start' ? -2 : 0)).attr('text-anchor', anc).style('fill', 'var(--ink2)').text(t);
       let bb = txt.node().getBBox();
       if (bb.x + bb.width > tl.iw + tl.m.r) { txt.attr('x', cx + 4).attr('text-anchor', 'end'); bb = txt.node().getBBox(); }
       if (bb.x < -tl.m.l) { txt.attr('x', cx - 2).attr('text-anchor', 'start'); bb = txt.node().getBBox(); }
@@ -99,8 +105,7 @@
       if (r === undefined) { txt.remove(); return; }
       used[r].push([bb.x - 8, bb.x + bb.width + 8]);
       txt.attr('y', ROWS[r]);
-      tl.g.append('line').attr('x1', cx).attr('x2', cx).attr('y1', top - 3).attr('y2', ROWS[r] + 3).attr('stroke', 'var(--axis)');
-      txt.raise();
+      lineG.append('line').attr('x1', cx).attr('x2', cx).attr('y1', top - 3).attr('y2', ROWS[r] + 3).attr('stroke', 'var(--axis)');
     });
   }
 
@@ -176,7 +181,7 @@
       f.g.append('g').selectAll('rect').data(fs).join('rect').attr('x', fl => x(fl.day) - 1).attr('width', 2.5).attr('y', y(d)).attr('height', y.bandwidth()).attr('rx', 1)
         .attr('fill', fl => CATS[fl.cat].color).attr('opacity', fl => pass(fl) ? .9 : .12);
     });
-    f.g.append('g').selectAll('text').data(mStarts).join('text').attr('x', d => x(d)).attr('y', f.ih + 16).text((d, i) => NOLA.months[i]);
+    f.g.append('g').selectAll('text').data(NOLA.monthTicks(mStarts, x, f.iw)).join('text').attr('x', d => d.x).attr('y', f.ih + 16).text(d => d.label);
     f.svg.on('mousemove', ev => {
       const [mx, my] = d3.pointer(ev, f.g.node()); const d = order.find(o => my >= y(o) && my <= y(o) + y.bandwidth()); if (d === undefined) return tip.hide();
       const day = Math.round(x.invert(mx)), fs = flights.filter(fl => fl.drone === d), near = fs.filter(fl => Math.abs(fl.day - day) <= 1), ext = d3.extent(fs, fl => fl.day);

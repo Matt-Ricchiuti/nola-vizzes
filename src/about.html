@@ -9,17 +9,18 @@
 </style></head><body><div class="wrap">
 {{NAV}}
 <h1>About</h1>
-<div class="src">Updated daily from <a href="https://data.nola.gov">data.nola.gov</a> · Last pulled {{PULLED}}</div>
+<div class="src">Updated daily from <a href="https://data.nola.gov">data.nola.gov</a> · Data last updated {{PULLED}}</div>
 <div class="prose">
 <p>An independent project, not affiliated with the City of New Orleans. Every page links to the City dataset it uses. The street map under every map is the City's <a href="https://data.nola.gov/d/22q2-dqpb">Centerline</a> dataset. Source code: <a href="https://github.com/Matt-Ricchiuti/nola-vizzes">GitHub</a>.</p>
 
 <h2>Notes on the data</h2>
 <ul>
-<li><b>Calls for service.</b> "Started by officers" means self-initiated. Arrival time runs from call creation to the first officer's arrival, for calls from the public only. The current month is left off the monthly chart until it's complete. NOPD withholds locations for medical and mental-health calls. The neighborhood map can show calls per 1,000 residents, using 2020 Census population.</li>
+<li><b>Calls for service.</b> "Started by officers" means self-initiated. Arrival time runs from call creation to the first officer's arrival, for calls from the public only. The current month is left off the monthly chart until it's complete. NOPD withholds locations for medical and mental-health calls. The neighborhood map can show calls per 1,000 residents, using 2020 Census population. Counts include calls the City closed as duplicate or void (about 6%). NOPD cautions against comparing its call data over time, since classifications and systems change.</li>
 <li><b>Drone flights.</b> Takeoff times appear to be UTC and are shown in Central time. Purposes are grouped from a free-text field; when it's blank, the activity summary is used. Locations are takeoff points, not flight paths.</li>
-<li><b>Planning cases.</b> Cases with several types are grouped under the most consequential one. Topics come from keywords in case descriptions. A neighborhood notice (NPP) and the case it leads to are separate records.</li>
-<li><b>Street trees.</b> A one-time inventory export from October 2026, not refreshed daily.</li>
-<li>Maps leave out neighborhoods with under 100 residents per square mile (Lake Catherine and Viavant–Venetian Isles), where there is too little data to show.</li>
+<li><b>Planning cases.</b> Cases with several types are grouped under the most consequential one. Topics come from keywords in case descriptions. A neighborhood notice (NPP) and the case it leads to are separate records; NPP notices start in 2016, which raises yearly totals from then on. Rows the City's file repeats exactly are counted once. Hearing dates are the next meeting dates the City lists; a few fall on weekends or holidays and are flagged as listed.</li>
+<li><b>Street trees.</b> The City's tree inventory as last updated on April 17, 2025, exported once and not refreshed daily.</li>
+<li>Every neighborhood is counted. Maps open on the populated city, so Lake Catherine and Viavant–Venetian Isles (under 100 residents per square mile) start out of view: zoom out or pick them from the menu.</li>
+<li>Shaded maps use seven shades with about the same number of neighborhoods in each; the legend shows where each shade starts.</li>
 <li>Other neighborhood figures are totals, not per resident.</li>
 </ul>
 </div>
