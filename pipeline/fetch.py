@@ -13,7 +13,9 @@ versions it was built from (Socrata's rowsUpdatedAt, or for the street centerlin
 newest edit). If those are the same today, the file is kept as it is. Rebuilt files are written only when
 their content differs, so a day without new City data leaves data/ and site/ untouched and the workflow
 commits nothing. Boundary and population downloads are kept in .cache/raw/ (restored between runs by the
-workflow). On the 1st of each month, and with --full, everything is downloaded fresh.
+workflow), and so is a copy of this year's Calls for Service rows: on a day the City changed that dataset, only
+the rows updated since the newest one in the copy are downloaded and merged in (see cfs_rows). On the 1st of
+each month, and with --full, everything is downloaded fresh.
 
 Every rebuilt file is checked before it's written. If a fetch comes back empty, a column disappears, or a
 count collapses compared with the last good file, that file keeps its last good version, the other files
@@ -22,7 +24,7 @@ workflow can publish first and then fail the run). A failure in the shared bound
 
 Set SOCRATA_APP_TOKEN in the environment to avoid API throttling.
 """
-import argparse, csv, datetime as dt, hashlib, io, json, math, os, re, subprocess, sys, time
+import argparse, csv, datetime as dt, gzip, hashlib, io, json, math, os, re, subprocess, sys, time
 from collections import Counter, defaultdict
 
 import numpy as np
@@ -507,19 +509,67 @@ def resp_minutes(create, arrive):
     return m if 0 <= m < 1440 else None
 
 
+def cfs_rows(api, ds, cols, total):
+    """This year's call rows, downloaded incrementally.
+
+    The City updates the dataset in place every night (a few thousand of ~300,000 rows change), so a copy of
+    every row, with its Socrata row id and last-updated time, is kept in RAW_CACHE (GitHub Actions restores
+    that folder between runs). Each run asks only for rows updated since the newest one in the copy and merges
+    them in by row id. If the merged copy's row count differs from the City's (rows were deleted), the copy is
+    missing, or this is a full run (the 1st of the month, or --full), every row is downloaded again.
+    A deletion offset by an addition on the same day goes unnoticed until the next monthly full download."""
+    fn = os.path.join(RAW_CACHE, f'cfs-{ds}.csv.gz')
+    fields = [':id', ':updated_at'] + cols
+
+    def fetch(where=None):
+        got = []
+        while True:
+            params = {'$select': ','.join(fields), '$order': ':id', '$limit': 50000, '$offset': len(got)}
+            if where:
+                params['$where'] = where
+            page = list(csv.DictReader(io.StringIO(api.get(f'/resource/{ds}.csv', params, kind='csv'))))
+            got += page
+            if len(page) < 50000:
+                return got
+
+    rows, how = None, ''
+    if api.use_raw and os.path.exists(fn):
+        try:
+            with gzip.open(fn, 'rt', encoding='utf-8', newline='') as f:
+                copy = {r[':id']: r for r in csv.DictReader(f)}
+        except (OSError, EOFError, csv.Error):
+            copy = {}
+        mark = max((r[':updated_at'] for r in copy.values()), default='')
+        if copy and mark:
+            delta = fetch(f":updated_at >= '{mark.rstrip('Z')}'")
+            for r in delta:
+                copy[r[':id']] = r
+            if len(copy) == total:
+                rows, how = list(copy.values()), f'{len(delta):,} new or changed rows merged into the saved copy'
+            else:
+                print(f'  saved copy has {len(copy):,} rows but the City has {total:,}: downloading all', flush=True)
+    if rows is None:
+        rows, how = fetch(), 'full download'
+    need(len(rows) >= total * 0.99, f'Calls for Service: fetched {len(rows)} rows but the API reports {total}')
+    print(f'  calls: {how}', flush=True)
+    os.makedirs(RAW_CACHE, exist_ok=True)
+    for old in os.listdir(RAW_CACHE):
+        if old.startswith('cfs-') and old != os.path.basename(fn):
+            os.remove(os.path.join(RAW_CACHE, old))  # last year's copy
+    with gzip.open(fn + '.tmp', 'wt', encoding='utf-8', newline='') as f:
+        w = csv.DictWriter(f, fieldnames=fields, extrasaction='ignore')
+        w.writeheader()
+        w.writerows(sorted(rows, key=lambda r: r[':id']))
+    os.replace(fn + '.tmp', fn)
+    return rows
+
+
 def build_cfs(api, nbp, pdp, geo, year, ds):
     cols = ['timecreate', 'timearrive', 'typetext', 'priority', 'selfinitiated', 'dispositiontext', 'location']
     api.require_columns(ds, cols, f'Calls for Service {year}')
     total = int(api.get(f'/resource/{ds}.json', {'$select': 'count(*) as n'})[0]['n'])
     need(total > 0, f'Calls for Service {year} ({ds}): 0 rows')
-    rows = []
-    for off in range(0, total + 50000, 50000):
-        body = api.get(f'/resource/{ds}.csv', {'$select': ','.join(cols), '$order': ':id', '$limit': 50000, '$offset': off}, kind='csv')
-        page = list(csv.DictReader(io.StringIO(body)))
-        rows += page
-        if len(page) < 50000:
-            break
-    need(len(rows) >= total * 0.99, f'Calls for Service: fetched {len(rows)} rows but the API reports {total}')
+    rows = cfs_rows(api, ds, cols, total)
 
     jan1 = dt.datetime(year, 1, 1)
     n = len(rows)
@@ -554,7 +604,8 @@ def build_cfs(api, nbp, pdp, geo, year, ds):
     nbi[~valid] = -1
     pdi[~valid] = -1
 
-    TOP = [t for t, _ in sorted(Counter(types).items(), key=lambda kv: -kv[1])[:24]]
+    # rankings break ties by name, so the result doesn't depend on the order rows arrive in (see cfs_rows)
+    TOP = [t for t, _ in sorted(Counter(types).items(), key=lambda kv: (-kv[1], kv[0]))[:24]]
     tix = {t: k for k, t in enumerate(TOP)}
     last = max(doy)
     daily = [[0, 0] for _ in range(last + 1)]
@@ -607,7 +658,7 @@ def build_cfs(api, nbp, pdp, geo, year, ds):
     for i in range(n):
         hist_months[tc[i].month - 1][1 if selfi[i] else 0] += 1
     out = {'year': year, 'ds': ds, 'TOP': TOP, 'last': last, 'daily': daily, 'heat': heat, 'types': ty, 'nb': nb, 'pd': pd, 'mResp': mResp,
-           'disp': [[k, v] for k, v in Counter(disp).most_common(8)],
+           'disp': [[k, v] for k, v in sorted(Counter(disp).items(), key=lambda kv: (-kv[1], kv[0] or ''))[:8]],
            'noLoc': int((~valid).sum()), 'outside': int((valid & (nbi < 0)).sum())}
     return out, hist_months
 

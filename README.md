@@ -20,11 +20,12 @@ build.py    src/ + data/ -> site/
 ## How the daily refresh works
 
 1. At 10:30 UTC (4:30 a.m. Central in winter, 5:30 a.m. in summer), `daily.yml` runs `python pipeline/fetch.py`.
-2. `fetch.py` downloads every dataset, recomputes `data/*.json`, and checks the results. If a dataset comes back empty, a column is missing, or a count drops by more than 10% from the last good version, it stops with an error and writes nothing.
-3. Otherwise it runs `build.py`, and the workflow commits `data/` and `site/` and publishes the site.
-4. A failed run leaves the site as it was. GitHub emails you about it, and the run shows a red X on the repo's **Actions** tab. Warnings (for example, the City hasn't added new calls in over a week) show in yellow on the run but don't stop it.
+2. `fetch.py` checks each dataset's "last updated" time on data.nola.gov and downloads only the ones the City changed. For Calls for Service it downloads only the rows changed since the last run and merges them into a saved copy. On the 1st of each month everything is downloaded fresh as a backstop.
+3. Each rebuilt data file is checked. If a dataset comes back empty, a column is missing, or a count drops by more than 10%, that page keeps its last good version and the others still publish.
+4. Files are rewritten only when their content changed, so a day with no new City data commits and publishes nothing. Otherwise the workflow commits `data/` and `site/` and publishes the site.
+5. If any dataset failed, the run ends with a red X on the repo's **Actions** tab and GitHub emails you. Warnings (for example, the City hasn't added new calls in over a week) show in yellow on the run but don't stop it.
 
-To run it by hand: GitHub repo → **Actions** → **Daily data refresh** → **Run workflow**.
+To run it by hand: GitHub repo → **Actions** → **Daily data refresh** → **Run workflow** (tick the box to download everything fresh).
 
 ## Working locally
 

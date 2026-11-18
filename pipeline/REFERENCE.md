@@ -109,7 +109,7 @@ Fetch every row (742 as of the pull): `$select=serial,longitude,latitude,takeoff
 
 ## `data/cfs.json`: Calls for Service 2026 (`es9j-6y5d`)
 
-Note: `timecreate` and the other times are **text** columns in 2026 and 2025, but calendar_date in earlier years. Fetch all rows as CSV in pages of 50,000 (`$order=:id&$offset=`): `timecreate,timearrive,typetext,priority,selfinitiated,dispositiontext,location`. The `location` field is `POINT (lon lat)`. Times are local.
+Note: `timecreate` and the other times are **text** columns in 2026 and 2025, but calendar_date in earlier years. Columns used: `timecreate,timearrive,typetext,priority,selfinitiated,dispositiontext,location`, fetched as CSV in pages of 50,000 (`$order=:id&$offset=`) together with the system fields `:id` and `:updated_at`. The City updates the dataset in place each night, so `fetch.py` keeps a copy of the year's rows in `.cache/raw/cfs-<id>.csv.gz` and on later runs asks only for `:updated_at >= <newest in the copy>`, merging by `:id` (a few thousand rows a day instead of ~300,000). If the merged row count differs from the City's `count(*)` (rows were deleted), the copy is missing, or it's a full run (the 1st of the month or `--full`), every row is downloaded again. Rankings (`TOP`, `disp`) break count ties by name, so the result doesn't depend on row order; an incremental build was checked to be identical to a full download. The `location` field is `POINT (lon lat)`. Times are local.
 
 ```
 { "TOP": [24 most common typetext values, by count],
