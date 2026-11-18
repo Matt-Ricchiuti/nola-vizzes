@@ -44,8 +44,17 @@ def nav(key):
             + ''.join(f'<a class="{"on" if k == key else ""}" href="{k}.html">{l}</a>' for k, l in EXTRA.items())
             + '</nav></div>')
 
+# Street centerlines are shared by every map, so they go in one file the browser caches across pages.
+STREETS_TAG = '<script src="streets.js"></script>'
+if os.path.exists(P('data', 'streets.json')):
+    streets_js = 'window.STREETS=' + json.dumps(load('streets.json'), separators=(',', ':')) + ';'
+    os.makedirs(P('site'), exist_ok=True)
+    open(P('site', 'streets.js'), 'w', encoding='utf-8').write(streets_js)
+    if mode == 'preview': STREETS_TAG = '<script>' + streets_js + '</script>'
+    print('built streets.js', len(streets_js))
+
 def fill(h, key):
-    h = h.replace('{{CSS}}', css).replace('{{NAV}}', nav(key)).replace('{{D3}}', d3_tag())
+    h = h.replace('{{CSS}}', css).replace('{{NAV}}', nav(key)).replace('{{D3}}', d3_tag() + STREETS_TAG)
     for k, v in TOKENS.items(): h = h.replace(k, v)
     return h
 

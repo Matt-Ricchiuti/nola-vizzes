@@ -32,6 +32,20 @@ geo.json = { "nb": [ {"n": NAME, "r": [ring, ...]}, ...72 ],   # order = feature
 
 ---
 
+## `data/streets.json`: street base map (Centerline, `22q2-dqpb`)
+
+Every map draws the City's street centerlines under its data. `build.py` writes them to `site/streets.js` (`window.STREETS = ...`), one file the browser caches across pages, and `NOLA.map()` in `src/lib.js` draws them.
+
+```
+streets.json = { "q": 4, "n": segmentCount, "d": [freeway, ramp, arterial, local] }   # each an SVG path string
+```
+
+- `roadclass` → tier: Freeway 0, Ramp 1, Major/Minor Arterial 2, Local 3. "Other" (alleys, driveways), "Umimproved" and `inwater = Yes` are left out.
+- Each line is simplified with Douglas–Peucker at 0.00003°, projected with X/Y multiplied by `q` (so about 5 m resolution), and written as `M x y l dx dy ...`. Pages draw it with `scale(1/q)`.
+- Local streets fade from 35% to full opacity as you zoom in.
+
+---
+
 ## `data/drone.json`: NOPD Drone Flights (`ay9z-ynxz`)
 
 Fetch every row (742 as of the pull): `$select=serial,longitude,latitude,takeoff_datetime,total_flight_time,deployment_purpose,activity_summary&$order=takeoff_datetime&$limit=5000`

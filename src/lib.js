@@ -39,6 +39,17 @@ const NOLA = (() => {
     const root = svg.append('g');
     const base = root.append('g');
     const nbSel = base.selectAll('path').data(GEO.nb).join('path').attr('class', 'nbpath' + (o.tip ? ' hot' : '')).attr('d', f => f.d);
+    // street base map (City centerlines, built into streets.js); local streets fade in as you zoom
+    const ST = window.STREETS;
+    let localSt = null;
+    if (ST) {
+      const sg = root.append('g').attr('class', 'streets').attr('transform', `scale(${1 / ST.q})`).attr('aria-hidden', 'true');
+      localSt = sg.append('path').attr('class', 'st st3').attr('d', ST.d[3]);
+      sg.append('path').attr('class', 'st st2').attr('d', ST.d[2]);
+      sg.append('path').attr('class', 'st st1').attr('d', ST.d[1]);
+      sg.append('path').attr('class', 'st st0').attr('d', ST.d[0]);
+    }
+    const streetZoom = k => { if (localSt) localSt.style('opacity', Math.max(0.35, Math.min(1, (k - 0.6) / 2.4))); };
     if (o.districts) root.append('g').selectAll('path').data(GEO.pd).join('path').attr('d', f => f.d)
       .attr('fill', 'none').attr('stroke', 'var(--ink2)').attr('stroke-width', 1.4).attr('vector-effect', 'non-scaling-stroke').attr('opacity', .55).style('pointer-events', 'none');
     const layer = root.append('g');
@@ -47,7 +58,7 @@ const NOLA = (() => {
       labG.append('text').attr('class', 'halo maplab').attr('x', c[0]).attr('y', c[1]).attr('text-anchor', 'middle').style('fill', 'var(--ink2)').style('font-size', '11px').text(f.name); });
     if (o.tip) nbSel.on('mousemove', (ev, f) => tip.show(o.tip(GEO.nb.indexOf(f)), ev)).on('mouseleave', tip.hide);
     let k = 1; const listeners = [];
-    const zoom = d3.zoom().scaleExtent([0.6, 14]).on('zoom', ev => { root.attr('transform', ev.transform); k = ev.transform.k; labG.selectAll('text').style('font-size', (11 / k) + 'px').style('stroke-width', (4 / k) + 'px'); listeners.forEach(f => f(k)); });
+    const zoom = d3.zoom().scaleExtent([0.6, 14]).on('zoom', ev => { root.attr('transform', ev.transform); k = ev.transform.k; labG.selectAll('text').style('font-size', (11 / k) + 'px').style('stroke-width', (4 / k) + 'px'); streetZoom(k); listeners.forEach(f => f(k)); });
     svg.call(zoom).on('dblclick.zoom', null);
     function zoomTo([x0, y0, x1, y1], dur = 0) {
       const s = Math.min(W / (x1 - x0), H / (y1 - y0));

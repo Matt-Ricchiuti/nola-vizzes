@@ -244,6 +244,38 @@ def build_geo(api):
     return geo, Polys(nbg['features']), Polys(pdg['features'])
 
 
+STREET_TIER = {'Freeway': 0, 'Ramp': 1, 'Major Arterial': 2, 'Minor Arterial': 2, 'Local': 3}
+STREET_Q = 4  # street coordinates are stored at 4x the map grid (about 5 m) so they stay sharp when zoomed in
+
+
+def build_streets(api):
+    """Street centerlines (22q2-dqpb) as one SVG path per tier: 0 freeway, 1 ramp, 2 arterial, 3 local.
+    Coordinates are the shared X/Y projection times STREET_Q; pages draw them with scale(1/q)."""
+    api.require_columns('22q2-dqpb', ['the_geom', 'roadclass', 'inwater'], 'Centerline')
+    g = api.get('/resource/22q2-dqpb.geojson', {'$select': 'the_geom,roadclass,inwater', '$limit': 100000}, kind='geojson')
+    feats = g.get('features', [])
+    need(len(feats) > 20000, f'Centerline: only {len(feats)} street segments')
+    d, n = ['', '', '', ''], 0
+    for f in feats:
+        p = f.get('properties') or {}
+        t = STREET_TIER.get(p.get('roadclass'))
+        if t is None or p.get('inwater') == 'Yes' or not f.get('geometry'):
+            continue
+        lines = f['geometry']['coordinates'] if f['geometry']['type'] == 'MultiLineString' else [f['geometry']['coordinates']]
+        for line in lines:
+            q = []
+            for lon, lat in douglas_peucker(line, 0.00003):
+                xy = (js_round((lon + 90.14) * 96600 / 20 * STREET_Q), js_round((30.20 - lat) * 111000 / 20 * STREET_Q))
+                if not q or q[-1] != xy:
+                    q.append(xy)
+            if len(q) < 2:
+                continue
+            d[t] += 'M%d %d' % q[0] + 'l' + ' '.join('%d %d' % (b[0] - a[0], b[1] - a[1]) for a, b in zip(q, q[1:]))
+            n += 1
+    need(n > 20000 and all(d), f'Centerline: only {n} usable segments, or a road class is missing')
+    return {'q': STREET_Q, 'd': d, 'n': n}
+
+
 # ---------------------------------------------------------------- drone flights
 DRONE_RULES = [
     (6, r'barricade|bourbon'),
@@ -575,6 +607,7 @@ def validate(out, prev, same_year):
     need(len(cpc['nbRecent']) == 72 and len(cpc['TYP']) == 11 and len(cpc['TH']) == 7, 'cpc: shape')
     need(cpc['total'] > 1000, 'cpc: suspiciously few cases')
     need(len(hist) >= 12, 'hist: missing years')
+    check_not_collapsed('street segments', out['streets.json']['n'], (load_prev('streets.json') or {}).get('n'))
     p = prev
     if same_year['drone']:
         check_not_collapsed('drone flights', len(drone['recs']), p['drone'] and len(p['drone']['recs']))
@@ -597,6 +630,8 @@ def main():
 
     print('geo ...', flush=True)
     geo, nbp, pdp = build_geo(api)
+    print('streets ...', flush=True)
+    streets = build_streets(api)
 
     # Pages cover the current calendar year once its data exists, else the previous year.
     print('drone ...', flush=True)
@@ -634,7 +669,7 @@ def main():
     print('planning cases ...', flush=True)
     cpc = build_cpc(api, nbp, today)
 
-    out = {'geo.json': geo, 'drone.json': drone, 'cfs.json': cfs, 'hist.json': hist, 'cpc.json': cpc}
+    out = {'geo.json': geo, 'streets.json': streets, 'drone.json': drone, 'cfs.json': cfs, 'hist.json': hist, 'cpc.json': cpc}
     validate(out, prev, {'drone': (prev['drone'] or {}).get('year', 2026) == drone['year'],
                          'cfs': (prev['cfs'] or {}).get('year', 2026) == cfs['year']})
     # The City sometimes stops updating a dataset. That isn't a reason to stop the site, but it's worth a look.

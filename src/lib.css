@@ -2,6 +2,7 @@
   color-scheme: light;
   --page:#f9f9f7; --surface:#fcfcfb; --ink:#0b0b0b; --ink2:#52514e; --muted:#898781;
   --grid:#e1e0d9; --axis:#c3c2b7; --ring:rgba(11,11,11,.10); --land:#efeee9; --landline:#d7d5cc;
+  --road:rgba(11,11,11,.13); --road-major:rgba(11,11,11,.26); --road-fwy:rgba(11,11,11,.42);
   --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100; --s5:#e87ba4; --s6:#008300; --s7:#6250d6; --s8:#e34948;
   --q1:#cde2fb; --q2:#9ec5f4; --q3:#6da7ec; --q4:#3987e5; --q5:#256abf; --q6:#184f95; --q7:#0d366b;
   --none:#d9d8d2; --accent:#2a78d6; --chip:#efeee9;
@@ -11,6 +12,7 @@
     color-scheme: dark;
     --page:#0d0d0d; --surface:#1a1a19; --ink:#f0efec; --ink2:#c3c2b7; --muted:#898781;
     --grid:#2c2c2a; --axis:#383835; --ring:rgba(255,255,255,.10); --land:#232321; --landline:#3a3a37;
+    --road:rgba(255,255,255,.12); --road-major:rgba(255,255,255,.24); --road-fwy:rgba(255,255,255,.40);
     --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --s5:#d55181; --s6:#0ca30c; --s7:#9085e9; --s8:#e66767;
     --q1:#0d366b; --q2:#104281; --q3:#184f95; --q4:#1c5cab; --q5:#2a78d6; --q6:#5598e7; --q7:#9ec5f4;
     --none:#2f2f2c; --accent:#3987e5; --chip:#262624;
@@ -56,6 +58,12 @@ svg text{fill:var(--muted);font-size:11px;font-family:inherit}
 .map svg{background:var(--surface);border-radius:10px;cursor:grab;touch-action:none}
 .nbpath{fill:var(--land);stroke:var(--landline);stroke-width:.8;vector-effect:non-scaling-stroke}
 .nbpath.hot:hover{stroke:var(--ink);stroke-width:1.6}
+.streets{pointer-events:none}
+.st{fill:none;vector-effect:non-scaling-stroke;stroke-linecap:round;stroke-linejoin:round}
+.st3{stroke:var(--road);stroke-width:.5}
+.st2{stroke:var(--road-major);stroke-width:.9}
+.st1{stroke:var(--road-major);stroke-width:.8}
+.st0{stroke:var(--road-fwy);stroke-width:1.7}
 .tip{position:fixed;pointer-events:none;background:var(--surface);color:var(--ink);border:1px solid var(--ring);box-shadow:0 6px 24px rgba(0,0,0,.14);border-radius:10px;padding:9px 11px;font-size:12.5px;max-width:300px;z-index:20;opacity:0;transition:opacity .08s}
 .tip b{font-size:13px}
 .tip .r{display:flex;justify-content:space-between;gap:14px;color:var(--ink2)}
