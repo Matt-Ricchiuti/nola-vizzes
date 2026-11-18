@@ -657,6 +657,16 @@ const NOLA = (() => {
       { mode: 'toggle', pressed: i => GCAT[i].on, onClick: i => { GCAT[i].on = !GCAT[i].on; refresh(); } });
   }
   function speciesSection(panel) {
+    if (selNb >= 0) { // the chosen neighborhood's own top species; click one to highlight it on the map
+      const cnt = new Map(); for (const g of groups) for (const i of g.idx) if (D.h[i] === selNb && setOk(i)) cnt.set(D.s[i], (cnt.get(D.s[i]) || 0) + 1);
+      const top = [...cnt].sort((a, b) => b[1] - a[1]).slice(0, 10);
+      const colorOf = sp => spGroup[sp] < 9 || sp === stumpIdx ? groups[spGroup[sp]].color : C['t-other'];
+      NOLA.flist(NOLA.fsec(panel, 'Most common in ' + esc(hoods[selNb].name), selSp >= 0 ? ['Show all', () => { selSp = -1; refresh(); }] : null),
+        top.map(([sp, c]) => ({ key: sp, name: esc(D.species[sp][0]), sub: esc(D.species[sp][1]), color: colorOf(sp), count: c })),
+        { pressed: sp => selSp === sp, onClick: sp => { selSp = selSp === sp ? -1 : sp; refresh(); } });
+      if (!top.length) panel.lastChild.insertAdjacentHTML('beforeend', '<div class="legend">No inventoried trees here.</div>');
+      return;
+    }
     const allOn = groups.every(g => g.on);
     const cnt = groups.map(() => 0); groups.forEach((g, gi) => { for (const i of g.idx) if (inNb(i) && setOk(i)) cnt[gi]++; });
     NOLA.flist(NOLA.fsec(panel, 'Most common', [allOn ? 'Hide all' : 'Show all', () => { groups.forEach(g => g.on = !allOn); selSp = -1; refresh(); }]),
@@ -810,6 +820,16 @@ const NOLA = (() => {
       tip.show(`<b>${esc(Hd.name)}</b>` + row('Trees', fmt(Hd.n)) + row('Per sq. mi.', fmt(Math.round(Hd.dens))) + row('Species', Hd.sp.size) + '<div style="margin-top:4px"></div>' + topSp(Hd.sp, 4), ev);
     } else tip.hide();
   }
+  // left-click a neighborhood to select it (the "Most common" list follows); click it again, or outside any neighborhood, to clear.
+  // A click doesn't move the map; choosing from the Neighborhood menu zooms to it.
+  function clickHood(x, y) {
+    ctx.setTransform(view.s, 0, 0, view.s, view.tx, view.ty);
+    let hh = -1; for (let k = 0; k < hoods.length; k++) if (!hoods[k].skip && ctx.isPointInPath(hoods[k].path, x, y)) { hh = k; break; }
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    selNb = hh < 0 || hh === selNb ? -1 : hh;
+    lastNb = selNb; // already where we want to be: no zoom
+    refresh();
+  }
   function initMap(plot) {
     plot.innerHTML = '<canvas class="tmap" aria-label="Map of street trees in New Orleans, colored by species"></canvas><div class="scalebar"><span></span><i></i></div><div class="mapctl"></div>';
     cv = plot.querySelector('canvas'); ctx = cv.getContext('2d'); scaleEl = plot.querySelector('.scalebar');
@@ -831,7 +851,7 @@ const NOLA = (() => {
       view.tx += dx; view.ty += dy; last = { x: e.offsetX, y: e.offsetY }; tip.hide(); req(); });
     const endPtr = e => { pointers.delete(e.pointerId); if (pointers.size < 2) pinch = null; if (!pointers.size) cv.classList.remove('drag');
       if (pointers.size === 1) { const p = [...pointers.values()][0]; last = { x: p.x, y: p.y }; }
-      if (!moved && e.type === 'pointerup') hover(e, e.offsetX, e.offsetY, true); };
+      if (!moved && e.type === 'pointerup') { if (e.button === 0) clickHood(e.offsetX, e.offsetY); hover(e, e.offsetX, e.offsetY, true); } };
     cv.addEventListener('pointerup', endPtr); cv.addEventListener('pointercancel', endPtr);
     cv.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse') { tip.hide(); if (hoverHood >= 0 || hoverTree >= 0 || hoverGS >= 0) { hoverHood = hoverTree = hoverGS = -1; req(); } } });
     cv.addEventListener('dblclick', e => zoomAt(2, e.offsetX, e.offsetY));
