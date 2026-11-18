@@ -42,6 +42,8 @@ Commit and push changes to `src/` together with the rebuilt `site/`.
 
 Every page has a short title, one line linking to its City dataset, and a dropdown that switches between views of that subject. Each view shows only the filters that apply to it, and the selected view is kept in the URL (for example `cfs.html#map`). The switcher is `NOLA.views()` in `src/lib.js`: a page lists its views and gives each filter control a `data-for="viewId ..."` attribute. Keep text to titles, axis labels and legends; caveats go on the About page.
 
+Every view also gets **Copy link** and **Download CSV** buttons (give the view a `csv()` that returns rows for what's on screen), and the footer's data link points at the view's dataset (`ds`). Filters a page reports through `state()` are saved in the link. Maps leave out neighborhoods under 100 residents per square mile (`MIN_DENSITY` in `lib.js`); use `NOLA.shown(nb)` to drop records there, and `NOLA.nbSelect()` for a neighborhood picker. Map controls are deliberately neutral: one "Reset view" button, no named regions.
+
 ## Pages
 
 | Page | Dataset | Refreshed |

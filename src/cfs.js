@@ -102,7 +102,8 @@
   }
 
   // ---------- neighborhood map ----------
-  const st = { metric: 'res' }, nb = C.nb;
+  const H = NOLA.hashState();
+  const st = { metric: H.metric || 'res', basis: H.basis || 'n', nb: H.nb != null ? +H.nb : -1 }, nb = C.nb;
   const isTime = () => st.metric === 'r2' || st.metric === 'r1';
   const rawVal = i => { const r = nb[i], mt = st.metric;
     if (mt === 'res') return r[0]; if (mt === 'self') return r[1];
@@ -111,23 +112,25 @@
   const perRes = () => st.basis === 'pc' && !isTime(); // counts can be shown per 1,000 residents; arrival times can't
   const metricVal = i => perRes() ? NOLA.perK(rawVal(i), NOLA.popOf(i)) : rawVal(i);
   const metricLabel = () => (({ res: 'Calls from the public', self: 'Calls started by officers', r2: 'Median minutes to arrive, emergency', r1: 'Median minutes to arrive, non-emergency' })[st.metric] || (tcase(C.TOP[+st.metric.slice(1)]) + ' calls')) + (perRes() ? ' per 1,000 residents' : '');
-  st.basis = 'n';
-  NOLA.basisChips(document.getElementById('basisChips'), v => { st.basis = v; V.refresh(); });
+  NOLA.basisChips(document.getElementById('basisChips'), v => { st.basis = v; V.refresh(); }, st.basis);
+  NOLA.nbSelect(document.getElementById('nbSel'), v => { st.nb = v; if (m) m.focus(v); V.refresh(); }, st.nb, 'Find a neighborhood');
   const msel = document.getElementById('metric');
   msel.innerHTML = [['res', 'Calls from the public'], ['self', 'Calls started by officers'], ['r2', 'Arrival time: emergency (P2)'], ['r1', 'Arrival time: non-emergency (P1)']].map(([v, l]) => `<option value="${v}">${l}</option>`).join('') +
     '<optgroup label="Call type">' + C.TOP.map((t, k) => unmappable(k) ? '' : `<option value="t${k}">${tcase(t)}</option>`).join('') + '</optgroup>';
+  msel.value = st.metric; if (msel.value !== st.metric) { st.metric = 'res'; msel.value = 'res'; }
   msel.onchange = () => { st.metric = msel.value; V.refresh(); };
   let m;
   function drawMap(el, first) {
     if (first) {
       el.innerHTML = '<div class="legend"></div><div></div><div class="map"></div>';
-      m = NOLA.map(el.lastChild, { height: 600, extent: [-70, 700, 1250, 1730], label: 'Map of calls by neighborhood',
+      m = NOLA.map(el.lastChild, { height: 600, label: 'Map of calls by neighborhood',
         tip: i => { const r = nb[i];
           const pop = NOLA.popOf(i), rate = NOLA.perK(r[0], pop);
           return `<b>${NOLA.GEO.nb[i].name}</b>` + (st.metric.startsWith('t') ? row(metricLabel(), perRes() ? NOLA.fmtRate(metricVal(i)) : fmt(rawVal(i))) : '') + row('Calls from the public', fmt(r[0])) + row('Started by officers', fmt(r[1]))
             + row('Residents (2020)', pop == null ? '—' : fmt(pop)) + (rate != null ? row('Public calls per 1,000 residents', NOLA.fmtRate(rate)) : '')
             + row('Median arrival, emergency', r[4] >= 30 ? r[2] + ' min' : 'too few calls') + row('Median arrival, non-emergency', r[3] == null ? '—' : Math.round(r[3]) + ' min'); } });
-      NOLA.mapButtons(el.lastChild, m, [['Core city', [-70, 950, 800, 1680]], ['Whole city', [-70, 130, 2110, 1730]]]);
+      NOLA.mapButtons(el.lastChild, m);
+      if (st.nb >= 0) m.focus(st.nb, 0);
     }
     const vals = nb.map((r, i) => metricVal(i)).filter(v => v != null).sort(d3.ascending);
     const lo = isTime() ? d3.quantile(vals, .05) : 0, hi = d3.quantile(vals, .95);
@@ -158,12 +161,24 @@
     });
   }
 
+  // ---------- CSV downloads ----------
+  const hrsLab = h => String(h).padStart(2, '0') + ':00';
+  const csvTrend = () => { const o = []; Object.keys(HIST).sort().forEach(y => HIST[y].forEach((v, m) => { if (!(+y === YEAR && m >= cutMonth)) o.push({ month: `${y}-${String(m + 1).padStart(2, '0')}`, from_public: v[0], started_by_officers: v[1] }); })); return o; };
+  const csvDaily = () => C.daily.map((d, i) => ({ date: NOLA.doyISO(i), from_public: d[0], started_by_officers: d[1] }));
+  const csvHeat = () => { const names = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'], o = []; C.heat.forEach((r, d) => r.forEach((v, h) => o.push({ weekday: names[d], hour: hrsLab(h), calls_from_public: v }))); return o; };
+  const csvTypes = () => rows.map(r => ({ call_type: r.name, calls: r.n, pct_started_by_officers: Math.round(100 * r.selfP), median_arrival_minutes: r.med == null ? '' : r.med, pct_gone_on_arrival: Math.round(100 * r.goaP), pct_report_filed: Math.round(100 * r.rtfP) }));
+  const csvMap = () => NOLA.nbList().map(f => { const r = nb[f.idx], pop = NOLA.popOf(f.idx);
+    return Object.assign({ neighborhood: f.name, residents_2020: pop, from_public: r[0], started_by_officers: r[1], public_per_1000_residents: NOLA.perK(r[0], pop) == null ? '' : +NOLA.perK(r[0], pop).toFixed(1),
+      median_arrival_emergency_min: r[4] >= 30 ? r[2] : '', median_arrival_nonemergency_min: r[3] == null ? '' : r[3] }, ...C.TOP.map((t, k) => unmappable(k) ? {} : { [tcase(t)]: r[5][k] })); });
+  const csvDist = () => C.pd.map(d => ({ district: d[0], from_public: d[1], started_by_officers: d[2], emergency_median_min: d[3], emergency_90th_pct_min: d[4], nonemergency_median_min: d[5] }));
+
   const V = NOLA.views([
-    { id: 'trend', label: 'Calls per month since 2014', draw: drawTrend },
-    { id: 'daily', label: `Calls per day, ${YEAR}`, draw: drawDaily },
-    { id: 'heat', label: 'Calls by weekday and hour', draw: drawHeat },
-    { id: 'types', label: 'Call types', draw: drawTypes },
-    { id: 'map', label: 'Calls by neighborhood', cls: 'card mapp', keep: true, draw: drawMap },
-    { id: 'dist', label: 'Officer arrival time by police district', draw: drawDist },
-  ]);
+    { id: 'trend', label: 'Calls per month since 2014', draw: drawTrend, csv: csvTrend },
+    { id: 'daily', label: `Calls per day, ${YEAR}`, draw: drawDaily, csv: csvDaily },
+    { id: 'heat', label: 'Calls by weekday and hour', draw: drawHeat, csv: csvHeat },
+    { id: 'types', label: 'Call types', draw: drawTypes, csv: csvTypes },
+    { id: 'map', label: 'Calls by neighborhood', cls: 'card mapp', keep: true, draw: drawMap, csv: csvMap },
+    { id: 'dist', label: 'Officer arrival time by police district', draw: drawDist, csv: csvDist },
+  ], { ds: [C.ds || 'es9j-6y5d', `Calls for Service ${YEAR}`],
+       state: () => ({ metric: st.metric !== 'res' ? st.metric : null, basis: st.basis !== 'n' ? st.basis : null, nb: st.nb >= 0 ? st.nb : null }) });
 })();

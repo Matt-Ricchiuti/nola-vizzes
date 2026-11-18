@@ -9,6 +9,15 @@
   const wx = new Float32Array(N), wy = new Float32Array(N);
   for (let i = 0; i < N; i++) { wx[i] = D.x[i] * 1e-5 * COS; wy[i] = -D.y[i] * 1e-5; }
   const toW = (lon, lat) => [(lon - D.lon0) * COS, -(lat - D.lat0)];
+  NOLA.setGeo(DATA.geo);
+  // this inventory has its own neighborhood shapes; match them to the shared list by name to apply the same coverage rule
+  const normN = s => s.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const geoSkip = new Map(NOLA.GEO.nb.map(f => [normN(f.n), f.skip]));
+  const hoodSkip = D.hoods.map(h => { const k = normN(h.n); return geoSkip.get(k) ?? [...geoSkip].some(([g, sk]) => sk && g.startsWith(k)); });
+  const valid = new Uint8Array(N); // trees inside a mapped neighborhood
+  for (let i = 0; i < N; i++) valid[i] = D.h[i] >= 0 && !hoodSkip[D.h[i]] ? 1 : 0;
+  const spCount = new Uint32Array(D.species.length);
+  for (let i = 0; i < N; i++) if (valid[i]) spCount[D.s[i]]++;
 
   // ---------- species groups: top 9, stumps, everything else ----------
   const TOP_COLORS = ['#d9418c', '#3a9a5b', '#c46a28', '#c23a3a', '#178f8f', '#7a68d8', '#d4a017', '#7f9a2e', '#3f7fd6'];
@@ -21,9 +30,9 @@
   const spGroup = new Int16Array(D.species.length);
   groups.forEach((g, gi) => g.sp.forEach(s => spGroup[s] = gi));
   groups.forEach(g => g.count = 0);
-  for (let i = 0; i < N; i++) groups[spGroup[D.s[i]]].count++;
+  for (let i = 0; i < N; i++) if (valid[i]) groups[spGroup[D.s[i]]].count++;
   groups.forEach(g => { g.idx = new Uint32Array(g.count); g.fill = 0; });
-  for (let i = 0; i < N; i++) { const g = groups[spGroup[D.s[i]]]; g.idx[g.fill++] = i; }
+  for (let i = 0; i < N; i++) if (valid[i]) { const g = groups[spGroup[D.s[i]]]; g.idx[g.fill++] = i; }
   const drawOrder = [groups.length - 1, groups.length - 2, ...groups.slice(0, 9).map((_, i) => i)]; // rarer on top
 
   // ---------- neighborhoods ----------
@@ -35,9 +44,14 @@
       for (let k = 0; k < r.length - 1; k++) { const [x0, y0] = toW(...r[k]), [x1, y1] = toW(...r[k + 1]); const c = x0 * y1 - x1 * y0; a += c; cx += (x0 + x1) * c; cy += (y0 + y1) * c; minx = Math.min(minx, x0); maxx = Math.max(maxx, x0); }
       if (Math.abs(a) > bestA) { bestA = Math.abs(a); best = { x: cx / (3 * a), y: cy / (3 * a), w: maxx - minx }; }
     }
-    return { name: h.n, path: p, c: best, n: 0, sp: new Map() };
+    let area = 0, bx0 = 1e9, by0 = 1e9, bx1 = -1e9, by1 = -1e9;
+    for (const poly of h.p) poly.forEach((ring, ri) => { const pts = ring.map(([lo, la]) => toW(lo, la)); area += (ri ? -1 : 1) * Math.abs(d3.polygonArea(pts));
+      if (!ri) pts.forEach(([x, y]) => { bx0 = Math.min(bx0, x); by0 = Math.min(by0, y); bx1 = Math.max(bx1, x); by1 = Math.max(by1, y); }); });
+    return { name: h.n, path: p, c: best, n: 0, sp: new Map(), sqmi: area * 69.05 * 69.05, bbox: [bx0, by0, bx1, by1] };
   });
-  for (let i = 0; i < N; i++) { const h = D.h[i]; if (h < 0) continue; const H = hoods[h]; H.n++; H.sp.set(D.s[i], (H.sp.get(D.s[i]) || 0) + 1); }
+  hoods.forEach((H, i) => H.skip = hoodSkip[i]);
+  for (let i = 0; i < N; i++) { if (!valid[i]) continue; const H = hoods[D.h[i]]; H.n++; H.sp.set(D.s[i], (H.sp.get(D.s[i]) || 0) + 1); }
+  const hoodList = hoods.map((h, i) => [h, i]).filter(([h]) => !h.skip).sort((a, b) => a[0].name.localeCompare(b[0].name));
   const shapePath = (geoms, close) => { const p = new Path2D(); for (const g of geoms) for (const part of g) {
     if (close) { for (const ring of part) { ring.forEach(([lo, la], k) => { const [x, y] = toW(lo, la); k ? p.lineTo(x, y) : p.moveTo(x, y); }); p.closePath(); } }
     else part.forEach(([lo, la], k) => { const [x, y] = toW(lo, la); k ? p.lineTo(x, y) : p.moveTo(x, y); }); } return p; };
@@ -61,7 +75,7 @@
 
   // ---------- spatial grid for hover ----------
   const CELL = 0.0012; let gx0 = Infinity, gy0 = Infinity, gx1 = -Infinity, gy1 = -Infinity;
-  for (let i = 0; i < N; i++) { if (wx[i] < gx0) gx0 = wx[i]; if (wx[i] > gx1) gx1 = wx[i]; if (wy[i] < gy0) gy0 = wy[i]; if (wy[i] > gy1) gy1 = wy[i]; }
+  for (let i = 0; i < N; i++) { if (!valid[i]) continue; if (wx[i] < gx0) gx0 = wx[i]; if (wx[i] > gx1) gx1 = wx[i]; if (wy[i] < gy0) gy0 = wy[i]; if (wy[i] > gy1) gy1 = wy[i]; }
   const GW = Math.ceil((gx1 - gx0) / CELL) + 1, GH = Math.ceil((gy1 - gy0) / CELL) + 1;
   const cellStart = new Uint32Array(GW * GH + 1), cellOf = new Uint32Array(N);
   for (let i = 0; i < N; i++) { const c = Math.floor((wy[i] - gy0) / CELL) * GW + Math.floor((wx[i] - gx0) / CELL); cellOf[i] = c; cellStart[c + 1]++; }
@@ -69,8 +83,15 @@
   const cellItems = new Uint32Array(N); { const f = cellStart.slice(); for (let i = 0; i < N; i++) cellItems[f[cellOf[i]]++] = i; }
 
   // ---------- filters: species search (map + neighborhoods), group toggles (map) ----------
-  let selSp = -1;
-  const isVisible = i => selSp >= 0 ? D.s[i] === selSp : groups[spGroup[D.s[i]]].on;
+  const H0 = NOLA.hashState();
+  let selSp = H0.sp != null ? +H0.sp : -1, selNb = H0.nb != null ? +H0.nb : -1, dens = H0.dens === '1';
+  const inNb = i => selNb < 0 || D.h[i] === selNb;
+  const isVisible = i => valid[i] && inNb(i) && (selSp >= 0 ? D.s[i] === selSp : groups[spGroup[D.s[i]]].on);
+  const nbSel = document.getElementById('nbSel');
+  nbSel.innerHTML = '<option value="-1">All neighborhoods</option>' + hoodList.map(([h, i]) => `<option value="${i}">${esc(h.name)}</option>`).join('');
+  nbSel.value = selNb;
+  nbSel.onchange = () => { selNb = +nbSel.value; if (cv) zoomToHood(); V.refresh(); };
+  NOLA.chips(document.getElementById('densChips'), [{ label: 'Trees', value: 0 }, { label: 'Trees per sq. mi.', value: 1 }], v => { dens = !!v; V.refresh(); }, { sel: dens ? 1 : 0 });
   const labelOf = s => `${s[0]} (${s[1]})`;
   const byLabel = new Map(D.species.map((s, i) => [labelOf(s).toLowerCase(), i]));
   const dl = document.getElementById('spList');
@@ -101,6 +122,10 @@
     gchips.appendChild(all);
   }
 
+  // ---------- trees per square mile (map shading) ----------
+  hoods.forEach(h => h.dens = h.sqmi > 0 ? h.n / h.sqmi : 0);
+  const densHi = d3.quantile(hoods.filter(h => !h.skip).map(h => h.dens).sort(d3.ascending), .95);
+
   // ---------- canvas map ----------
   let cv, ctx, W = 0, H = 0, DPR = 1, view = { s: 1, tx: 0, ty: 0 }, C = {}, raf = 0, hoverHood = -1, hoverTree = -1;
   const req = () => { if (cv && !raf) raf = requestAnimationFrame(draw); };
@@ -108,10 +133,16 @@
     const pad = 16, w = W - 2 * pad, h = H - 2 * pad, s = Math.min(w / (gx1 - gx0), h / (gy1 - gy0));
     view.s = s; view.tx = pad + (w - (gx1 - gx0) * s) / 2 - gx0 * s; view.ty = pad + (h - (gy1 - gy0) * s) / 2 - gy0 * s;
   }
+  function zoomToHood() {
+    if (selNb < 0) { fit(); return; }
+    const [x0, y0, x1, y1] = hoods[selNb].bbox, padPx = 40;
+    const s = Math.min((W - 2 * padPx) / (x1 - x0), (H - 2 * padPx) / (y1 - y0));
+    view.s = s; view.tx = W / 2 - (x0 + x1) / 2 * s; view.ty = H / 2 - (y0 + y1) / 2 * s;
+  }
   function resize() { DPR = Math.min(devicePixelRatio || 1, 2); W = cv.clientWidth; H = cv.clientHeight; cv.width = W * DPR; cv.height = H * DPR; }
   function readColors() {
     const cs = getComputedStyle(document.documentElement);
-    for (const k of ['water', 't-land', 't-hood', 'landline', 't-hood-hi', 't-dim', 'ink', 'ink2', 'muted', 'surface', 'road', 'road-major', 'road-fwy']) C[k] = cs.getPropertyValue('--' + k).trim();
+    for (const k of ['water', 't-land', 't-hood', 'landline', 't-hood-hi', 't-dim', 'ink', 'ink2', 'muted', 'surface', 'road', 'road-major', 'road-fwy', 'q1', 'q2', 'q3', 'q4', 'q5', 'q6', 'q7']) C[k] = cs.getPropertyValue('--' + k).trim();
     groups.forEach(g => { if (g.colorVar) g.color = cs.getPropertyValue(g.colorVar).trim(); });
   }
   function draw() {
@@ -120,15 +151,17 @@
     ctx.setTransform(DPR * s, 0, 0, DPR * s, DPR * view.tx, DPR * view.ty);
     ctx.fillStyle = C['t-land']; ctx.fill(landPath, 'evenodd');
     ctx.fillStyle = C.water; ctx.fill(lakePath, 'evenodd');
-    ctx.fillStyle = C['t-hood']; hoods.forEach(h => ctx.fill(h.path));
-    if (hoverHood >= 0) { ctx.fillStyle = C['t-hood-hi']; ctx.fill(hoods[hoverHood].path); }
+    if (dens) hoods.forEach(h => { if (h.skip) return; ctx.fillStyle = C['q' + (1 + Math.max(0, Math.min(6, Math.floor(h.dens / densHi * 7))))]; ctx.fill(h.path); });
+    else { ctx.fillStyle = C['t-hood']; hoods.forEach(h => { if (!h.skip) ctx.fill(h.path); }); }
+    if (hoverHood >= 0 && !dens) { ctx.fillStyle = C['t-hood-hi']; ctx.fill(hoods[hoverHood].path); } // in density mode the outline is enough
     ctx.fillStyle = C.water; ctx.fill(waterPath);
     ctx.lineJoin = 'round'; ctx.lineCap = 'round';
     { const base = Math.max(0.5, Math.min(4, s * 0.00003));
       ctx.strokeStyle = C.road; ctx.lineWidth = Math.max(0.4, base * Math.min(1, s / 12000)) / s; ctx.stroke(roadPaths[2]);
       ctx.strokeStyle = C['road-major']; ctx.lineWidth = Math.max(0.7, base * 1.6) / s; ctx.stroke(roadPaths[3]); ctx.stroke(roadPaths[1]);
       ctx.strokeStyle = C['road-fwy']; ctx.lineWidth = Math.max(1.2, base * 2.4) / s; ctx.stroke(roadPaths[0]); }
-    ctx.strokeStyle = C.landline; ctx.lineWidth = 1 / s; hoods.forEach(h => ctx.stroke(h.path));
+    ctx.strokeStyle = C.landline; ctx.lineWidth = 1 / s; hoods.forEach(h => { if (!h.skip) ctx.stroke(h.path); });
+    if (selNb >= 0) { ctx.strokeStyle = C.ink; ctx.lineWidth = 2.4 / s; ctx.stroke(hoods[selNb].path); }
     if (hoverHood >= 0) { ctx.strokeStyle = C.ink; ctx.lineWidth = 1.5 / s; ctx.stroke(hoods[hoverHood].path); }
     // trees
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
@@ -141,13 +174,15 @@
         const px = x * s + view.tx, py = y * s + view.ty;
         if (circles) { ctx.moveTo(px + r, py); ctx.arc(px, py, r, 0, 6.2832); } else ctx.rect(px - r, py - r, r * 2, r * 2); any = true; }
       if (any) ctx.fill(); };
+    if (selNb >= 0) for (const gi of drawOrder) plot(groups[gi].idx, C['t-dim'], i => !inNb(i));
+    const here = selNb >= 0 ? inNb : null;
     if (selSp >= 0) {
-      for (const gi of drawOrder) plot(groups[gi].idx, C['t-dim'], i => D.s[i] !== selSp);
+      for (const gi of drawOrder) plot(groups[gi].idx, C['t-dim'], i => D.s[i] !== selSp && inNb(i));
       const g = groups[spGroup[selSp]], col = spGroup[selSp] < 9 ? g.color : (selSp === stumpIdx ? g.color : TOP_COLORS[0]), big = Math.max(r * 1.6, 1.6);
       ctx.fillStyle = col; ctx.beginPath();
-      for (const i of g.idx) { if (D.s[i] !== selSp) continue; const px = wx[i] * s + view.tx, py = wy[i] * s + view.ty; ctx.moveTo(px + big, py); ctx.arc(px, py, big, 0, 6.2832); }
+      for (const i of g.idx) { if (D.s[i] !== selSp || !inNb(i)) continue; const px = wx[i] * s + view.tx, py = wy[i] * s + view.ty; ctx.moveTo(px + big, py); ctx.arc(px, py, big, 0, 6.2832); }
       ctx.fill();
-    } else for (const gi of drawOrder) { const g = groups[gi]; if (g.on) plot(g.idx, g.color); }
+    } else for (const gi of drawOrder) { const g = groups[gi]; if (g.on) plot(g.idx, g.color, here); }
     drawLabels(s);
     if (hoverTree >= 0) { const px = wx[hoverTree] * s + view.tx, py = wy[hoverTree] * s + view.ty; ctx.strokeStyle = C.ink; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(px, py, Math.max(r, 2) + 3, 0, 6.2832); ctx.stroke(); }
   }
@@ -196,7 +231,7 @@
   function hover(ev, x, y, tap) {
     const t = view.s > 4000 ? nearestTree(x, y, tap ? 12 : 7) : -1;
     ctx.setTransform(view.s, 0, 0, view.s, view.tx, view.ty);
-    let hh = -1; for (let k = 0; k < hoods.length; k++) if (ctx.isPointInPath(hoods[k].path, x, y)) { hh = k; break; }
+    let hh = -1; for (let k = 0; k < hoods.length; k++) if (!hoods[k].skip && ctx.isPointInPath(hoods[k].path, x, y)) { hh = k; break; }
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     if (t !== hoverTree || hh !== hoverHood) { hoverTree = t; hoverHood = hh; req(); }
     if (t >= 0) {
@@ -204,14 +239,14 @@
       tip.show(`<b>${esc(sp[0])}</b><div style="color:var(--ink2)"><i>${esc(sp[1])}</i></div>` + (D.near[t] >= 0 ? row('Near', esc(D.roadNames[D.near[t]])) : '') + (D.h[t] >= 0 ? row('Neighborhood', esc(hoods[D.h[t]].name)) : ''), ev);
     } else if (hh >= 0) {
       const H = hoods[hh], top = [...H.sp].sort((a, b) => b[1] - a[1]).slice(0, 4);
-      tip.show(`<b>${esc(H.name)}</b>` + row('Trees', fmt(H.n)) + row('Species', H.sp.size) + '<div style="margin-top:4px"></div>' + top.map(([s, c]) => row(esc(D.species[s][0]), fmt(c))).join(''), ev);
+      tip.show(`<b>${esc(H.name)}</b>` + row('Trees', fmt(H.n)) + row('Per sq. mi.', fmt(Math.round(H.dens))) + row('Species', H.sp.size) + '<div style="margin-top:4px"></div>' + top.map(([s, c]) => row(esc(D.species[s][0]), fmt(c))).join(''), ev);
     } else tip.hide();
   }
   function initMap(el) {
-    el.innerHTML = '<canvas class="tmap" aria-label="Map of street trees in New Orleans, colored by species"></canvas><div class="row zoomhint"></div>';
-    cv = el.firstChild; ctx = cv.getContext('2d');
+    el.innerHTML = '<div class="legend dleg"></div><canvas class="tmap" aria-label="Map of street trees in New Orleans, colored by species"></canvas><div class="row zoomhint"></div>';
+    cv = el.querySelector('canvas'); ctx = cv.getContext('2d');
     const zoomAt = (f, x, y) => { const ns = Math.max(1500, Math.min(600000, view.s * f)); f = ns / view.s; view.tx = x - (x - view.tx) * f; view.ty = y - (y - view.ty) * f; view.s = ns; req(); };
-    [['Zoom in', () => zoomAt(1.8, W / 2, H / 2)], ['Zoom out', () => zoomAt(1 / 1.8, W / 2, H / 2)], ['Whole city', () => { fit(); req(); }]].forEach(([l, fn]) => {
+    [['Zoom in', () => zoomAt(1.8, W / 2, H / 2)], ['Zoom out', () => zoomAt(1 / 1.8, W / 2, H / 2)], ['Reset view', () => { zoomToHood(); req(); }]].forEach(([l, fn]) => {
       const b = document.createElement('button'); b.className = 'btn'; b.textContent = l; b.onclick = fn; el.lastChild.appendChild(b); });
     const pointers = new Map(); let last = null, pinch = null, moved = false;
     cv.addEventListener('wheel', e => { e.preventDefault(); zoomAt(Math.exp(-e.deltaY * 0.0015), e.offsetX, e.offsetY); }, { passive: false });
@@ -235,11 +270,13 @@
     const reTheme = () => { readColors(); buildChips(); req(); };
     matchMedia('(prefers-color-scheme: dark)').addEventListener('change', reTheme);
     new MutationObserver(reTheme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
-    resize(); fit(); readColors(); buildChips();
+    resize(); zoomToHood(); readColors(); buildChips();
   }
   function drawMap(el, first) {
     if (first) initMap(el);
-    else if (W !== cv.clientWidth || H !== cv.clientHeight) { resize(); fit(); }
+    else if (W !== cv.clientWidth || H !== cv.clientHeight) { resize(); zoomToHood(); }
+    const lg = el.querySelector('.dleg'); lg.hidden = !dens;
+    if (dens) NOLA.seqLegend(lg, [0, densHi], v => fmt(Math.round(v)), 'Trees per sq. mi.:');
     draw();
   }
 
@@ -257,20 +294,35 @@
       .on('mousemove', (ev, d) => tip.show(`<b>${esc(d.name)}</b>` + (d.sub ? `<div style="color:var(--ink2)"><i>${esc(d.sub)}</i></div>` : '') + row(label, fmt(d.v)) + (d.extra || ''), ev)).on('mouseleave', tip.hide);
   }
   function drawSpecies(el) {
-    const items = D.species.map((s, i) => ({ name: s[0], sub: s[1], v: s[2], i })).sort((a, b) => b.v - a.v).slice(0, 30)
-      .map(d => ({ ...d, color: groups[spGroup[d.i]].color, extra: row('Share of all trees', (100 * d.v / N).toFixed(1) + '%') }));
+    const cnt = selNb >= 0 ? hoods[selNb].sp : new Map(D.species.map((s, i) => [i, spCount[i]]));
+    const tot = selNb >= 0 ? hoods[selNb].n : d3.sum(spCount);
+    const items = [...cnt].map(([i, v]) => ({ name: D.species[i][0], sub: D.species[i][1], v, i })).filter(d => d.v > 0).sort((a, b) => b.v - a.v).slice(0, 30)
+      .map(d => ({ ...d, color: groups[spGroup[d.i]].color, extra: row('Share of trees' + (selNb >= 0 ? ' here' : ''), (100 * d.v / tot).toFixed(1) + '%') }));
     hbars(el, items);
   }
   function drawHoods(el) {
-    const items = hoods.map((h, hi) => ({ name: h.name, v: selSp >= 0 ? (h.sp.get(selSp) || 0) : h.n, extra: selSp >= 0 ? row('All trees', fmt(h.n)) : row('Species', h.sp.size) }))
+    const items = hoodList.map(([h, hi]) => { const n = selSp >= 0 ? (h.sp.get(selSp) || 0) : h.n, v = dens ? Math.round(n / h.sqmi) : n;
+      return { name: h.name, v, hi, color: hi === selNb ? 'var(--ink)' : null, extra: (dens ? row('Trees', fmt(n)) : row('Per sq. mi.', fmt(Math.round(n / h.sqmi)))) + (selSp >= 0 ? row('All trees', fmt(h.n)) : row('Species', h.sp.size)) }; })
       .filter(d => d.v > 0).sort((a, b) => b.v - a.v);
     const col = selSp >= 0 ? (spGroup[selSp] < 9 ? groups[spGroup[selSp]].color : TOP_COLORS[0]) : 'var(--s3)';
-    hbars(el, items, { color: col, label: selSp >= 0 ? D.species[selSp][0] : 'Trees' });
+    hbars(el, items, { color: col, label: (selSp >= 0 ? D.species[selSp][0] : 'Trees') + (dens ? ' per sq. mi.' : '') });
   }
 
+  // ---------- CSV downloads ----------
+  const ll = i => [+(D.x[i] * 1e-5 + D.lon0).toFixed(6), +(D.y[i] * 1e-5 + D.lat0).toFixed(6)];
+  const csvMap = () => { const o = []; for (let i = 0; i < N; i++) if (isVisible(i)) { const [lon, lat] = ll(i), sp = D.species[D.s[i]];
+    o.push({ species: sp[0], botanical_name: sp[1], neighborhood: hoods[D.h[i]].name, near_street: D.near[i] >= 0 ? D.roadNames[D.near[i]] : '', lon, lat }); } return o; };
+  const csvSpecies = () => { const cnt = selNb >= 0 ? hoods[selNb].sp : new Map(D.species.map((s, i) => [i, spCount[i]]));
+    return [...cnt].filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]).map(([i, v]) => ({ species: D.species[i][0], botanical_name: D.species[i][1], trees: v, neighborhood: selNb >= 0 ? hoods[selNb].name : 'All' })); };
+  const csvHoods = () => hoodList.map(([h]) => ({ neighborhood: h.name, trees: h.n, sq_mi: +h.sqmi.toFixed(2), trees_per_sq_mi: Math.round(h.n / h.sqmi), species_count: h.sp.size,
+    ...(selSp >= 0 ? { [D.species[selSp][0]]: h.sp.get(selSp) || 0 } : {}) }));
+
+  readColors(); buildChips(); // colors and species buttons are needed by every view, not just the map
   const V = NOLA.views([
-    { id: 'map', label: 'Map of every tree', cls: 'card mapp', keep: true, draw: drawMap },
-    { id: 'species', label: 'Most common species', draw: drawSpecies },
-    { id: 'hoods', label: 'Trees by neighborhood', draw: drawHoods },
-  ]);
+    { id: 'map', label: 'Map of every tree', cls: 'card mapp', keep: true, draw: drawMap, csv: csvMap },
+    { id: 'species', label: 'Most common species', draw: drawSpecies, csv: csvSpecies },
+    { id: 'hoods', label: 'Trees by neighborhood', draw: drawHoods, csv: csvHoods },
+  ], { ds: ['3tyj-9x33', 'Tree Location'],
+       state: () => ({ sp: selSp >= 0 ? selSp : null, nb: selNb >= 0 ? selNb : null, dens: dens ? 1 : null }) });
+  if (selSp >= 0) { q.value = labelOf(D.species[selSp]); qClear.hidden = false; }
 })();

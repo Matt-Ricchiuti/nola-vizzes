@@ -36,22 +36,27 @@
   const sw = c => `<i style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${c}"></i> `;
 
   // ---------- filters ----------
-  const st = { cat: -1, period: 'all' };
-  const inPeriod = f => st.period === 'all' || (st.period === 'early' ? f.day < DFR : f.day >= DFR);
+  const H = NOLA.hashState();
+  const st = { cat: H.cat != null ? +H.cat : -1, period: SPLIT && H.period ? H.period : 'all', nb: H.nb != null ? +H.nb : -1 };
+  const inNb = f => st.nb < 0 || f.nb === st.nb;
+  const inPeriod = f => (st.period === 'all' || (st.period === 'early' ? f.day < DFR : f.day >= DFR)) && inNb(f);
   const pass = f => (st.cat < 0 || f.cat === st.cat) && inPeriod(f);
-  NOLA.chips(document.getElementById('catChips'), [{ label: 'All purposes', value: -1 }, ...CATS.map((c, i) => ({ label: c.n, value: i, color: c.color }))], v => { st.cat = v; V.refresh(); }, { sel: -1 });
-  if (SPLIT) NOLA.chips(document.getElementById('perChips'), [{ label: 'Whole year', value: 'all' }, { label: `Jan 1 – ${NOLA.doyDate(DFR - 1)}`, value: 'early' }, { label: `Since ${dfrLabel}`, value: 'late' }], v => { st.period = v; V.refresh(); }, { sel: 'all' });
+  NOLA.chips(document.getElementById('catChips'), [{ label: 'All purposes', value: -1 }, ...CATS.map((c, i) => ({ label: c.n, value: i, color: c.color }))], v => { st.cat = v; V.refresh(); }, { sel: st.cat });
+  if (SPLIT) NOLA.chips(document.getElementById('perChips'), [{ label: 'Whole year', value: 'all' }, { label: `Jan 1 – ${NOLA.doyDate(DFR - 1)}`, value: 'early' }, { label: `Since ${dfrLabel}`, value: 'late' }], v => { st.period = v; V.refresh(); }, { sel: st.period });
   else document.getElementById('perChips').remove();
+  NOLA.nbSelect(document.getElementById('nbSel'), v => { st.nb = v; if (m) m.focus(v); V.refresh(); }, st.nb, 'All neighborhoods (launch site)');
+  const nbName = i => i >= 0 ? NOLA.GEO.nb[i].name : '';
+  const hm = h => String(Math.floor(h)).padStart(2, '0') + ':' + String(Math.round((h % 1) * 60) % 60).padStart(2, '0');
 
   // ---------- flights per week ----------
   function drawWeek(el) {
     el.innerHTML = '<div></div>'; // the purpose filter buttons double as the color key
     const nW = Math.floor(LAST / 7) + 1;
     const weeks = d3.range(nW).map(() => CATS.map(() => 0));
-    flights.forEach(f => weeks[Math.floor(f.day / 7)][f.cat]++);
+    flights.filter(inNb).forEach(f => weeks[Math.floor(f.day / 7)][f.cat]++);
     const tl = NOLA.frame(el.lastChild, { h: 300, m: { t: 34, r: 12, b: 28, l: 36 } });
     const xw = d3.scaleBand().domain(d3.range(nW)).range([0, tl.iw]).paddingInner(0.18);
-    const yw = d3.scaleLinear().domain([0, d3.max(weeks, w => d3.sum(w)) * 1.05]).range([tl.ih, 0]).nice();
+    const yw = d3.scaleLinear().domain([0, Math.max(4, d3.max(weeks, w => d3.sum(w))) * 1.05]).range([tl.ih, 0]).nice();
     NOLA.yGrid(tl, yw, 4, d3.format('d'));
     const segs = [];
     weeks.forEach((w, wi) => { let y0 = 0; w.forEach((v, ci) => { if (v) segs.push({ wi, ci, y0, y1: y0 + v }); y0 += v; }); });
@@ -69,7 +74,7 @@
     Object.entries(EVN).forEach(([code, name]) => {
       const byW = d3.rollup(flights.filter(f => f.ev === +code), v => v.length, f => Math.floor(f.day / 7));
       const top = [...byW].sort((a, b) => b[1] - a[1] || a[0] - b[0])[0];
-      if (top && top[1] >= 4) ann.push([top[0], name, top[0] === 0 ? 'start' : 'middle']);
+      if (top && top[1] >= 4 && st.nb < 0) ann.push([top[0], name, top[0] === 0 ? 'start' : 'middle']);
     });
     ann.sort((a, b) => a[0] - b[0]);
     if (SPLIT && DFR <= LAST) ann.unshift([Math.floor(DFR / 7), `${dfrLabel}: daily dispatch flights begin`, 'end']);
@@ -94,14 +99,14 @@
   function drawMap(el, first) {
     if (first) {
       el.innerHTML = '<div class="map"></div>';
-      m = NOLA.map(el.lastChild, { height: 600, extent: [20, 1080, 760, 1640], label: 'Map of drone launch points',
-        labels: ['FRENCH QUARTER', 'CENTRAL BUSINESS DISTRICT', 'LOWER GARDEN DISTRICT', 'MID-CITY', 'ALGIERS POINT', 'GENTILLY TERRACE', 'BYWATER', 'UPTOWN', 'LAKEVIEW'],
+      m = NOLA.map(el.lastChild, { height: 600, label: 'Map of drone launch points',
         tip: i => `<b>${NOLA.GEO.nb[i].name}</b>` + row('Flights launched here', fmt(flights.filter(f => f.nb === i && pass(f)).length)) });
-      NOLA.mapButtons(el.lastChild, m, [['Downtown', [200, 1250, 480, 1480]], ['Core city', [20, 1080, 760, 1640]], ['Whole city', [-70, 130, 2110, 1730]]]);
+      NOLA.mapButtons(el.lastChild, m);
       dots = m.layer.append('g');
+      if (st.nb >= 0) m.focus(st.nb, 0);
       m.onZoom(k => dots.selectAll('circle').attr('r', d => (3 + Math.sqrt(d.n) * 2.2) / k).attr('stroke-width', 1.5 / k));
     }
-    const data = d3.groups(flights.filter(f => f.hasLoc && pass(f)), f => Math.round(f.x / 3) + ',' + Math.round(f.y / 3)).map(([, fs]) => {
+    const data = d3.groups(flights.filter(f => f.hasLoc && NOLA.shown(f.nb) && pass(f)), f => Math.round(f.x / 3) + ',' + Math.round(f.y / 3)).map(([, fs]) => {
       const counts = CATS.map((c, ci) => fs.filter(f => f.cat === ci).length);
       return { fs, x: d3.mean(fs, f => f.x), y: d3.mean(fs, f => f.y), n: fs.length, cat: counts.indexOf(d3.max(counts)), counts };
     }).sort((a, b) => b.n - a.n);
@@ -166,11 +171,20 @@
     }).on('mouseleave', tip.hide);
   }
 
+  // ---------- CSV downloads (what the chart shows, with its filters) ----------
+  const flightRows = fs => fs.map(f => { const [lon, lat] = f.hasLoc ? NOLA.lonlat(f.x, f.y) : ['', ''];
+    return { date: NOLA.doyISO(f.day), time_central: hm(f.hr), purpose: CATS[f.cat].n, neighborhood: nbName(f.nb), drone: 'X10-' + D.drones[f.drone], minutes: Math.round(f.dur / 6) / 10, lon, lat }; });
+  const csvWeek = () => d3.range(Math.floor(LAST / 7) + 1).map(w => { const fs = flights.filter(f => inNb(f) && Math.floor(f.day / 7) === w);
+    return Object.assign({ week_of: NOLA.doyISO(w * 7), flights: fs.length }, ...CATS.map((c, ci) => ({ [c.n]: fs.filter(f => f.cat === ci).length }))); });
+  const csvPurpose = () => CATS.map((c, ci) => { const fs = flights.filter(f => f.cat === ci && inPeriod(f)); return { purpose: c.n, flights: fs.length, hours: +(d3.sum(fs, f => f.dur) / 3600).toFixed(1), median_minutes: fs.length ? Math.round(med(fs)) : '' }; });
+  const csvHour = () => { const fs = flights.filter(pass); return d3.range(24).map(h => ({ hour_central: hrLab(h), flights: fs.filter(f => Math.floor(f.hr) === h).length })); };
+  const csvFleet = () => D.drones.map((dn, d) => { const fs = flights.filter(f => f.drone === d && pass(f)); return { drone: 'X10-' + dn, flights: fs.length, first: fs.length ? NOLA.doyISO(d3.min(fs, f => f.day)) : '', last: fs.length ? NOLA.doyISO(d3.max(fs, f => f.day)) : '' }; });
+
   const V = NOLA.views([
-    { id: 'week', label: 'Flights per week, by purpose', draw: drawWeek },
-    { id: 'map', label: 'Launch points', cls: 'card mapp', keep: true, draw: drawMap },
-    { id: 'purpose', label: 'Flights by purpose', draw: drawPurpose },
-    { id: 'hour', label: 'Takeoffs by hour (Central time)', draw: drawHour },
-    { id: 'fleet', label: 'Flights by drone', draw: drawFleet },
-  ]);
+    { id: 'week', label: 'Flights per week, by purpose', draw: drawWeek, csv: csvWeek },
+    { id: 'map', label: 'Launch points', cls: 'card mapp', keep: true, draw: drawMap, csv: () => flightRows(flights.filter(f => NOLA.shown(f.nb) && pass(f))) },
+    { id: 'purpose', label: 'Flights by purpose', draw: drawPurpose, csv: csvPurpose },
+    { id: 'hour', label: 'Takeoffs by hour (Central time)', draw: drawHour, csv: csvHour },
+    { id: 'fleet', label: 'Flights by drone', draw: drawFleet, csv: csvFleet },
+  ], { ds: ['ay9z-ynxz', 'NOPD Drone Flights'], state: () => ({ cat: st.cat >= 0 ? st.cat : null, period: st.period !== 'all' ? st.period : null, nb: st.nb >= 0 ? st.nb : null }) });
 })();

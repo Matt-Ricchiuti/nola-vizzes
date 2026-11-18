@@ -37,7 +37,7 @@ cfs_year, drone_year = cfs_meta.get('year', 2026), drone_meta.get('year', 2026)
 TOKENS = {'{{PULLED}}': pulled.strftime('%b ') + str(pulled.day) + pulled.strftime(', %Y'),
           '{{CFS_YEAR}}': str(cfs_year), '{{CFS_PREV}}': str(cfs_year - 1), '{{CFS_DS}}': cfs_meta.get('ds', 'es9j-6y5d'),
           '{{DRONE_YEAR}}': str(drone_year),
-          '{{FOOT}}': '<div class="foot">Data: <a href="https://data.nola.gov">data.nola.gov</a> · Not affiliated with the City of New Orleans · <a href="about.html">About</a></div>'}
+          '{{FOOT}}': '<div class="foot">Data: <a id="dataLink" href="https://data.nola.gov">data.nola.gov</a> · Not affiliated with the City of New Orleans · <a href="about.html">About</a></div>'}
 
 def nav(key):
     return ('<div class="site"><b><a href="index.html" style="color:inherit;text-decoration:none">NOLA Open Data, visualized</a></b><nav>'

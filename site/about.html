@@ -35,7 +35,10 @@ h2{font-size:19px;margin:0 0 4px}
 .src{font-size:13px;color:var(--muted);margin:0 0 22px}
 .src a{color:var(--ink2)}
 .card{background:var(--surface);border:1px solid var(--ring);border-radius:12px;padding:18px}
-.viewbar{margin:0 0 12px}
+.viewbar{margin:0 0 12px;display:flex;flex-wrap:wrap;align-items:center;gap:10px}
+.viewbar .tools{margin-left:auto;display:flex;gap:6px}
+.nbfocus{fill:none;stroke:var(--ink);stroke-width:2.4;vector-effect:non-scaling-stroke}
+.nbsel{font-size:13px}
 .viewsel{font-size:17px;font-weight:600;padding:7px 38px 7px 12px;border-radius:10px;max-width:100%;cursor:pointer;
   appearance:none;-webkit-appearance:none;background:var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%23898781' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 13px center}
 [hidden]{display:none!important}
@@ -104,8 +107,9 @@ tbody tr:hover td{background:var(--chip)}
 <li><b>Drone flights.</b> Takeoff times appear to be UTC and are shown in Central time. Purposes are grouped from a free-text field; when it's blank, the activity summary is used. Locations are takeoff points, not flight paths.</li>
 <li><b>Planning cases.</b> Cases with several types are grouped under the most consequential one. Topics come from keywords in case descriptions. A neighborhood notice (NPP) and the case it leads to are separate records.</li>
 <li><b>Street trees.</b> A one-time inventory export from October 2026, not refreshed daily.</li>
+<li>Maps leave out neighborhoods with under 100 residents per square mile (Lake Catherine and Viavant–Venetian Isles), where there is too little data to show.</li>
 <li>Other neighborhood figures are totals, not per resident.</li>
 </ul>
 </div>
-<div class="foot">Data: <a href="https://data.nola.gov">data.nola.gov</a> · Not affiliated with the City of New Orleans · <a href="about.html">About</a></div>
+<div class="foot">Data: <a id="dataLink" href="https://data.nola.gov">data.nola.gov</a> · Not affiliated with the City of New Orleans · <a href="about.html">About</a></div>
 </div></body></html>

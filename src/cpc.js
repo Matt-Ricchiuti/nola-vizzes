@@ -15,6 +15,10 @@
   const nbName = i => i >= 0 ? NOLA.GEO.nb[i].name : '—';
   const sw = c => `<i style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${c}"></i> `;
 
+  const H = NOLA.hashState();
+  const st = { fold: H.fold != null ? +H.fold : -1, theme: H.theme != null ? +H.theme : -1, nb: H.nb != null ? +H.nb : -1 };
+  NOLA.nbSelect(document.getElementById('nbSel'), v => { st.nb = v; V.refresh(); }, st.nb);
+
   // ---------- upcoming hearings: map + agenda ----------
   const seen = new Set();
   const up = P.up.filter(u => { const k = u[0] + u[2]; if (seen.has(k)) return false; seen.add(k); return true; })
@@ -22,20 +26,23 @@
   const dayFmt = s => new Date(s.slice(0, 10) + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
   const timeFmt = s => { const h = +s.slice(11, 13), mi = s.slice(14, 16); return !h && mi === '00' ? '' : (h % 12 || 12) + ':' + mi + (h < 12 ? ' a.m.' : ' p.m.'); };
   const cleanDesc = s => s.replace(/^Zoning Docket \d+\/\d+\s*/, '').replace(/^Applicant\(s\):\s*/, '').replace(/^Request:\s*/, '') + (s.length >= 170 ? '…' : '');
+  const upF = () => up.filter(u => st.nb < 0 || u.nb === st.nb);
   function drawUpcoming(el) {
+    const up = upF();
     el.innerHTML = NOLA.legendHTML(FOLD.filter((f, i) => up.some(u => u.fold === i)).map(f => [f.color, f.n, 1])) +
       '<div class="split"><div class="map card mapp"></div><div class="card" id="uplist"></div></div>';
     const umEl = el.querySelector('.map'), list = el.querySelector('#uplist');
-    const um = NOLA.map(umEl, { height: 620, extent: [-20, 880, 1000, 1640], label: 'Map of upcoming planning cases' });
-    NOLA.mapButtons(umEl, um, [['Core city', [-20, 880, 1000, 1640]], ['Whole city', [-70, 130, 2110, 1730]]]);
+    const um = NOLA.map(umEl, { height: 620, label: 'Map of upcoming planning cases' });
+    NOLA.mapButtons(umEl, um);
+    if (st.nb >= 0) um.focus(st.nb, 0);
     const upTip = d => `<b>${d.addr}</b><div style="color:var(--ink2)">${d.type} · ${d.cnum}</div>` + row('Hearing', dayFmt(d.when) + (timeFmt(d.when) ? ', ' + timeFmt(d.when) : '')) + row('Body', d.body) + row('Neighborhood', nbName(d.nb)) + `<div style="margin-top:6px">${cleanDesc(d.desc)}</div>`;
-    const ud = um.layer.append('g').selectAll('circle').data(up.filter(u => u.x || u.y)).join('circle').attr('cx', d => d.x).attr('cy', d => d.y).attr('r', 7)
+    const ud = um.layer.append('g').selectAll('circle').data(up.filter(u => (u.x || u.y) && NOLA.shown(u.nb))).join('circle').attr('cx', d => d.x).attr('cy', d => d.y).attr('r', 7)
       .attr('fill', d => FOLD[d.fold].color).attr('stroke', 'var(--surface)').attr('stroke-width', 2)
       .on('mousemove', (ev, d) => { tip.show(upTip(d), ev); hi(d); }).on('mouseleave', () => { tip.hide(); hi(null); });
     um.onZoom(k => ud.attr('r', 7 / Math.sqrt(k)).attr('stroke-width', 2 / Math.sqrt(k)));
     list.innerHTML = up.length ? d3.groups(up, u => u.when.slice(0, 10)).map(([day, us]) => `<div class="day"><div class="dh">${dayFmt(day)} · ${[...new Set(us.map(u => u.body))].join(', ')}</div>` +
       us.map(u => `<div class="ui" data-c="${u.cnum}${u.when}"><i style="background:${FOLD[u.fold].color}"></i><div><b>${u.addr}</b> <span class="ty">${u.type}</span><div class="ds">${cleanDesc(u.desc)}</div><div class="nb">${nbName(u.nb)} · ${u.cnum}</div></div></div>`).join('') + '</div>').join('')
-      : '<div class="ds">No hearings scheduled.</div>';
+      : `<div class="ds">No hearings scheduled${st.nb >= 0 ? ' in ' + nbName(st.nb) : ''}.</div>`;
     const items = [...list.querySelectorAll('.ui')];
     items.forEach(it => { const u = up.find(v => v.cnum + v.when === it.dataset.c); it.onmouseenter = () => hi(u); it.onmouseleave = () => hi(null); it.onclick = () => { if (u.x) um.zoomTo([u.x - 90, u.y - 70, u.x + 90, u.y + 70], 500); }; });
     function hi(u) {
@@ -46,28 +53,31 @@
   }
 
   // ---------- past 12 months (map and neighborhood ranking share filters) ----------
-  const st = { fold: -1, theme: -1 };
-  NOLA.chips(document.getElementById('typeChips'), [{ label: 'All case types', value: -1 }, ...FOLD.map((f, i) => ({ label: f.n, value: i }))], v => { st.fold = v; V.refresh(); }, { sel: -1 });
-  NOLA.chips(document.getElementById('themeChips'), [{ label: 'Any topic', value: -1 }, ...P.TH.map((t, i) => ({ label: t, value: i }))], v => { st.theme = v; V.refresh(); }, { sel: -1 });
+  NOLA.chips(document.getElementById('typeChips'), [{ label: 'All case types', value: -1 }, ...FOLD.map((f, i) => ({ label: f.n, value: i }))], v => { st.fold = v; V.refresh(); }, { sel: st.fold });
+  NOLA.chips(document.getElementById('themeChips'), [{ label: 'Any topic', value: -1 }, ...P.TH.map((t, i) => ({ label: t, value: i }))], v => { st.theme = v; V.refresh(); }, { sel: st.theme });
   const startDay = new Date((P.windowStart || '2025-11-18') + 'T00:00:00Z');
   const pDate = d => { const t = new Date(+startDay + d * 864e5); return NOLA.months[t.getUTCMonth()] + ' ' + t.getUTCDate() + ', ' + t.getUTCFullYear(); };
-  const matching = () => P.pts.filter(p => (st.fold < 0 || foldOf(p[1]) === st.fold) && (st.theme < 0 || (p[5] >> st.theme) & 1));
-  const countLine = pts => `<div class="legend">${fmt(pts.length)} case${pts.length === 1 ? '' : 's'} filed since ${pDate(0)}</div>`;
+  // cases matching the type and topic filters, in mapped neighborhoods
+  const matching = () => P.pts.filter(p => NOLA.shown(p[4]) && (st.fold < 0 || foldOf(p[1]) === st.fold) && (st.theme < 0 || (p[5] >> st.theme) & 1));
+  const inNb = pts => st.nb < 0 ? pts : pts.filter(p => p[4] === st.nb);
+  const countLine = pts => `<div class="legend">${fmt(pts.length)} case${pts.length === 1 ? '' : 's'}${st.nb >= 0 ? ' in ' + nbName(st.nb) : ''} filed since ${pDate(0)}</div>`;
   let rm, rg, recentNb = [];
   function drawRecent(el, first) {
-    const pts = matching();
+    const all = matching(), pts = inNb(all);
     recentNb = []; pts.forEach(p => { if (p[4] >= 0) recentNb[p[4]] = (recentNb[p[4]] || 0) + 1; });
     if (first) {
       el.innerHTML = '<div></div><div class="split"><div class="map card mapp"></div><div class="card rank"></div></div>';
       const mapEl = el.querySelector('.map');
-      rm = NOLA.map(mapEl, { height: 600, extent: [-20, 880, 1000, 1640], label: 'Map of planning cases filed in the past 12 months',
+      rm = NOLA.map(mapEl, { height: 600, label: 'Map of planning cases filed in the past 12 months',
         tip: i => `<b>${NOLA.GEO.nb[i].name}</b>` + row('Cases, past 12 months', recentNb[i] || 0) });
-      NOLA.mapButtons(mapEl, rm, [['Core city', [-20, 880, 1000, 1640]], ['Whole city', [-70, 130, 2110, 1730]]]);
+      NOLA.mapButtons(mapEl, rm);
       rg = rm.layer.append('g');
+      rm.lastNb = -2;
       rm.onZoom(k => rg.selectAll('circle').attr('r', 4 / Math.sqrt(k)).attr('stroke-width', 1 / Math.sqrt(k)));
     }
     el.firstChild.innerHTML = countLine(pts);
-    drawRank(el.querySelector('.rank'), pts);
+    drawRank(el.querySelector('.rank'), all);
+    if (rm.lastNb !== st.nb) { rm.focus(st.nb, first ? 0 : 450); rm.lastNb = st.nb; }
     const k = rm.k();
     rg.selectAll('circle').data(pts, p => p.join()).join('circle').attr('cx', p => p[2]).attr('cy', p => p[3]).attr('r', 4 / Math.sqrt(k))
       .attr('fill', p => FOLD[foldOf(p[1])].color).attr('fill-opacity', .8).attr('stroke', 'var(--surface)').attr('stroke-width', 1 / Math.sqrt(k))
@@ -76,9 +86,13 @@
   function drawRank(el, pts) {
     const cnt = [];
     pts.forEach(p => { if (p[4] >= 0) cnt[p[4]] = (cnt[p[4]] || 0) + 1; });
-    const top = cnt.map((v, i) => [i, v || 0]).filter(d => d[1]).sort((a, b) => b[1] - a[1]).slice(0, 15);
-    const mx = top.length ? top[0][1] : 1;
-    el.innerHTML = '<b style="font-size:14px">Top neighborhoods</b>' + (top.length ? '<table><tbody>' + top.map(([i, v]) => `<tr><td>${NOLA.GEO.nb[i].name}</td><td class="num" style="width:55%"><span class="bar" style="width:${85 * v / mx}%;margin-right:6px"></span>${v}</td></tr>`).join('') + '</tbody></table>' : '<div class="legend">No matching cases.</div>');
+    const ranked = NOLA.nbList().map(f => [f.idx, cnt[f.idx] || 0]).sort((a, b) => b[1] - a[1]).map((d, r) => [...d, r + 1]);
+    const top = ranked.filter(d => d[1]).slice(0, 15);
+    const mine = ranked.find(d => d[0] === st.nb);
+    if (mine && !top.includes(mine)) top.push(mine); // the chosen neighborhood is always listed, with its rank
+    const mx = top.length ? Math.max(1, top[0][1]) : 1;
+    el.innerHTML = '<b style="font-size:14px">Top neighborhoods</b>' + (top.length ? '<table><tbody>' + top.map(([i, v, r]) => `<tr class="${i === st.nb ? 'sel' : ''}"><td style="color:var(--muted);width:2.2em">${r}</td><td>${NOLA.GEO.nb[i].name}</td><td class="num" style="width:50%"><span class="bar" style="width:${85 * v / mx}%;margin-right:6px"></span>${v}</td></tr>`).join('') + '</tbody></table>' : '<div class="legend">No matching cases.</div>');
+    el.querySelectorAll('tbody tr').forEach((tr, j) => tr.onclick = () => { const i = top[j][0]; st.nb = st.nb === i ? -1 : i; document.getElementById('nbSel').value = st.nb; V.refresh(); });
   }
 
   // ---------- filings per year ----------
@@ -119,10 +133,18 @@
     });
   }
 
+  // ---------- CSV downloads ----------
+  const csvUp = () => upF().map(u => ({ hearing: u.when.replace('T', ' '), body: u.body, case_number: u.cnum, type: u.type, address: u.addr, neighborhood: nbName(u.nb), description: u.desc }));
+  const csvRecent = () => inNb(matching()).map(p => { const [lon, lat] = p[2] || p[3] ? NOLA.lonlat(p[2], p[3]) : ['', ''];
+    return { filed: new Date(+startDay + p[0] * 864e5).toISOString().slice(0, 10), type: P.TYP[p[1]], neighborhood: nbName(p[4]), topics: P.TH.filter((t, i) => (p[5] >> i) & 1).join('; '), lon, lat }; });
+  const csvYears = () => Object.keys(P.typeY).sort().map(y => Object.assign({ year: y }, ...P.TYP.map((t, i) => ({ [t]: P.typeY[y][i] }))));
+  const csvTopics = () => Object.keys(P.themeY).sort().map(y => Object.assign({ year: y }, ...P.TH.map((t, i) => ({ [t]: P.themeY[y][i] }))));
+
   const V = NOLA.views([
-    { id: 'upcoming', label: 'Upcoming hearings', cls: 'plain', keep: true, draw: (el, first) => { if (first) drawUpcoming(el); } },
-    { id: 'recent', label: 'Cases filed in the past 12 months', cls: 'plain', keep: true, draw: drawRecent },
-    { id: 'years', label: 'Cases filed per year, by type', draw: drawYears },
-    { id: 'topics', label: 'Cases per year mentioning each topic', draw: drawTopics },
-  ]);
+    { id: 'upcoming', label: 'Upcoming hearings', cls: 'plain', keep: true, draw: drawUpcoming, csv: csvUp },
+    { id: 'recent', label: 'Cases filed in the past 12 months', cls: 'plain', keep: true, draw: drawRecent, csv: csvRecent },
+    { id: 'years', label: 'Cases filed per year, by type', draw: drawYears, csv: csvYears },
+    { id: 'topics', label: 'Cases per year mentioning each topic', draw: drawTopics, csv: csvTopics },
+  ], { ds: ['xxb5-5azv', 'CPC Projects'],
+       state: () => ({ fold: st.fold >= 0 ? st.fold : null, theme: st.theme >= 0 ? st.theme : null, nb: st.nb >= 0 ? st.nb : null }) });
 })();
