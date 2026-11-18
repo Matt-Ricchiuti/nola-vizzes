@@ -8,8 +8,9 @@ Templates can use these placeholders, filled in at build time:
     {{PULLED}}      date the data was pulled, e.g. "Nov 18, 2026"
     {{CFS_YEAR}} {{CFS_DS}} {{CFS_PREV}}   year, dataset id and previous year of the Calls for Service page
     {{DRONE_YEAR}}  year covered by the drone page
+    {{MENU}}        home-page menu of every view on every page, read from each page's NOLA.views([...]) list
 """
-import json, sys, os, datetime as dt
+import json, sys, os, re, html, datetime as dt
 HERE = os.path.dirname(os.path.abspath(__file__))
 P = lambda *a: os.path.join(HERE, *a)
 mode = sys.argv[1] if len(sys.argv) > 1 else 'site'
@@ -40,10 +41,34 @@ TOKENS = {'{{PULLED}}': pulled.strftime('%b ') + str(pulled.day) + pulled.strfti
           '{{FOOT}}': '<div class="foot">Data: <a id="dataLink" href="https://data.nola.gov">data.nola.gov</a> · Not affiliated with the City of New Orleans · <a href="about.html">About</a></div>'}
 
 def nav(key):
-    return ('<div class="site"><b><a href="index.html" style="color:inherit;text-decoration:none">NOLA Open Data, visualized</a></b><nav>'
+    return ('<div class="site"><b><a href="index.html" style="color:inherit;text-decoration:none">Nola Vizzes</a></b><nav>'
             + ''.join(f'<a class="{"on" if k == key else ""}" href="{k}.html">{l}</a>' for k, (l, _) in PAGES.items())
             + ''.join(f'<a class="{"on" if k == key else ""}" href="{k}.html">{l}</a>' for k, l in EXTRA.items())
             + '</nav></div>')
+
+# The home-page menu lists every view of every page. It is read straight from the NOLA.views([...]) call in
+# src/<page>.js (one `{ id: '...', label: '...', ... },` per line), so a new view shows up in the menu by itself.
+VIEW_YEAR = {'cfs': cfs_year, 'drone': drone_year, 'cpc': pulled.year, 'trees': pulled.year}
+def page_views(key):
+    lines = open(P('src', f'{key}.js'), encoding='utf-8').read().split('NOLA.views([', 1)[1].split('\n')[1:]
+    out = []
+    for ln in lines:
+        if not ln.strip().startswith('{'): break
+        m = re.match(r"\s*\{\s*id:\s*'([\w-]+)',\s*label:\s*(['`])(.*?)\2", ln)
+        if not m: sys.exit(f'build.py: cannot read the view on this line of src/{key}.js:\n{ln}')
+        label = m[3].replace('${YEAR}', str(VIEW_YEAR[key]))
+        if '${' in label: sys.exit(f'build.py: unknown placeholder in view label {label!r} (src/{key}.js)')
+        out.append((m[1], label))
+    if not out: sys.exit(f'build.py: no views found in src/{key}.js')
+    return out
+def menu():
+    e = html.escape
+    groups = ''.join(f'<section class="vgrp"><h2 class="eyebrow" id="vg-{k}">{e(l)}</h2><ul aria-labelledby="vg-{k}">'
+                     + ''.join(f'<li><a href="{k}.html#{i}">{e(t)}</a></li>' for i, t in page_views(k)) + '</ul></section>'
+                     for k, (l, _) in PAGES.items())
+    extra = ''.join(f'<a href="{k}.html">{e(l)}</a>' for k, l in EXTRA.items())
+    return f'<div class="vgrid">{groups}</div><div class="vextra">{extra}</div>'
+TOKENS['{{MENU}}'] = menu()
 
 # Street centerlines are shared by every map, so they go in one file the browser caches across pages.
 STREETS_TAG = '<script src="streets.js"></script>'
