@@ -2,7 +2,7 @@
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>City Planning Commission cases · NOLA Open Data</title>
 <style>{{CSS}}
-#uplist{max-height:650px;overflow:auto;padding:4px 10px}
+.agenda{margin:0 -4px}
 .day{margin-bottom:10px}
 .dh{position:sticky;top:0;background:var(--surface);font-weight:650;font-size:13px;padding:8px 0 6px;border-bottom:1px solid var(--grid)}
 .ui{display:flex;gap:10px;padding:8px 6px;border-bottom:1px solid var(--grid);cursor:pointer;border-radius:6px}
@@ -12,7 +12,8 @@
 .ty{font-size:12px;color:var(--ink2)}
 .ds{font-size:12.5px;color:var(--ink2);margin-top:2px}
 .nb{font-size:11.5px;color:var(--muted);margin-top:2px}
-.sms{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:18px 16px}
+.sms{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:18px 16px}
+.sms.one{grid-template-columns:1fr}
 .smh{font-size:13px;margin-bottom:2px}
 </style>
 {{D3}}
@@ -21,9 +22,6 @@
 <h1>City Planning Commission cases</h1>
 <div class="src"><a href="https://data.nola.gov/d/xxb5-5azv">CPC Projects</a> · data.nola.gov · Updated {{PULLED}}</div>
 <div class="viewbar"><select id="view" class="viewsel" aria-label="Chart"></select></div>
-<div class="chips" data-for="upcoming recent"><select id="nbSel" class="nbsel" aria-label="Neighborhood"></select></div>
-<div class="chips" id="typeChips" data-for="recent"></div>
-<div class="chips" id="themeChips" data-for="recent"></div>
 <div id="chart"></div>
 {{FOOT}}
 </div>

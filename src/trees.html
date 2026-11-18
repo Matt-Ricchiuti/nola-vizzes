@@ -2,12 +2,12 @@
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>New Orleans Street Trees · NOLA Open Data</title>
 <style>{{CSS}}
-:root{--water:#cdd9de;--t-land:#e6e5de;--t-hood:#f7f7f4;--t-hood-hi:#fffdf0;--t-dim:#d4d3cb;--t-other:#a9b1ab;--t-stump:#7d837f}
-@media (prefers-color-scheme: dark){:root:where(:not([data-theme="light"])){--water:#0f191e;--t-land:#1b1b1a;--t-hood:#222221;--t-hood-hi:#2d2d2a;--t-dim:#33332f;--t-other:#5b6560;--t-stump:#8d948f}}
-.tmap{display:block;width:100%;height:min(680px,72vh);border-radius:10px;touch-action:none;cursor:grab}
+:root{--water:#c7d6dd;--t-land:#e6e8e1;--t-hood:#f5f6f1;--t-dim:#c9cfc8;--t-other:#aab3ad;--t-stump:#7d837f;
+  --t-park:#dbe8d0;--t-park-line:#b5cba4;--t-wild:#e2eadb;--t-cem:#dfe2d8;--t-lot:#e9e7dc;--t-park-ink:#3d6a47}
+@media (prefers-color-scheme: dark){:root:where(:not([data-theme="light"])){--water:#0d1820;--t-land:#151e1d;--t-hood:#1c2826;--t-dim:#2c3836;--t-other:#55635d;--t-stump:#8d948f;
+  --t-park:#1d3128;--t-park-line:#2d4a3a;--t-wild:#1b2b24;--t-cem:#232d29;--t-lot:#272a24;--t-park-ink:#93c29d}}
+.tmap{position:absolute;inset:0;display:block;width:100%;height:100%;touch-action:none;cursor:grab;border-radius:12px}
 .tmap.drag{cursor:grabbing}
-.find{display:flex;gap:6px;max-width:460px}
-.find input{flex:1;min-width:0;font:inherit;font-size:13px;color:var(--ink);background:var(--surface);border:1px solid var(--ring);border-radius:8px;padding:6px 10px}
 </style>
 {{D3}}
 </head><body><div class="wrap">
@@ -15,10 +15,6 @@
 <h1>Street trees</h1>
 <div class="src"><a href="https://data.nola.gov/d/3tyj-9x33">Tree Location</a> · data.nola.gov · Inventory export, Oct 2026</div>
 <div class="viewbar"><select id="view" class="viewsel" aria-label="Chart"></select></div>
-<div class="chips" data-for="map hoods"><div class="find"><input id="q" list="spList" placeholder="Find a species" autocomplete="off" aria-label="Find a species"><button id="qClear" class="btn" type="button" hidden>Clear</button></div><datalist id="spList"></datalist></div>
-<div class="chips" data-for="map species hoods"><select id="nbSel" class="nbsel" aria-label="Neighborhood"></select></div>
-<div class="chips" id="densChips" data-for="map hoods"></div>
-<div class="chips" id="groupChips" data-for="map"></div>
 <div id="chart"></div>
 {{FOOT}}
 </div>

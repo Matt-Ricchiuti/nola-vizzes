@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Young+Serif&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
 :root{
   color-scheme: light;
   --page:#f9f9f7; --surface:#fcfcfb; --ink:#0b0b0b; --ink2:#52514e; --muted:#898781;
@@ -19,7 +20,9 @@
   }
 }
 *{box-sizing:border-box}
-html,body{margin:0;background:var(--page);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",sans-serif;font-size:15px;line-height:1.5}
+html,body{margin:0;background:var(--page);color:var(--ink);font-family:"Public Sans",system-ui,-apple-system,"Segoe UI",sans-serif;font-size:15px;line-height:1.5}
+h1,.viewsel,.cards h2{font-family:"Young Serif",Georgia,"Times New Roman",serif;font-weight:400}
+.eyebrow,.flist .ct,.scalebar,.src,.tip .r span:last-child{font-family:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace}
 a{color:var(--accent)}
 .wrap{max-width:1120px;margin:0 auto;padding:28px 24px 64px}
 .site{display:flex;justify-content:space-between;align-items:baseline;gap:16px;flex-wrap:wrap;border-bottom:1px solid var(--grid);padding-bottom:12px;margin-bottom:28px}
@@ -27,16 +30,16 @@ a{color:var(--accent)}
 .site nav{display:flex;gap:16px;font-size:13px;flex-wrap:wrap}
 .site nav a{color:var(--ink2);text-decoration:none}
 .site nav a.on{color:var(--ink);font-weight:600}
-h1{font-size:26px;line-height:1.2;margin:0 0 4px;letter-spacing:-.01em}
+h1{font-size:30px;line-height:1.15;margin:0 0 6px;letter-spacing:0}
 h2{font-size:19px;margin:0 0 4px}
-.src{font-size:13px;color:var(--muted);margin:0 0 22px}
+.src{font-size:11.5px;color:var(--muted);margin:0 0 22px}
 .src a{color:var(--ink2)}
 .card{background:var(--surface);border:1px solid var(--ring);border-radius:12px;padding:18px}
 .viewbar{margin:0 0 12px;display:flex;flex-wrap:wrap;align-items:center;gap:10px}
 .viewbar .tools{margin-left:auto;display:flex;gap:6px}
 .nbfocus{fill:none;stroke:var(--ink);stroke-width:2.4;vector-effect:non-scaling-stroke}
 .nbsel{font-size:13px}
-.viewsel{font-size:17px;font-weight:600;padding:7px 38px 7px 12px;border-radius:10px;max-width:100%;cursor:pointer;
+.viewsel{font-size:19px;padding:7px 38px 7px 12px;border-radius:10px;max-width:100%;cursor:pointer;
   appearance:none;-webkit-appearance:none;background:var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%23898781' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 13px center}
 [hidden]{display:none!important}
 .pane.mapp{padding:6px}
@@ -86,3 +89,64 @@ tbody tr:hover td{background:var(--chip)}
 .sr{position:absolute;left:-9999px}
 .halo{paint-order:stroke;stroke:var(--surface);stroke-width:5px;stroke-linejoin:round}
 .maplab{font-weight:600;letter-spacing:.02em}
+/* ---------- filters live on the chart: a panel of legend-style rows (see NOLA.stage / fsec / flist) ---------- */
+.tools{display:flex;gap:6px;margin:-12px 0 18px}
+.stage{position:relative}
+.stage.chartstage{display:grid;grid-template-columns:260px minmax(0,1fr);gap:18px;align-items:start}
+.stage.chartstage>.fpanel{position:sticky;top:12px}
+.stage.mapstage{height:min(740px,80vh);padding:0;overflow:hidden}
+.stage.mapstage .plot{position:absolute;inset:0}
+.stage.mapstage .plot .map,.stage.mapstage .plot svg{width:100%;height:100%}
+.stage.mapstage .map svg{border-radius:12px}
+.stage.mapstage>.fpanel{position:absolute;top:12px;left:12px;width:296px;max-height:calc(100% - 24px);overflow:auto;
+  background:var(--surface);border:1px solid var(--ring);border-radius:10px;box-shadow:0 6px 24px rgb(0 0 0 / .12);z-index:2}
+.fpanel{display:flex;flex-direction:column;gap:14px;padding:14px 14px 12px;font-size:13px}
+.stage.chartstage>.fpanel{padding:0}
+.fpanel:empty{display:none}
+.stage.chartstage>.fpanel:empty+*{grid-column:1/-1}
+.eyebrow{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.fsec{display:flex;flex-direction:column;gap:6px}
+.fsec-h{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.linkbtn{background:none;border:0;padding:2px 0;color:var(--accent);font:500 12px inherit;font-family:inherit;cursor:pointer}
+.flist{display:flex;flex-direction:column;gap:1px;margin:0;padding:0;list-style:none}
+.flist button{all:unset;box-sizing:border-box;width:100%;display:grid;grid-template-columns:12px minmax(0,1fr) auto;gap:9px;align-items:center;padding:5px 6px;border-radius:6px;cursor:pointer}
+.flist button:hover{background:var(--chip)}
+.flist button:focus-visible,.seg button:focus-visible,.mapctl button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.flist .sw{width:11px;height:11px;border-radius:50%}
+.flist .nm{min-width:0;display:flex;flex-direction:column;gap:3px}
+.flist .nm>span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.flist .nm em{font-style:normal;font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.flist .fb{height:3px;border-radius:2px;background:var(--grid);overflow:hidden}
+.flist .fb i{display:block;height:100%}
+.flist .ct{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.flist.filtering button[aria-pressed="false"]{opacity:.45}
+.flist button[aria-pressed="true"]{background:var(--chip);box-shadow:inset 0 0 0 1.5px var(--accent)}
+.flist.toggles button[aria-pressed="false"]{opacity:.45}
+.flist.toggles button[aria-pressed="false"] .sw{background:transparent!important;box-shadow:inset 0 0 0 1.5px var(--muted)}
+.flist.toggles button[aria-pressed="true"]{background:none;box-shadow:none}
+.seg{display:flex;border:1px solid var(--ring);border-radius:8px;overflow:hidden;width:max-content;max-width:100%}
+.seg button{font:inherit;font-size:12px;border:0;background:var(--surface);color:var(--ink2);padding:5px 10px;cursor:pointer}
+.seg button+button{border-left:1px solid var(--ring)}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--surface)}
+.fsel{width:100%}
+.find{display:flex;gap:6px}
+.find input{flex:1;min-width:0;font:inherit;font-size:13px;color:var(--ink);background:var(--chip);border:1px solid var(--ring);border-radius:7px;padding:6px 9px}
+.mapctl{position:absolute;top:12px;right:12px;display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--ring);border-radius:8px;overflow:hidden;z-index:2}
+.mapctl button{width:34px;height:34px;border:0;background:none;color:var(--ink);font:500 17px inherit;font-family:inherit;cursor:pointer}
+.mapctl button+button{border-top:1px solid var(--ring)}
+.mapctl button:hover{background:var(--chip)}
+.scalebar{position:absolute;right:14px;bottom:12px;font-size:11px;color:var(--ink2);display:flex;flex-direction:column;align-items:flex-end;gap:3px;pointer-events:none;z-index:2}
+.scalebar i{display:block;height:5px;border:1.5px solid var(--ink2);border-top:0}
+.ftoggle{display:none}
+.stlab{font-weight:500;pointer-events:none;paint-order:stroke;stroke:var(--surface);stroke-linejoin:round}
+.stlab.major{font-weight:650}
+@media(max-width:760px){
+  .stage.chartstage{grid-template-columns:1fr}
+  .stage.chartstage>.fpanel{position:static}
+  .stage.mapstage{height:auto;overflow:visible;border:0;background:none}
+  .stage.mapstage>.fpanel{position:static;width:auto;max-height:none;box-shadow:none;margin-bottom:10px}
+  .stage.mapstage .plot{position:relative;height:min(560px,70vh);border:1px solid var(--ring);border-radius:12px;overflow:hidden;background:var(--surface)}
+  .ftoggle{display:block;margin-bottom:8px}
+  .fpanel.collapsed{display:none}
+  .viewsel{font-size:16px;width:100%}
+}

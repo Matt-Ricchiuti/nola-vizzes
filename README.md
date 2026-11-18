@@ -40,9 +40,11 @@ Commit and push changes to `src/` together with the rebuilt `site/`.
 
 ## Page layout
 
-Every page has a short title, one line linking to its City dataset, and a dropdown that switches between views of that subject. Each view shows only the filters that apply to it, and the selected view is kept in the URL (for example `cfs.html#map`). The switcher is `NOLA.views()` in `src/lib.js`: a page lists its views and gives each filter control a `data-for="viewId ..."` attribute. Keep text to titles, axis labels and legends; caveats go on the About page.
+Every page has a title, one source line linking to its City dataset, **Copy link** / **Download CSV** right under it, and a dropdown that switches between views of that subject. The selected view and its filters are kept in the URL.
 
-Every view also gets **Copy link** and **Download CSV** buttons (give the view a `csv()` that returns rows for what's on screen), and the footer's data link points at the view's dataset (`ds`). Filters a page reports through `state()` are saved in the link. Maps leave out neighborhoods under 100 residents per square mile (`MIN_DENSITY` in `lib.js`); use `NOLA.shown(nb)` to drop records there, and `NOLA.nbSelect()` for a neighborhood picker. Map controls are deliberately neutral: one "Reset view" button, no named regions.
+Filters live **on the chart**, in a panel styled after the original street-trees map: legend-style rows (swatch, name, live count, proportion bar), segmented switches and a neighborhood picker. On maps the panel floats over the top-left corner, with zoom buttons and a scale bar on the map; on charts it's a sidebar inside the chart card; on phones it stacks above (maps fold it behind a "Filters" button).
+
+How to build a view (`src/lib.js`): `NOLA.views([...])` lists the views; each view's `draw(pane, first)` calls `NOLA.stage(pane, { map })` once to get `{ panel, plot }`, fills the panel with `NOLA.fsec` / `NOLA.flist` / `NOLA.seg` / `NOLA.nbPick`, and draws into `plot`. Maps come from `NOLA.map(plot, { panel })`, which adds the City street map, street names (placed after each zoom, never overlapping), zoom controls and a scale bar. Give each view a `csv()` for its download. Keep text to titles, axis labels and legends; caveats go on the About page. Maps leave out neighborhoods under 100 residents per square mile (`MIN_DENSITY`), and map controls are deliberately neutral (no named regions).
 
 ## Pages
 
@@ -51,7 +53,7 @@ Every view also gets **Copy link** and **Download CSV** buttons (give the view a
 | `cfs.html` | Calls for Service, current year + 2014 onward yearly files | daily |
 | `drone.html` | NOPD Drone Flights (`ay9z-ynxz`), current year | daily |
 | `cpc.html` | CPC Projects (`xxb5-5azv`) | daily |
-| `trees.html` | Tree Location (`3tyj-9x33`), Oct 2026 export in `data/trees.json` | static (street map daily) |
+| `trees.html` | Tree Location (`3tyj-9x33`) + green space, Oct 2026 export in `data/trees.json` | static (street map daily) |
 | `about.html` | About the site, sources, disclaimer | with each build |
 
 ## Things to check now and then

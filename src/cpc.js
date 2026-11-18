@@ -17,132 +17,155 @@
 
   const H = NOLA.hashState();
   const st = { fold: H.fold != null ? +H.fold : -1, theme: H.theme != null ? +H.theme : -1, nb: H.nb != null ? +H.nb : -1 };
-  NOLA.nbSelect(document.getElementById('nbSel'), v => { st.nb = v; V.refresh(); }, st.nb);
+  const staged = (el, first, isMap) => { if (first) el._s = NOLA.stage(el, { map: isMap }); return el._s; };
+  const set = (k, v) => { st[k] = v; V.refresh(); };
+  const toggle = k => v => set(k, st[k] === v ? -1 : v);
+  // shared filter sections
+  const nbSection = panel => NOLA.nbPick(NOLA.fsec(panel, 'Neighborhood'), st.nb, v => set('nb', v));
+  function typeSection(panel, counts) {
+    NOLA.flist(NOLA.fsec(panel, 'Case type', st.fold >= 0 ? ['Show all', () => set('fold', -1)] : null),
+      FOLD.map((f, i) => ({ key: i, name: f.n, color: f.color, count: counts[i] })), { pressed: i => st.fold === i, onClick: toggle('fold') });
+  }
 
-  // ---------- upcoming hearings: map + agenda ----------
+  // ---------- upcoming hearings: map, with the agenda in the panel ----------
   const seen = new Set();
   const up = P.up.filter(u => { const k = u[0] + u[2]; if (seen.has(k)) return false; seen.add(k); return true; })
     .map(u => ({ when: u[0], body: u[1], cnum: u[2], type: u[3], fold: foldOf(TYPEIDX[u[3]]), addr: u[4].trim(), nb: u[5], x: u[6], y: u[7], desc: u[8] }));
   const dayFmt = s => new Date(s.slice(0, 10) + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
   const timeFmt = s => { const h = +s.slice(11, 13), mi = s.slice(14, 16); return !h && mi === '00' ? '' : (h % 12 || 12) + ':' + mi + (h < 12 ? ' a.m.' : ' p.m.'); };
   const cleanDesc = s => s.replace(/^Zoning Docket \d+\/\d+\s*/, '').replace(/^Applicant\(s\):\s*/, '').replace(/^Request:\s*/, '') + (s.length >= 170 ? '…' : '');
-  const upF = () => up.filter(u => st.nb < 0 || u.nb === st.nb);
-  function drawUpcoming(el) {
-    const up = upF();
-    el.innerHTML = NOLA.legendHTML(FOLD.filter((f, i) => up.some(u => u.fold === i)).map(f => [f.color, f.n, 1])) +
-      '<div class="split"><div class="map card mapp"></div><div class="card" id="uplist"></div></div>';
-    const umEl = el.querySelector('.map'), list = el.querySelector('#uplist');
-    const um = NOLA.map(umEl, { height: 620, label: 'Map of upcoming planning cases' });
-    NOLA.mapButtons(umEl, um);
-    if (st.nb >= 0) um.focus(st.nb, 0);
-    const upTip = d => `<b>${d.addr}</b><div style="color:var(--ink2)">${d.type} · ${d.cnum}</div>` + row('Hearing', dayFmt(d.when) + (timeFmt(d.when) ? ', ' + timeFmt(d.when) : '')) + row('Body', d.body) + row('Neighborhood', nbName(d.nb)) + `<div style="margin-top:6px">${cleanDesc(d.desc)}</div>`;
-    const ud = um.layer.append('g').selectAll('circle').data(up.filter(u => (u.x || u.y) && NOLA.shown(u.nb))).join('circle').attr('cx', d => d.x).attr('cy', d => d.y).attr('r', 7)
-      .attr('fill', d => FOLD[d.fold].color).attr('stroke', 'var(--surface)').attr('stroke-width', 2)
-      .on('mousemove', (ev, d) => { tip.show(upTip(d), ev); hi(d); }).on('mouseleave', () => { tip.hide(); hi(null); });
-    um.onZoom(k => ud.attr('r', 7 / Math.sqrt(k)).attr('stroke-width', 2 / Math.sqrt(k)));
-    list.innerHTML = up.length ? d3.groups(up, u => u.when.slice(0, 10)).map(([day, us]) => `<div class="day"><div class="dh">${dayFmt(day)} · ${[...new Set(us.map(u => u.body))].join(', ')}</div>` +
+  const upNb = () => up.filter(u => st.nb < 0 || u.nb === st.nb);
+  const upF = () => upNb().filter(u => st.fold < 0 || u.fold === st.fold);
+  let um, ud;
+  function drawUpcoming(pane, first) {
+    const { panel, plot } = staged(pane, first, true);
+    const list = upF();
+    panel.innerHTML = '';
+    nbSection(panel);
+    typeSection(panel, FOLD.map((f, i) => upNb().filter(u => u.fold === i).length));
+    const ag = NOLA.fsec(panel, `Agenda · ${fmt(list.length)} case${list.length === 1 ? '' : 's'}`);
+    const box = document.createElement('div'); box.className = 'agenda'; ag.appendChild(box);
+    box.innerHTML = list.length ? d3.groups(list, u => u.when.slice(0, 10)).map(([day, us]) => `<div class="day"><div class="dh">${dayFmt(day)} · ${[...new Set(us.map(u => u.body))].join(', ')}</div>` +
       us.map(u => `<div class="ui" data-c="${u.cnum}${u.when}"><i style="background:${FOLD[u.fold].color}"></i><div><b>${u.addr}</b> <span class="ty">${u.type}</span><div class="ds">${cleanDesc(u.desc)}</div><div class="nb">${nbName(u.nb)} · ${u.cnum}</div></div></div>`).join('') + '</div>').join('')
       : `<div class="ds">No hearings scheduled${st.nb >= 0 ? ' in ' + nbName(st.nb) : ''}.</div>`;
-    const items = [...list.querySelectorAll('.ui')];
-    items.forEach(it => { const u = up.find(v => v.cnum + v.when === it.dataset.c); it.onmouseenter = () => hi(u); it.onmouseleave = () => hi(null); it.onclick = () => { if (u.x) um.zoomTo([u.x - 90, u.y - 70, u.x + 90, u.y + 70], 500); }; });
+    if (first) {
+      um = NOLA.map(plot, { panel, label: 'Map of upcoming planning cases' });
+      ud = um.layer.append('g');
+      um.onZoom(k => ud.selectAll('circle').attr('r', 7 / Math.sqrt(k)).attr('stroke-width', 2 / Math.sqrt(k)));
+      um.lastNb = -1;
+    }
+    if (um.lastNb !== st.nb) { um.focus(st.nb, first ? 0 : 450); um.lastNb = st.nb; }
+    const upTip = d => `<b>${d.addr}</b><div style="color:var(--ink2)">${d.type} · ${d.cnum}</div>` + row('Hearing', dayFmt(d.when) + (timeFmt(d.when) ? ', ' + timeFmt(d.when) : '')) + row('Body', d.body) + row('Neighborhood', nbName(d.nb)) + `<div style="margin-top:6px">${cleanDesc(d.desc)}</div>`;
+    const k = um.k();
+    const dots = ud.selectAll('circle').data(list.filter(u => (u.x || u.y) && NOLA.shown(u.nb)), d => d.cnum + d.when).join('circle')
+      .attr('cx', d => d.x).attr('cy', d => d.y).attr('r', 7 / Math.sqrt(k)).attr('stroke-width', 2 / Math.sqrt(k))
+      .attr('fill', d => FOLD[d.fold].color).attr('stroke', 'var(--surface)')
+      .on('mousemove', (ev, d) => { tip.show(upTip(d), ev); hi(d); }).on('mouseleave', () => { tip.hide(); hi(null); });
+    const items = [...box.querySelectorAll('.ui')];
+    items.forEach(it => { const u = list.find(v => v.cnum + v.when === it.dataset.c); it.onmouseenter = () => hi(u); it.onmouseleave = () => hi(null); it.onclick = () => { if (u.x) um.zoomTo([u.x - 60, u.y - 45, u.x + 60, u.y + 45], 500); }; });
     function hi(u) {
-      ud.attr('opacity', d => !u || d === u ? 1 : .25);
+      dots.attr('opacity', d => !u || d === u ? 1 : .25);
       items.forEach(it => it.classList.toggle('on', !!u && it.dataset.c === u.cnum + u.when));
-      if (u && !list.matches(':hover')) { const it = items.find(e => e.dataset.c === u.cnum + u.when); if (it) it.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }
+      if (u && !panel.matches(':hover')) { const it = items.find(e => e.dataset.c === u.cnum + u.when); if (it) it.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }
     }
   }
 
-  // ---------- past 12 months (map and neighborhood ranking share filters) ----------
-  NOLA.chips(document.getElementById('typeChips'), [{ label: 'All case types', value: -1 }, ...FOLD.map((f, i) => ({ label: f.n, value: i }))], v => { st.fold = v; V.refresh(); }, { sel: st.fold });
-  NOLA.chips(document.getElementById('themeChips'), [{ label: 'Any topic', value: -1 }, ...P.TH.map((t, i) => ({ label: t, value: i }))], v => { st.theme = v; V.refresh(); }, { sel: st.theme });
+  // ---------- cases filed in the past 12 months ----------
   const startDay = new Date((P.windowStart || '2025-11-18') + 'T00:00:00Z');
   const pDate = d => { const t = new Date(+startDay + d * 864e5); return NOLA.months[t.getUTCMonth()] + ' ' + t.getUTCDate() + ', ' + t.getUTCFullYear(); };
-  // cases matching the type and topic filters, in mapped neighborhoods
-  const matching = () => P.pts.filter(p => NOLA.shown(p[4]) && (st.fold < 0 || foldOf(p[1]) === st.fold) && (st.theme < 0 || (p[5] >> st.theme) & 1));
-  const inNb = pts => st.nb < 0 ? pts : pts.filter(p => p[4] === st.nb);
-  const countLine = pts => `<div class="legend">${fmt(pts.length)} case${pts.length === 1 ? '' : 's'}${st.nb >= 0 ? ' in ' + nbName(st.nb) : ''} filed since ${pDate(0)}</div>`;
+  const mapped = P.pts.filter(p => NOLA.shown(p[4]));
+  const okType = p => st.fold < 0 || foldOf(p[1]) === st.fold, okTheme = p => st.theme < 0 || (p[5] >> st.theme) & 1, okNb = p => st.nb < 0 || p[4] === st.nb;
+  const matching = () => mapped.filter(p => okType(p) && okTheme(p));
   let rm, rg, recentNb = [];
-  function drawRecent(el, first) {
-    const all = matching(), pts = inNb(all);
-    recentNb = []; pts.forEach(p => { if (p[4] >= 0) recentNb[p[4]] = (recentNb[p[4]] || 0) + 1; });
+  function drawRecent(pane, first) {
+    const { panel, plot } = staged(pane, first, true);
+    const all = matching(), pts = all.filter(okNb);
+    recentNb = []; pts.forEach(p => { recentNb[p[4]] = (recentNb[p[4]] || 0) + 1; });
+    panel.innerHTML = '';
+    nbSection(panel);
+    typeSection(panel, FOLD.map((f, i) => mapped.filter(p => okTheme(p) && okNb(p) && foldOf(p[1]) === i).length));
+    NOLA.flist(NOLA.fsec(panel, 'Topic in description', st.theme >= 0 ? ['Any topic', () => set('theme', -1)] : null),
+      P.TH.map((t, i) => ({ key: i, name: t, color: 'var(--ink2)', count: mapped.filter(p => okType(p) && okNb(p) && (p[5] >> i) & 1).length })),
+      { pressed: i => st.theme === i, onClick: toggle('theme') });
+    // where the matching cases are: neighborhoods ranked, the chosen one always listed with its rank
+    const cnt = []; all.forEach(p => { cnt[p[4]] = (cnt[p[4]] || 0) + 1; });
+    const ranked = NOLA.nbList().map(f => [f.idx, cnt[f.idx] || 0]).sort((a, b) => b[1] - a[1]).map((d, r) => [...d, r + 1]);
+    const top = ranked.filter(d => d[1]).slice(0, 8), mine = ranked.find(d => d[0] === st.nb);
+    if (mine && !top.includes(mine)) top.push(mine);
+    NOLA.flist(NOLA.fsec(panel, `Most cases · ${fmt(pts.length)} since ${pDate(0)}`),
+      top.map(([i, v, r]) => ({ key: i, name: `${r}. ${NOLA.GEO.nb[i].name}`, color: 'var(--s1)', count: v })), { pressed: i => st.nb === i, onClick: toggle('nb') });
     if (first) {
-      el.innerHTML = '<div></div><div class="split"><div class="map card mapp"></div><div class="card rank"></div></div>';
-      const mapEl = el.querySelector('.map');
-      rm = NOLA.map(mapEl, { height: 600, label: 'Map of planning cases filed in the past 12 months',
-        tip: i => `<b>${NOLA.GEO.nb[i].name}</b>` + row('Cases, past 12 months', recentNb[i] || 0) });
-      NOLA.mapButtons(mapEl, rm);
-      rg = rm.layer.append('g');
-      rm.lastNb = -2;
+      rm = NOLA.map(plot, { panel, label: 'Map of planning cases filed in the past 12 months',
+        tip: i => `<b>${NOLA.GEO.nb[i].name}</b>` + row('Matching cases, past 12 months', recentNb[i] || 0) });
+      rg = rm.layer.append('g'); rm.lastNb = -1;
       rm.onZoom(k => rg.selectAll('circle').attr('r', 4 / Math.sqrt(k)).attr('stroke-width', 1 / Math.sqrt(k)));
     }
-    el.firstChild.innerHTML = countLine(pts);
-    drawRank(el.querySelector('.rank'), all);
     if (rm.lastNb !== st.nb) { rm.focus(st.nb, first ? 0 : 450); rm.lastNb = st.nb; }
     const k = rm.k();
     rg.selectAll('circle').data(pts, p => p.join()).join('circle').attr('cx', p => p[2]).attr('cy', p => p[3]).attr('r', 4 / Math.sqrt(k))
-      .attr('fill', p => FOLD[foldOf(p[1])].color).attr('fill-opacity', .8).attr('stroke', 'var(--surface)').attr('stroke-width', 1 / Math.sqrt(k))
+      .attr('fill', p => FOLD[foldOf(p[1])].color).attr('fill-opacity', .85).attr('stroke', 'var(--surface)').attr('stroke-width', 1 / Math.sqrt(k))
       .on('mousemove', (ev, p) => tip.show(`<b>${P.TYP[p[1]]}</b>` + row('Filed', pDate(p[0])) + row('Neighborhood', nbName(p[4])) + (p[5] ? row('Topics', P.TH.filter((t, i) => (p[5] >> i) & 1).join(', ')) : ''), ev)).on('mouseleave', tip.hide);
-  }
-  function drawRank(el, pts) {
-    const cnt = [];
-    pts.forEach(p => { if (p[4] >= 0) cnt[p[4]] = (cnt[p[4]] || 0) + 1; });
-    const ranked = NOLA.nbList().map(f => [f.idx, cnt[f.idx] || 0]).sort((a, b) => b[1] - a[1]).map((d, r) => [...d, r + 1]);
-    const top = ranked.filter(d => d[1]).slice(0, 15);
-    const mine = ranked.find(d => d[0] === st.nb);
-    if (mine && !top.includes(mine)) top.push(mine); // the chosen neighborhood is always listed, with its rank
-    const mx = top.length ? Math.max(1, top[0][1]) : 1;
-    el.innerHTML = '<b style="font-size:14px">Top neighborhoods</b>' + (top.length ? '<table><tbody>' + top.map(([i, v, r]) => `<tr class="${i === st.nb ? 'sel' : ''}"><td style="color:var(--muted);width:2.2em">${r}</td><td>${NOLA.GEO.nb[i].name}</td><td class="num" style="width:50%"><span class="bar" style="width:${85 * v / mx}%;margin-right:6px"></span>${v}</td></tr>`).join('') + '</tbody></table>' : '<div class="legend">No matching cases.</div>');
-    el.querySelectorAll('tbody tr').forEach((tr, j) => tr.onclick = () => { const i = top[j][0]; st.nb = st.nb === i ? -1 : i; document.getElementById('nbSel').value = st.nb; V.refresh(); });
   }
 
   // ---------- filings per year ----------
-  function drawYears(el) {
-    el.innerHTML = NOLA.legendHTML(FOLD.map(f => [f.color, f.n])) + '<div></div>';
+  function drawYears(pane, first) {
+    const { panel, plot } = staged(pane, first);
     const yrs = Object.keys(P.typeY).sort();
     const data = yrs.map(y => { const a = FOLD.map(() => 0); P.typeY[y].forEach((v, t) => a[foldOf(t)] += v); return { y, a }; });
-    const f = NOLA.frame(el.lastChild, { h: 340, m: { t: 10, r: 10, b: 28, l: 40 } });
+    panel.innerHTML = '';
+    typeSection(panel, FOLD.map((f, i) => d3.sum(data, d => d.a[i])));
+    plot.innerHTML = '';
+    const f = NOLA.frame(plot, { h: 380, m: { t: 10, r: 10, b: 28, l: 40 } });
     const x = d3.scaleBand().domain(yrs).range([0, f.iw]).paddingInner(.22);
-    const yy = d3.scaleLinear().domain([0, d3.max(data, d => d3.sum(d.a)) * 1.05]).range([f.ih, 0]).nice();
+    const val = d => st.fold < 0 ? d3.sum(d.a) : d.a[st.fold];
+    const yy = d3.scaleLinear().domain([0, d3.max(data, val) * 1.05]).range([f.ih, 0]).nice();
     NOLA.yGrid(f, yy, 5, d3.format('d'));
-    data.forEach(d => { let y0 = 0; d.a.forEach((v, i) => { if (v) f.g.append('rect').attr('x', x(d.y)).attr('width', x.bandwidth()).attr('y', yy(y0 + v) + 1).attr('height', Math.max(.5, yy(y0) - yy(y0 + v) - 1)).attr('fill', FOLD[i].color).attr('rx', 1.5); y0 += v; }); });
+    data.forEach(d => { let y0 = 0; d.a.forEach((v, i) => { if (!v || (st.fold >= 0 && i !== st.fold)) return; f.g.append('rect').attr('x', x(d.y)).attr('width', x.bandwidth()).attr('y', yy(y0 + v) + 1).attr('height', Math.max(.5, yy(y0) - yy(y0 + v) - 1)).attr('fill', FOLD[i].color).attr('rx', 1.5); y0 += v; }); });
     f.g.selectAll('rect.h').data(data).join('rect').attr('class', 'h').attr('x', d => x(d.y) - 2).attr('width', x.step()).attr('height', f.ih).attr('fill', 'transparent')
       .on('mousemove', (ev, d) => tip.show(`<b>${d.y}${+d.y === YEAR ? ` (through ${NOLA.isoDate(lastFiled).replace(/, \d+$/, '')})` : ''}</b>` + row('Total', fmt(d3.sum(d.a))) + FOLD.map((fo, i) => d.a[i] ? row(sw(fo.color) + fo.n, d.a[i]) : '').join(''), ev)).on('mouseleave', tip.hide);
     f.g.selectAll('text.x').data(yrs.filter((y, i) => i % (f.iw < 500 ? 4 : 2) === 0)).join('text').attr('class', 'x').attr('x', y => x(y) + x.bandwidth() / 2).attr('y', f.ih + 18).attr('text-anchor', 'middle').text(y => "'" + y.slice(2));
     f.g.append('line').attr('x1', 0).attr('x2', f.iw).attr('y1', f.ih).attr('y2', f.ih).attr('stroke', 'var(--axis)');
   }
 
-  // ---------- topics per year (small multiples) ----------
-  function drawTopics(el) {
-    el.innerHTML = '<div class="sms"></div>';
-    const host = el.firstChild;
+  // ---------- topics per year: all side by side, or one picked in the panel ----------
+  function drawTopics(pane, first) {
+    const { panel, plot } = staged(pane, first);
     const yrs = Object.keys(P.themeY).sort().filter(y => +y >= 2010);
-    const yMax = d3.max(P.TH, (t, i) => d3.max(yrs, y => P.themeY[y][i])) * 1.05;
+    panel.innerHTML = '';
+    NOLA.flist(NOLA.fsec(panel, `Topic · cases since ${yrs[0]}`, st.theme >= 0 ? ['Show all', () => set('theme', -1)] : null),
+      P.TH.map((t, i) => ({ key: i, name: t, color: 'var(--s1)', count: d3.sum(yrs, y => P.themeY[y][i]) })), { pressed: i => st.theme === i, onClick: toggle('theme') });
+    plot.innerHTML = '<div class="sms"></div>';
+    const host = plot.firstChild, one = st.theme >= 0;
+    host.classList.toggle('one', one);
+    const yMax = d3.max(one ? [st.theme] : P.TH.map((t, i) => i), i => d3.max(yrs, y => P.themeY[y][i])) * 1.05;
     P.TH.forEach((t, i) => {
+      if (one && i !== st.theme) return;
       const box = document.createElement('div'); box.className = 'sm'; host.appendChild(box);
       box.innerHTML = `<div class="smh"><b>${t}</b></div>`;
       const vals = yrs.map(y => P.themeY[y][i]);
-      const f = NOLA.frame(box, { h: 100, m: { t: 6, r: 4, b: 18, l: 4 } });
+      const f = NOLA.frame(box, { h: one ? 340 : 100, m: { t: 6, r: 4, b: 18, l: one ? 34 : 4 } });
       const x = d3.scaleBand().domain(yrs).range([0, f.iw]).paddingInner(.2);
-      const y = d3.scaleLinear().domain([0, yMax]).range([f.ih, 0]);
-      f.g.selectAll('rect').data(vals).join('rect').attr('x', (v, j) => x(yrs[j])).attr('width', x.bandwidth()).attr('y', v => y(v)).attr('height', v => f.ih - y(v)).attr('rx', 1.5).attr('fill', 'var(--s1)');
+      const y = d3.scaleLinear().domain([0, yMax]).range([f.ih, 0]).nice();
+      if (one) NOLA.yGrid(f, y, 4, d3.format('d'));
+      f.g.selectAll('rect.b').data(vals).join('rect').attr('class', 'b').attr('x', (v, j) => x(yrs[j])).attr('width', x.bandwidth()).attr('y', v => y(v)).attr('height', v => f.ih - y(v)).attr('rx', 1.5).attr('fill', 'var(--s1)');
       f.g.selectAll('rect.h').data(yrs).join('rect').attr('class', 'h').attr('x', yy => x(yy) - 1).attr('width', x.step()).attr('height', f.ih).attr('fill', 'transparent')
         .on('mousemove', (ev, yy) => tip.show(`<b>${t}, ${yy}</b>` + row('Cases', P.themeY[yy][i]), ev)).on('mouseleave', tip.hide);
       f.g.append('line').attr('x1', 0).attr('x2', f.iw).attr('y1', f.ih).attr('y2', f.ih).attr('stroke', 'var(--axis)');
-      f.g.append('text').attr('x', 0).attr('y', f.ih + 13).text("'" + yrs[0].slice(2));
-      f.g.append('text').attr('x', f.iw).attr('y', f.ih + 13).attr('text-anchor', 'end').text("'" + yrs[yrs.length - 1].slice(2));
+      if (one) f.g.selectAll('text.x').data(yrs.filter((yy, j) => j % 2 === 0)).join('text').attr('class', 'x').attr('x', yy => x(yy) + x.bandwidth() / 2).attr('y', f.ih + 14).attr('text-anchor', 'middle').text(yy => "'" + yy.slice(2));
+      else { f.g.append('text').attr('x', 0).attr('y', f.ih + 13).text("'" + yrs[0].slice(2)); f.g.append('text').attr('x', f.iw).attr('y', f.ih + 13).attr('text-anchor', 'end').text("'" + yrs[yrs.length - 1].slice(2)); }
     });
   }
 
   // ---------- CSV downloads ----------
   const csvUp = () => upF().map(u => ({ hearing: u.when.replace('T', ' '), body: u.body, case_number: u.cnum, type: u.type, address: u.addr, neighborhood: nbName(u.nb), description: u.desc }));
-  const csvRecent = () => inNb(matching()).map(p => { const [lon, lat] = p[2] || p[3] ? NOLA.lonlat(p[2], p[3]) : ['', ''];
+  const csvRecent = () => matching().filter(okNb).map(p => { const [lon, lat] = p[2] || p[3] ? NOLA.lonlat(p[2], p[3]) : ['', ''];
     return { filed: new Date(+startDay + p[0] * 864e5).toISOString().slice(0, 10), type: P.TYP[p[1]], neighborhood: nbName(p[4]), topics: P.TH.filter((t, i) => (p[5] >> i) & 1).join('; '), lon, lat }; });
   const csvYears = () => Object.keys(P.typeY).sort().map(y => Object.assign({ year: y }, ...P.TYP.map((t, i) => ({ [t]: P.typeY[y][i] }))));
   const csvTopics = () => Object.keys(P.themeY).sort().map(y => Object.assign({ year: y }, ...P.TH.map((t, i) => ({ [t]: P.themeY[y][i] }))));
 
   const V = NOLA.views([
-    { id: 'upcoming', label: 'Upcoming hearings', cls: 'plain', keep: true, draw: drawUpcoming, csv: csvUp },
-    { id: 'recent', label: 'Cases filed in the past 12 months', cls: 'plain', keep: true, draw: drawRecent, csv: csvRecent },
+    { id: 'upcoming', label: 'Upcoming hearings', keep: true, draw: drawUpcoming, csv: csvUp },
+    { id: 'recent', label: 'Cases filed in the past 12 months', keep: true, draw: drawRecent, csv: csvRecent },
     { id: 'years', label: 'Cases filed per year, by type', draw: drawYears, csv: csvYears },
     { id: 'topics', label: 'Cases per year mentioning each topic', draw: drawTopics, csv: csvTopics },
   ], { ds: ['xxb5-5azv', 'CPC Projects'],

@@ -65,16 +65,18 @@ const NOLA = (() => {
   const lonlat = (x, y) => [+(x / 4830 - 90.14).toFixed(5), +(30.20 - y / 5550).toFixed(5)];
 
   // map(el, opts) -> {svg, layer, zoomTo, setFill, focus, k()}
+  // The map fills el. It keeps clear of an on-map filter panel (o.panel) when fitting, and carries its own
+  // zoom controls, scale bar and street-name labels.
   let mapN = 0;
   function map(el, o) {
-    const W = 1000, H = o.height || 640, home = o.extent || FULL;
+    el.classList.add('map');
+    const W = 1000, H = Math.round(W * (el.clientHeight > 50 ? el.clientHeight / Math.max(1, el.clientWidth) : (o.height || 640) / 1000));
     const svg = d3.select(el).append('svg').attr('viewBox', `0 0 ${W} ${H}`).attr('role', 'img').attr('aria-label', o.label || 'Map of New Orleans');
     const root = svg.append('g');
     const base = root.append('g');
     const nbs = GEO.nb.filter(f => !f.skip);
     const nbSel = base.selectAll('path').data(nbs).join('path').attr('class', 'nbpath' + (o.tip ? ' hot' : '')).attr('d', f => f.d);
-    // street base map (City centerlines, built into streets.js), clipped to the mapped neighborhoods;
-    // local streets fade in as you zoom
+    // street base map (City centerlines, in streets.js), clipped to the mapped neighborhoods; local streets fade in as you zoom
     const ST = window.STREETS;
     let localSt = null;
     if (ST) {
@@ -90,35 +92,133 @@ const NOLA = (() => {
     const focusG = root.append('g').style('pointer-events', 'none');
     if (o.districts) root.append('g').selectAll('path').data(GEO.pd).join('path').attr('d', f => f.d)
       .attr('fill', 'none').attr('stroke', 'var(--ink2)').attr('stroke-width', 1.4).attr('vector-effect', 'non-scaling-stroke').attr('opacity', .55).style('pointer-events', 'none');
+    const stLabG = root.append('g').attr('aria-hidden', 'true');
     const layer = root.append('g');
-    const labG = root.append('g').style('pointer-events', 'none');
-    (o.labels || []).forEach(nm => { const f = GEO.nb.find(f => f.n === nm); if (!f || f.skip) return; const c = d3.polygonCentroid(decode(f.r[0]));
-      labG.append('text').attr('class', 'halo maplab').attr('x', c[0]).attr('y', c[1]).attr('text-anchor', 'middle').style('fill', 'var(--ink2)').style('font-size', '11px').text(f.name); });
     if (o.tip) nbSel.on('mousemove', (ev, f) => tip.show(o.tip(f.idx), ev)).on('mouseleave', tip.hide);
-    let k = 1; const listeners = [];
-    const zoom = d3.zoom().scaleExtent([0.6, 24]).on('zoom', ev => { root.attr('transform', ev.transform); k = ev.transform.k; labG.selectAll('text').style('font-size', (11 / k) + 'px').style('stroke-width', (4 / k) + 'px'); streetZoom(k); listeners.forEach(f => f(k)); });
-    svg.call(zoom).on('dblclick.zoom', null);
-    function zoomTo([x0, y0, x1, y1], dur = 0) {
-      const s = Math.min(W / (x1 - x0), H / (y1 - y0));
-      const t = d3.zoomIdentity.translate(W / 2, H / 2).scale(s).translate(-(x0 + x1) / 2, -(y0 + y1) / 2);
-      (dur ? svg.transition().duration(dur) : svg).call(zoom.transform, t);
+
+    // ---- street names, placed after each zoom so they never overlap; longer streets first ----
+    const SL = ST && ST.lab, q = ST ? ST.q : 1;
+    const AN = SL ? SL.a.length / 6 : 0;
+    const order = SL ? d3.range(AN).sort((a, b) => SL.a[a * 6 + 5] - SL.a[b * 6 + 5] || SL.a[b * 6 + 3] - SL.a[a * 6 + 3]) : [];
+    function layoutLabels() {
+      if (!SL) return;
+      const t = d3.zoomTransform(svg.node()), k = t.k, placed = [], seen = new Map(), cell = 60, grid = new Map();
+      const hit = b => { for (let gx = Math.floor(b[0] / cell); gx <= Math.floor(b[2] / cell); gx++) for (let gy = Math.floor(b[1] / cell); gy <= Math.floor(b[3] / cell); gy++) { const L = grid.get(gx * 9973 + gy); if (L) for (const r of L) if (b[0] < r[2] && b[2] > r[0] && b[1] < r[3] && b[3] > r[1]) return true; } return false; };
+      const add = b => { for (let gx = Math.floor(b[0] / cell); gx <= Math.floor(b[2] / cell); gx++) for (let gy = Math.floor(b[1] / cell); gy <= Math.floor(b[3] / cell); gy++) { const key = gx * 9973 + gy; (grid.get(key) || grid.set(key, []).get(key)).push(b); } };
+      if (k >= 2) for (const i of order) {
+        const b = i * 6, tier = SL.a[b + 5];
+        if (tier === 2 && k < 5) continue;
+        const [sx, sy] = t.apply([SL.a[b] / q, SL.a[b + 1] / q]);
+        if (sx < -40 || sx > W + 40 || sy < -20 || sy > H + 20) continue;
+        const name = SL.names[SL.a[b + 4]], fs = tier < 2 ? 11.5 : 10.5, w = name.length * fs * 0.56 + 8;
+        if (w > 2 * SL.a[b + 3] / q * k) continue; // the street is too short at this zoom
+        const a = SL.a[b + 2] * Math.PI / 180, c = Math.abs(Math.cos(a)), sn = Math.abs(Math.sin(a)), hw = w / 2, hh = fs / 2 + 2;
+        const sh = c > .3 && sn > .3 ? .8 : 1, ex = (hw * c + hh * sn) * sh, ey = (hw * sn + hh * c) * sh, box = [sx - ex, sy - ey, sx + ex, sy + ey];
+        if (hit(box)) continue;
+        const prev = seen.get(name); if (prev && prev.some(([px, py]) => (px - sx) ** 2 + (py - sy) ** 2 < 260 * 260)) continue;
+        add(box); if (prev) prev.push([sx, sy]); else seen.set(name, [[sx, sy]]);
+        placed.push({ x: SL.a[b] / q, y: SL.a[b + 1] / q, a: SL.a[b + 2], name, fs, major: tier < 2 });
+        if (placed.length > 260) break;
+      }
+      stLabG.selectAll('text').data(placed).join('text').attr('class', d => 'stlab' + (d.major ? ' major' : ''))
+        .attr('transform', d => `translate(${d.x},${d.y}) rotate(${d.a})`).attr('text-anchor', 'middle').attr('dy', '0.35em')
+        .style('font-size', d => (d.fs / k) + 'px').style('stroke-width', (3 / k) + 'px').style('fill', 'var(--ink2)').text(d => d.name);
     }
-    zoomTo(home);
-    return {
+
+    // ---- zoom, controls, scale bar ----
+    let k = 1, lt = 0; const listeners = [];
+    const scaleEl = document.createElement('div'); scaleEl.className = 'scalebar'; scaleEl.innerHTML = '<span></span><i></i>'; el.appendChild(scaleEl);
+    function drawScale() {
+      const pxPerMile = 80.47 * k * (el.clientWidth || W) / W, opts = [0.05, 0.1, 0.25, 0.5, 1, 2, 5]; let m = opts[0];
+      for (const v of opts) if (v * pxPerMile <= 110) m = v;
+      scaleEl.lastChild.style.width = (m * pxPerMile).toFixed(0) + 'px';
+      scaleEl.firstChild.textContent = m < 1 ? (m * 5280 >= 1000 ? m + ' mi' : Math.round(m * 5280) + ' ft') : m + ' mi';
+    }
+    const zoom = d3.zoom().scaleExtent([0.6, 40]).on('zoom', ev => {
+      root.attr('transform', ev.transform); k = ev.transform.k; streetZoom(k); drawScale();
+      stLabG.selectAll('text').style('font-size', d => (d.fs / k) + 'px').style('stroke-width', (3 / k) + 'px');
+      listeners.forEach(f => f(k)); clearTimeout(lt); lt = setTimeout(layoutLabels, 90);
+    });
+    svg.call(zoom).on('dblclick.zoom', null);
+    // fit an extent into the part of the map the filter panel doesn't cover
+    const inset = () => { if (!o.panel || getComputedStyle(o.panel).position !== 'absolute' || !o.panel.childElementCount) return 0;
+      return (o.panel.offsetWidth + 24) * W / Math.max(1, el.clientWidth); };
+    function zoomTo([x0, y0, x1, y1], dur = 0) {
+      const L = inset(), s = Math.min((W - L) / (x1 - x0), H / (y1 - y0)) * 0.96;
+      const tr = d3.zoomIdentity.translate(L + (W - L) / 2, H / 2).scale(s).translate(-(x0 + x1) / 2, -(y0 + y1) / 2);
+      (dur ? svg.transition().duration(dur) : svg).call(zoom.transform, tr);
+    }
+    const home = o.extent || FULL;
+    let focused = -1;
+    const ctl = document.createElement('div'); ctl.className = 'mapctl';
+    [['+', 'Zoom in', () => svg.transition().duration(250).call(zoom.scaleBy, 1.7)], ['−', 'Zoom out', () => svg.transition().duration(250).call(zoom.scaleBy, 1 / 1.7)],
+     ['⤢', 'Reset view', () => api.focus(focused)]].forEach(([t, l, fn]) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = t; b.title = l; b.setAttribute('aria-label', l); b.onclick = fn; ctl.appendChild(b); });
+    el.appendChild(ctl);
+    zoomTo(home); drawScale(); layoutLabels();
+    const api = {
       svg, layer, nbSel, zoomTo, k: () => k, onZoom: f => listeners.push(f), home,
       setFill(fn) { nbSel.attr('fill', f => fn(f.idx) || null).style('fill', f => fn(f.idx) || null); },
-      // outline one neighborhood and zoom to it (-1: clear and go back to the default view)
+      // outline one neighborhood and zoom to it (-1: clear and go back to the whole mapped city)
       focus(i, dur = 450) {
+        focused = i;
         focusG.selectAll('path').data(i >= 0 ? [GEO.nb[i]] : []).join('path').attr('d', f => f.d).attr('class', 'nbfocus');
         zoomTo(i >= 0 ? pad(GEO.nb[i].bbox, 0.25) : home, dur);
       }
     };
+    return api;
   }
-  // one neutral control: back to the default view of the whole mapped city
-  function mapButtons(el, m) {
-    const d = document.createElement('div'); d.className = 'row zoomhint';
-    const b = document.createElement('button'); b.className = 'btn'; b.textContent = 'Reset view'; b.onclick = () => m.focus(-1); d.appendChild(b);
-    el.appendChild(d);
+  // kept for older callers; maps carry their own controls now
+  function mapButtons() {}
+
+  // ---------- filters on the chart ----------
+  // stage(el, { map }) turns a view's pane into a filter panel + plot area. On maps the panel floats over the map.
+  function stage(el, { map: isMap = false } = {}) {
+    el.classList.add('stage', isMap ? 'mapstage' : 'chartstage');
+    el.innerHTML = '<div class="fpanel"></div><div class="plot"></div>';
+    const panel = el.firstChild;
+    if (isMap) { // on phones the map's filters fold away behind a button, so the map shows first
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'btn ftoggle'; b.textContent = 'Filters';
+      panel.classList.add('collapsed'); b.onclick = () => { panel.classList.toggle('collapsed'); b.textContent = panel.classList.contains('collapsed') ? 'Filters' : 'Hide filters'; };
+      el.insertBefore(b, panel);
+    }
+    return { panel, plot: el.lastChild };
+  }
+  // panel section with a small heading and an optional link-style action ("Show all")
+  function fsec(panel, title, action) {
+    const sec = document.createElement('div'); sec.className = 'fsec';
+    sec.innerHTML = `<div class="fsec-h"><span class="eyebrow">${title}</span></div>`;
+    if (action) { const b = document.createElement('button'); b.type = 'button'; b.className = 'linkbtn'; b.textContent = action[0]; b.onclick = action[1]; sec.firstChild.appendChild(b); }
+    panel.appendChild(sec); return sec;
+  }
+  // legend-style filter rows: swatch, name (+ sub), proportion bar, count. mode 'pick' (one at a time) or 'toggle' (each on/off)
+  function flist(sec, rows, { pressed, onClick, mode = 'pick' }) {
+    const ul = document.createElement('ul'); ul.className = 'flist' + (mode === 'toggle' ? ' toggles' : '');
+    const mx = Math.max(1, ...rows.map(r => r.count || 0)); let any = false;
+    rows.forEach(r => {
+      const li = document.createElement('li'), b = document.createElement('button'); b.type = 'button';
+      const on = !!pressed(r.key); if (on) any = true; b.setAttribute('aria-pressed', on);
+      const col = r.color || 'var(--muted)';
+      b.innerHTML = `<span class="sw" style="background:${col}${r.square ? ';border-radius:3px' : ''}"></span><span class="nm"><span>${r.name}</span>${r.sub ? `<em>${r.sub}</em>` : ''}${r.count != null ? `<span class="fb"><i style="width:${(100 * r.count / mx).toFixed(1)}%;background:${col}"></i></span>` : ''}</span><span class="ct">${r.count != null ? fmt(r.count) : ''}</span>`;
+      b.onclick = () => onClick(r.key); li.appendChild(b); ul.appendChild(li);
+    });
+    if (mode === 'pick' && any) ul.classList.add('filtering');
+    sec.appendChild(ul); return ul;
+  }
+  // segmented switch
+  function seg(sec, opts, value, onChange) {
+    const d = document.createElement('div'); d.className = 'seg';
+    opts.forEach(([v, l]) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = l; b.setAttribute('aria-pressed', v === value); b.onclick = () => onChange(v); d.appendChild(b); });
+    sec.appendChild(d); return d;
+  }
+  // neighborhood picker inside a panel section
+  function nbPick(sec, value, onSel, label = 'All neighborhoods') {
+    const s = document.createElement('select'); s.className = 'fsel'; s.setAttribute('aria-label', 'Neighborhood'); sec.appendChild(s);
+    nbSelect(s, onSel, value, label); return s;
+  }
+  // on phones the panel collapses behind a "Filters" button
+  function phoneToggle(panel) {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'btn ftoggle'; b.textContent = 'Filters';
+    b.onclick = () => panel.classList.toggle('collapsed'); panel.prepend(b);
   }
 
   // sequential color for a value in [0,1]
@@ -191,7 +291,7 @@ const NOLA = (() => {
     const tools = document.createElement('div'); tools.className = 'tools';
     const linkB = document.createElement('button'); linkB.className = 'btn'; linkB.type = 'button'; linkB.textContent = 'Copy link';
     const csvB = document.createElement('button'); csvB.className = 'btn'; csvB.type = 'button'; csvB.textContent = 'Download CSV';
-    tools.append(linkB, csvB); bar.appendChild(tools);
+    tools.append(linkB, csvB); (document.querySelector('.src') || bar).after(tools);
     const panes = {}, drawn = new Set(); let cur = null;
     list.forEach(v => {
       const o = document.createElement('option'); o.value = v.id; o.textContent = v.label; sel.appendChild(o);
@@ -235,6 +335,6 @@ const NOLA = (() => {
   }
   const legendHTML = items => '<div class="legend">' + items.map(([c, l, round]) => `<span><i style="background:${c}${round ? ';border-radius:50%' : ''}"></i>${l}</span>`).join('') + '</div>';
 
-  return { css, S, fmt, pct, tip, row, setGeo, views, hashState, legendHTML, popOf, perK, fmtRate, POP_NOTE, basisChips, shown, nbList, nbSelect, lonlat, get FULL() { return FULL; }, get GEO() { return GEO; }, map, mapButtons, seqVar, seqLegend, frame, yGrid, chips, months, monthsLong,
+  return { css, S, fmt, pct, tip, row, setGeo, views, hashState, legendHTML, stage, fsec, flist, seg, nbPick, phoneToggle, popOf, perK, fmtRate, POP_NOTE, basisChips, shown, nbList, nbSelect, lonlat, get FULL() { return FULL; }, get GEO() { return GEO; }, map, mapButtons, seqVar, seqLegend, frame, yGrid, chips, months, monthsLong,
     setYear, get YEAR() { return YEAR; }, doyTime, doyDate, doyISO, doyMonth, monthStarts, isoDate, share, numWord, cap, setText, setHTML, title };
 })();

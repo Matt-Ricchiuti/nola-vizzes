@@ -265,8 +265,8 @@ STREET_Q = 4  # street coordinates are stored at 4x the map grid (about 5 m) so 
 def build_streets(api):
     """Street centerlines (22q2-dqpb) as one SVG path per tier: 0 freeway, 1 ramp, 2 arterial, 3 local.
     Coordinates are the shared X/Y projection times STREET_Q; pages draw them with scale(1/q)."""
-    api.require_columns('22q2-dqpb', ['the_geom', 'roadclass', 'inwater'], 'Centerline')
-    g = api.get('/resource/22q2-dqpb.geojson', {'$select': 'the_geom,roadclass,inwater', '$limit': 100000}, kind='geojson')
+    api.require_columns('22q2-dqpb', ['the_geom', 'roadclass', 'inwater', 'fullnameabv'], 'Centerline')
+    g = api.get('/resource/22q2-dqpb.geojson', {'$select': 'the_geom,roadclass,inwater,fullnameabv', '$limit': 100000}, kind='geojson')
     feats = g.get('features', [])
     need(len(feats) > 20000, f'Centerline: only {len(feats)} street segments')
     d, n = ['', '', '', ''], 0
@@ -287,7 +287,80 @@ def build_streets(api):
             d[t] += 'M%d %d' % q[0] + 'l' + ' '.join('%d %d' % (b[0] - a[0], b[1] - a[1]) for a, b in zip(q, q[1:]))
             n += 1
     need(n > 20000 and all(d), f'Centerline: only {n} usable segments, or a road class is missing')
-    return {'q': STREET_Q, 'd': d, 'n': n}
+    return {'q': STREET_Q, 'd': d, 'n': n, 'lab': street_labels(feats)}
+
+
+def street_labels(feats):
+    """Where street names can go: the City's centerline comes in block-length pieces, so join each street's pieces
+    into nearly straight runs, then put an anchor at the middle of every ~60-unit (1.2 km) stretch.
+    Returns {'names': [...], 'a': [x, y, angleDeg, halfLength, nameIndex, tier, ...]} with x, y, halfLength in map
+    units x STREET_Q and tier 0 freeway, 1 arterial, 2 local."""
+    LT = {'Freeway': 0, 'Major Arterial': 1, 'Minor Arterial': 1, 'Local': 2}
+    segs = defaultdict(list)  # (name, tier) -> list of polylines in map units
+    for f in feats:
+        p = f.get('properties') or {}
+        t, name = LT.get(p.get('roadclass')), (p.get('fullnameabv') or '').strip()
+        if t is None or not name or p.get('inwater') == 'Yes' or not f.get('geometry'):
+            continue
+        lines = f['geometry']['coordinates'] if f['geometry']['type'] == 'MultiLineString' else [f['geometry']['coordinates']]
+        for line in lines:
+            pts = [((lon + 90.14) * 4830, (30.20 - lat) * 5550) for lon, lat in line]
+            if len(pts) >= 2:
+                segs[(name, t)].append(pts)
+    ang = lambda a, b: math.atan2(b[1] - a[1], b[0] - a[0])
+    def turn(a1, a2):
+        d = abs(a1 - a2) % (2 * math.pi)
+        return min(d, 2 * math.pi - d)
+    key = lambda p: (round(p[0] * 2), round(p[1] * 2))
+    names, out = [], []
+    for (name, t), lines in segs.items():
+        ends = defaultdict(list)
+        for i, l in enumerate(lines):
+            ends[key(l[0])].append(i); ends[key(l[-1])].append(i)
+        used = [False] * len(lines)
+        def grow(chain, forward):
+            while True:
+                tip = chain[-1] if forward else chain[0]
+                prev = chain[-2] if forward else chain[1]
+                nxt = None
+                for j in ends[key(tip)]:
+                    if used[j]:
+                        continue
+                    l = lines[j] if key(lines[j][0]) == key(tip) else lines[j][::-1]
+                    a_in, a_out = ang(prev, tip) if forward else ang(tip, prev), ang(l[0], l[1]) if forward else ang(l[1], l[0])
+                    if turn(a_in, a_out) < math.radians(28):
+                        nxt = (j, l); break
+                if not nxt:
+                    return chain
+                used[nxt[0]] = True
+                chain = chain + nxt[1][1:] if forward else nxt[1][::-1][:-1] + chain
+        for i, l in enumerate(lines):
+            if used[i]:
+                continue
+            used[i] = True
+            chain = grow(grow(list(l), True), False)
+            # cut the run into stretches of ~60 units and anchor each one at its middle
+            seglen = [math.dist(chain[k], chain[k + 1]) for k in range(len(chain) - 1)]
+            total = sum(seglen)
+            if total < 5:  # about one block
+                continue
+            pieces = max(1, round(total / 60))
+            step = total / pieces
+            if name not in names:
+                names.append(name)
+            ni = names.index(name)
+            for pc in range(pieces):
+                target, acc = (pc + 0.5) * step, 0.0
+                for k, L in enumerate(seglen):
+                    if acc + L >= target and L > 0:
+                        f_ = (target - acc) / L
+                        x = chain[k][0] + f_ * (chain[k + 1][0] - chain[k][0]); y = chain[k][1] + f_ * (chain[k + 1][1] - chain[k][1])
+                        a = math.degrees(ang(chain[k], chain[k + 1]))
+                        a = a - 180 if a > 90 else a + 180 if a < -90 else a  # keep text upright
+                        out += [js_round(x * STREET_Q), js_round(y * STREET_Q), js_round(a), js_round(step / 2 * STREET_Q), ni, t]
+                        break
+                    acc += L
+    return {'names': names, 'a': out}
 
 
 # ---------------------------------------------------------------- drone flights

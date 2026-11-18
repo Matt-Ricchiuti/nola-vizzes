@@ -40,12 +40,14 @@ geo.json = { "nb": [ {"n": NAME, "r": [ring, ...]}, ...72 ],   # order = feature
 Every map draws the City's street centerlines under its data. `build.py` writes them to `site/streets.js` (`window.STREETS = ...`), one file the browser caches across pages, and `NOLA.map()` in `src/lib.js` draws them.
 
 ```
-streets.json = { "q": 4, "n": segmentCount, "d": [freeway, ramp, arterial, local] }   # each an SVG path string
+streets.json = { "q": 4, "n": segmentCount, "d": [freeway, ramp, arterial, local],   # each an SVG path string
+                 "lab": { "names": [...], "a": [...] } }                            # street-name label positions
 ```
 
 - `roadclass` → tier: Freeway 0, Ramp 1, Major/Minor Arterial 2, Local 3. "Other" (alleys, driveways), "Umimproved" and `inwater = Yes` are left out.
 - Each line is simplified with Douglas–Peucker at 0.00003°, projected with X/Y multiplied by `q` (so about 5 m resolution), and written as `M x y l dx dy ...`. Pages draw it with `scale(1/q)`.
 - Local streets fade from 35% to full opacity as you zoom in.
+- `lab` holds street-name positions: `{ names, a: [x, y, angleDeg, halfLength, nameIndex, tier, ...] }` (x, y and halfLength in map units × q; tier 0 freeway, 1 arterial, 2 local). Built from `fullnameabv`: each street's block-length pieces are chained into nearly straight runs (turns under 28°), then anchored every ~60 map units (1.2 km). Pages place a name only where the run is longer than the label at the current zoom, skip overlaps, and space repeats of the same name apart.
 
 ---
 
