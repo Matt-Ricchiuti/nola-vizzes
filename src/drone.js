@@ -1,7 +1,8 @@
 // NOPD drone flights page
 (() => {
   const D = DATA.drone; NOLA.setGeo(DATA.geo);
-  const { fmt, tip, row } = NOLA;
+  const YEAR = D.year || 2026; NOLA.setYear(YEAR);
+  const { fmt, tip, row, setText } = NOLA;
   const CATS = [
     { n: 'Call for service', codes: [0] },
     { n: 'Event overwatch', codes: [1] },
@@ -14,15 +15,25 @@
   CATS.forEach((c, i) => c.color = i < 7 ? NOLA.S(i) : 'var(--none)');
   const catOf = code => CATS.findIndex(c => c.codes.includes(code));
   const EV = ['', 'Mardi Gras', 'French Quarter Fest', 'Jazz Fest', 'Essence Fest', 'Saints game', 'Super Sunday / second line', 'Southern Decadence', 'Street takeover'];
-  const DFR = 285; // first day of the fixed-launch-point era (Oct 13)
+  // Oct 13, 2026: new drones and daily dispatch flights from fixed launch points begin.
+  // DFR is that day as a day-of-year; 0 for later years (the whole year is the new era).
+  const DFR = Math.max(0, Math.round((Date.UTC(2026, 9, 13) - Date.UTC(YEAR, 0, 1)) / 864e5));
+  const SPLIT = DFR > 0; // whether the page compares before / after Oct 13
+  const dfrLabel = NOLA.doyDate(DFR);
 
-  // UTC -> Central
+  // UTC -> Central. US daylight time runs from 2 a.m. on the second Sunday in March (08:00 UTC)
+  // to 2 a.m. on the first Sunday in November (07:00 UTC).
+  const sunday = (m, n) => { const wd = new Date(Date.UTC(YEAR, m, 1)).getUTCDay(); return 1 + (7 - wd) % 7 + 7 * (n - 1); };
+  const hOf = (m, d, hr) => (Date.UTC(YEAR, m, d, hr) - Date.UTC(YEAR, 0, 1)) / 36e5;
+  const dstOn = hOf(2, sunday(2, 2), 8), dstOff = hOf(10, sunday(10, 1), 7);
   const flights = D.recs.map(r => {
     const h = r[0] * 24 + r[1];
-    const off = (h >= 66 * 24 + 8 && h < 304 * 24 + 7) ? 5 : 6;
+    const off = (h >= dstOn && h < dstOff) ? 5 : 6;
     const l = h - off;
     return { day: Math.floor(l / 24), hr: l - 24 * Math.floor(l / 24), dur: r[2], cat: catOf(r[3]), drone: r[4], nb: r[5], x: r[6], y: r[7], ev: r[8], inferred: r[9], hasLoc: !!(r[6] || r[7]) };
-  });
+  }).filter(f => f.day >= 0); // a flight just after midnight UTC on Jan 1 is still Dec 31 in New Orleans
+  const LAST = d3.max(flights, f => f.day);
+  const mStarts = NOLA.monthStarts(YEAR, LAST);
   const st = { cat: -1, period: 'all' };
   const pass = f => (st.cat < 0 || f.cat === st.cat) && (st.period === 'all' || (st.period === 'early' ? f.day < DFR : f.day >= DFR));
 
@@ -30,21 +41,23 @@
   const tot = flights.length, hrs = d3.sum(flights, f => f.dur) / 3600;
   const late = flights.filter(f => f.day >= DFR);
   const med = a => d3.median(a, f => f.dur) / 60;
+  const range = `Jan 1 – ${NOLA.doyDate(LAST)}`, rangeTo = `Jan 1 to ${NOLA.doyDate(LAST)}`;
   document.getElementById('tiles').innerHTML = [
-    [fmt(tot), 'flights logged, Jan 1 – Nov 5'],
+    [fmt(tot), 'flights logged, ' + range],
     [Math.round(hrs) + ' hrs', 'total time in the air'],
-    [fmt(late.length), `flights since Oct 13 (${Math.round(100 * late.length / tot)}% of the year)`],
+    SPLIT ? [fmt(late.length), `flights since ${dfrLabel} (${Math.round(100 * late.length / tot)}% of the year)`]
+          : [Math.round(med(flights)) + ' min', 'median flight length'],
     [D.drones.length, 'Skydio X10 drones in the log']
   ].map(([v, l]) => `<div class="tile"><div class="v">${v}</div><div class="l">${l}</div></div>`).join('');
 
   // ---------- filters ----------
   const catChips = document.getElementById('catChips');
   NOLA.chips(catChips, [{ label: 'All purposes', value: -1 }, ...CATS.map((c, i) => ({ label: c.n, value: i, color: c.color }))], v => { st.cat = v; redraw(); }, { sel: -1 });
-  NOLA.chips(document.getElementById('perChips'), [{ label: 'Whole year', value: 'all' }, { label: 'Jan 1 – Oct 12', value: 'early' }, { label: 'Since Oct 13', value: 'late' }], v => { st.period = v; redraw(); }, { sel: 'all' });
+  if (SPLIT) NOLA.chips(document.getElementById('perChips'), [{ label: 'Whole year', value: 'all' }, { label: `Jan 1 – ${NOLA.doyDate(DFR - 1)}`, value: 'early' }, { label: `Since ${dfrLabel}`, value: 'late' }], v => { st.period = v; redraw(); }, { sel: 'all' });
   document.getElementById('legend').innerHTML = CATS.map(c => `<span><i style="background:${c.color}"></i>${c.n}</span>`).join('');
 
   // ---------- weekly timeline (stacked) ----------
-  const nW = Math.ceil(313 / 7);
+  const nW = Math.floor(LAST / 7) + 1;
   const weeks = d3.range(nW).map(w => { const a = CATS.map(() => 0); flights.forEach(f => { if (Math.floor(f.day / 7) === w) a[f.cat]++; }); return a; });
   const tl = NOLA.frame(document.getElementById('timeline'), { h: 280, m: { t: 34, r: 12, b: 28, l: 36 } });
   const xw = d3.scaleBand().domain(d3.range(nW)).range([0, tl.iw]).paddingInner(0.18);
@@ -61,15 +74,35 @@
     .on('mousemove', (ev, w) => { const i = weeks.indexOf(w); tip.show(`<b>Week of ${NOLA.doyDate(i * 7)}</b>` + row('Flights', d3.sum(w)) + CATS.map((c, ci) => w[ci] ? row(`<i style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${c.color}"></i> ${c.n}`, w[ci]) : '').join(''), ev); })
     .on('mouseleave', tip.hide);
   // month axis
-  const mStarts = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304];
   tl.g.append('g').selectAll('text').data(mStarts).join('text').attr('x', d => xw(Math.floor(d / 7))).attr('y', tl.ih + 18).text((d, i) => NOLA.months[i]);
   tl.g.append('line').attr('x1', 0).attr('x2', tl.iw).attr('y1', tl.ih).attr('y2', tl.ih).attr('stroke', 'var(--axis)');
-  // annotations
-  const ann = [[0, 'New Year\'s', -6, 'start'], [Math.floor(45 / 7), 'Mardi Gras', -20, 'middle'], [Math.floor(105 / 7), 'French Quarter Fest', -6, 'middle'], [Math.floor(183 / 7), 'Essence', -20, 'middle'], [Math.floor(247 / 7), 'Southern Decadence', -6, 'middle'], [Math.floor(DFR / 7), 'Oct 13: new drones, daily dispatch flights', -20, 'end']];
-  ann.forEach(([w, t, ly, anc]) => {
+  // annotations: the busiest week of each big event with at least 4 tagged flights, plus the Oct 13 shift
+  const ANN_EV = { 1: 'Mardi Gras', 2: 'French Quarter Fest', 3: 'Jazz Fest', 4: 'Essence', 7: 'Southern Decadence' };
+  const ann = [];
+  Object.entries(ANN_EV).forEach(([code, name]) => {
+    const byW = d3.rollup(flights.filter(f => f.ev === +code), v => v.length, f => Math.floor(f.day / 7));
+    if (!byW.size) return;
+    const [w, n] = [...byW].sort((a, b) => b[1] - a[1] || a[0] - b[0])[0];
+    if (n >= 4) ann.push([w, name]);
+  });
+  ann.sort((a, b) => a[0] - b[0]);
+  // place labels in two rows above the bars; the Oct 13 label goes first, and a label that fits in neither row is skipped
+  const annF = ann.map(([w, t]) => [w, t, w === 0 ? 'start' : 'middle']);
+  if (SPLIT && DFR <= LAST) annF.unshift([Math.floor(DFR / 7), `${dfrLabel}: new drones, daily dispatch flights`, 'end']);
+  const ROWS = [-6, -20], used = [[], []];
+  annF.forEach(([w, t, anc]) => {
     const top = yw(d3.sum(weeks[w])), cx = xw(w) + xw.bandwidth() / 2;
-    tl.g.append('line').attr('x1', cx).attr('x2', cx).attr('y1', top - 3).attr('y2', ly + 3).attr('stroke', 'var(--axis)');
-    tl.g.append('text').attr('class', 'halo').attr('x', cx + (anc === 'end' ? 4 : anc === 'start' ? -2 : 0)).attr('y', ly).attr('text-anchor', anc).style('fill', 'var(--ink2)').text(t);
+    const txt = tl.g.append('text').attr('class', 'halo').attr('x', cx + (anc === 'end' ? 4 : anc === 'start' ? -2 : 0)).attr('text-anchor', anc).style('fill', 'var(--ink2)').text(t);
+    let bb = txt.node().getBBox();
+    if (bb.x + bb.width > tl.iw + tl.m.r) { txt.attr('x', cx + 4).attr('text-anchor', 'end'); bb = txt.node().getBBox(); }
+    if (bb.x < -tl.m.l) { txt.attr('x', cx - 2).attr('text-anchor', 'start'); bb = txt.node().getBBox(); }
+    const x0 = bb.x - 8, x1 = bb.x + bb.width + 8;
+    const r = [0, 1].find(i => used[i].every(([a, b]) => x1 < a || x0 > b));
+    if (r === undefined) { txt.remove(); return; }
+    used[r].push([x0, x1]);
+    txt.attr('y', ROWS[r]);
+    tl.g.append('line').attr('x1', cx).attr('x2', cx).attr('y1', top - 3).attr('y2', ROWS[r] + 3).attr('stroke', 'var(--axis)');
+    txt.raise();
   });
 
   // ---------- map ----------
@@ -119,9 +152,9 @@
     fleetEl.innerHTML = '';
     const order = d3.range(D.drones.length).sort((a, b) => d3.min(flights.filter(f => f.drone === a), f => f.day) - d3.min(flights.filter(f => f.drone === b), f => f.day));
     const f = NOLA.frame(fleetEl, { h: 30 + order.length * 22, m: { t: 6, r: 10, b: 22, l: 120 } });
-    const x = d3.scaleLinear().domain([0, 313]).range([0, f.iw]);
+    const x = d3.scaleLinear().domain([0, LAST]).range([0, f.iw]);
     const y = d3.scaleBand().domain(order).range([0, f.ih]).paddingInner(.3);
-    f.g.append('rect').attr('x', x(DFR)).attr('width', f.iw - x(DFR)).attr('y', 0).attr('height', f.ih).attr('fill', 'var(--chip)');
+    if (SPLIT) f.g.append('rect').attr('x', x(DFR)).attr('width', f.iw - x(DFR)).attr('y', 0).attr('height', f.ih).attr('fill', 'var(--chip)');
     order.forEach(d => {
       const fs = flights.filter(fl => fl.drone === d);
       f.g.append('text').attr('x', -8).attr('y', y(d) + y.bandwidth() / 2 + 4).attr('text-anchor', 'end').style('fill', 'var(--ink2)').text(`X10-${D.drones[d]} · ${fs.length}`);
@@ -130,7 +163,7 @@
         .attr('fill', fl => CATS[fl.cat].color).attr('opacity', fl => pass(fl) ? .9 : .12);
     });
     f.g.append('g').selectAll('text').data(mStarts).join('text').attr('x', d => x(d)).attr('y', f.ih + 16).text((d, i) => NOLA.months[i]);
-    f.g.append('text').attr('x', x(DFR) + 4).attr('y', 10).style('fill', 'var(--ink2)').text('since Oct 13');
+    if (SPLIT) f.g.append('text').attr('x', x(DFR) + 4).attr('y', 10).style('fill', 'var(--ink2)').text('since ' + dfrLabel);
     f.svg.on('mousemove', ev => {
       const [mx, my] = d3.pointer(ev, f.g.node()); const d = order.find(o => my >= y(o) && my <= y(o) + y.bandwidth()); if (d === undefined) return tip.hide();
       const day = Math.round(x.invert(mx)); const fs = flights.filter(fl => fl.drone === d); const near = fs.filter(fl => Math.abs(fl.day - day) <= 1);
@@ -147,6 +180,30 @@
       rows.map(r => `<tr data-c="${r.ci}" class="${st.cat === r.ci ? 'sel' : ''}"><td><i style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${r.c.color};margin-right:6px"></i>${r.c.n}</td><td class="num">${r.n}</td><td style="width:28%"><span class="bar" style="width:${100 * r.n / mx}%;background:${r.c.color}"></span></td><td class="num">${r.h.toFixed(1)}</td><td class="num">${r.med == null ? '—' : Math.round(r.med) + ' min'}</td></tr>`).join('') + `</tbody>`;
     document.querySelectorAll('#ptable tbody tr').forEach(tr => tr.onclick = () => { const c = +tr.dataset.c; st.cat = st.cat === c ? -1 : c; [...catChips.children].forEach((b, i) => b.classList.toggle('on', i === st.cat + 1)); redraw(); });
   }
+
+  // ---------- sentences that quote the data ----------
+  (function copy() {
+    const nLoc = flights.filter(f => !f.hasLoc).length;
+    const medOf = ci => { const fs = flights.filter(f => f.cat === ci); return fs.length >= 5 ? Math.round(med(fs)) : null; };
+    const disp = medOf(0), over = medOf(1);
+    setText('metaRange', `${fmt(tot)} flights from ${rangeTo}, ${YEAR}`);
+    setText('noPurpose', `${NOLA.cap(NOLA.share(D.missingPurpose / D.recs.length))} of flights (${fmt(D.missingPurpose)} of ${fmt(D.recs.length)}) have no purpose recorded. Where the free-text summary made the purpose clear, such as "photogrammetry for vehicle crash investigation," we assigned it (${fmt(D.inferred)} flights). The remaining ${fmt(D.unknown)} are shown in gray as "Not recorded."`);
+    if (disp != null && over != null) setText('durNote', `Click a row to filter. Dispatch flights are short, about ${disp} minutes at the median. Event overwatch flights typically last about ${over}.`);
+    setText('noLoc', 'Launch points are where the drone took off, not where it flew.' + (nLoc ? ` ${NOLA.cap(NOLA.numWord(nLoc))} flight${nLoc === 1 ? ' has' : 's have'} no location.` : ''));
+    if (SPLIT) {
+      const firstDay = d3.range(D.drones.length).map(d => d3.min(flights.filter(f => f.drone === d), f => f.day));
+      const newD = firstDay.filter(d => d >= DFR).length;
+      setText('fleetSub', `Each row is one drone and each tick is one flight. ${NOLA.cap(NOLA.numWord(newD))} drone${newD === 1 ? '' : 's'} first appear${newD === 1 ? 's' : ''} on or after ${dfrLabel}, the same week the dispatch flights begin.`);
+    } else {
+      setText('fleetSub', 'Each row is one drone and each tick is one flight.');
+      // the 2026 headline is about the October shift; later years get a neutral one until the story is rewritten
+      setText('h1', `NOPD drone flights in ${YEAR}`);
+      setText('dek', 'Every flight NOPD has logged this year: what the drones were sent to do, where they took off, and when.');
+      setText('tlSub', 'Each bar is one week. Hover over a bar for its breakdown.');
+      setText('mapSub', 'Circles are launch points, sized by number of flights and colored by their most common purpose.');
+      const pc = document.getElementById('perChips'); if (pc) pc.remove();
+    }
+  })();
 
   function redraw() {
     segSel.attr('opacity', d => st.cat < 0 || d.ci === st.cat ? 1 : .18);

@@ -1,6 +1,6 @@
 # Data reference: how each `data/*.json` file was produced
 
-Everything in `data/` was pulled from data.nola.gov (Socrata) on **2026-11-18**. The aggregation ran as JavaScript in a browser on data.nola.gov. The daily pipeline should reproduce the same output in a script (Python is fine), write the same JSON shapes to `data/`, then run `build.py`.
+The first snapshot in `data/` was pulled on **2026-11-18** with JavaScript in a browser. `pipeline/fetch.py` now reproduces it: run against that day's data it matches `geo`, `hist`, `drone` and `cfs` exactly and `cpc` apart from hearings scheduled since. GitHub Actions runs it every morning (`.github/workflows/daily.yml`). It also adds a few fields the pages use: `drone.year`, `cfs.year`, `cfs.ds`, `cpc.windowStart`, `cpc.total`, `cpc.firstFiled`, `cpc.lastFiled`, and `data/meta.json` (`pulled` date).
 
 The front-end expects exactly the shapes documented below. If you change a shape, change the matching `src/*.js`.
 
@@ -53,8 +53,9 @@ Fetch every row (742 as of the pull): `$select=serial,longitude,latitude,takeoff
   - 0 call for service: `dispatch|call for service|carjack`
   - 2 training/test: `train|test|demo|non-operational|maint`
   - otherwise 7 (other)
-- `eventCode` (purpose, falling back to summary): 1 mardi, 2 french quarter fest, 3 jazz, 4 essence, 5 saints/nfl, 6 super sunday/second line, 7 decadence, 8 takeover, otherwise 0.
-- `src/drone.js` hard-codes `DFR = 285` (Oct 13, 2026), the start of daily dispatch flights, and the page copy describes it. Revisit both as the story changes.
+- `eventCode` (matched on purpose and summary joined with a space): 1 mardi, 2 french quarter fest, 3 jazz, 4 essence, 5 saints/nfl, 6 super sunday/second line, 7 decadence, 8 takeover, otherwise 0.
+- Only flights in the page's calendar year are fetched. In early January, before the new year has flights, the page keeps showing last year.
+- `src/drone.js` computes `DFR` (Oct 13, 2026, the start of daily dispatch flights) as a day of the page's year. For 2027 on it is 0, which hides the before/after comparison and swaps the 2026 headline for a neutral one. Write a new headline when the 2027 story is clear. DST dates are computed for any year.
 
 ## `data/cfs.json`: Calls for Service 2026 (`es9j-6y5d`)
 
@@ -73,9 +74,9 @@ Note: `timecreate` and the other times are **text** columns in 2026 and 2025, bu
   "noLoc": int, "outside": int }
 ```
 
-- **Response time** = timearrive − timecreate in minutes. It counts only public calls (`selfinitiated != 'Y'`) that have an arrival and whose value is ≥ 0 and < 1440.
+- **Response time** = timearrive − timecreate in minutes, with both times truncated to whole seconds. It counts only public calls (`selfinitiated != 'Y'`) that have an arrival and whose value is ≥ 0 and < 1440.
 - **Priority group** = the first character of `priority` (2 = emergency, 1 = non-emergency).
-- **Medians and percentiles**: null when there are fewer than 15 values.
+- **Medians and percentiles**: `sorted[floor(n * q)]` (no interpolation), rounded to 0.1. Null when there are fewer than 15 values.
 - **Valid location**: lon < -89.5 and lat > 29.8. Neighborhood and district come from point-in-polygon.
 - `GONE ON ARRIVAL` and `REPORT TO FOLLOW` are values of `dispositiontext`.
 - Medical and mental-health calls have no location in the source data.
@@ -91,9 +92,9 @@ Yearly dataset ids: 2014 `jsyu-nz5r`, 2015 `w68y-xmk6`, 2016 `wgrp-d3ma`, 2017 `
 - **Calendar-date years**: `$select=date_trunc_ym(timecreate) as m,selfinitiated,count(*) as n&$group=m,selfinitiated`
 - **Text-time years (2025, 2026)**: run one query per month: `$where=timecreate>='YYYY-MM-01' AND timecreate<'next month'&$group=selfinitiated`
 
-Past years never change. The daily job only needs to refresh the current year. `src/cfs.js` leaves off the current, incomplete month (`m >= 10` is hard-coded for Nov 2026, so make it dynamic).
+Past years never change. The daily job only recomputes the current year (from the rows it already fetched for `cfs.json`) and refetches last year during January and February. `src/cfs.js` leaves the current month off the trend chart until the data reaches the month's last day.
 
-**New year:** the City publishes a new dataset id each January ("Calls for Service 2027"). Find it with `/api/catalog/v1?domains=data.nola.gov&q=calls%20for%20service`.
+**New year:** the City publishes a new dataset id each January ("Calls for Service 2027"). `fetch.py` looks it up in `/api/catalog/v1?domains=data.nola.gov&q=calls%20for%20service%20YYYY` by exact name. Until it exists (or while it's empty) the page keeps showing last year. If it still isn't found by March the job fails: add the id to `CFS_IDS` in `fetch.py`.
 
 ## `data/cpc.json`: CPC Projects (`xxb5-5azv`)
 
@@ -105,7 +106,8 @@ Fetch every row (15,671 as of the pull): `case_type,case_num,address,filing_date
   "themeY": {year: [count per TH]},
   "openByType": [...], "dec": {"appr", "den", "wd"},
   "nbRecent": [[count per TYP] per nb]   # last 5 years
-  "up":  [[nextMeetingISO16, body, caseNum, typeName, address(<=40 chars), nb, x, y, description(<=170 chars)], ...]  # next_meeting_date >= today, sorted
+  "up":  [[nextMeetingISO16, body, caseNum, typeName, address, nb, x, y, description], ...]  # next_meeting_date >= today, sorted
+         # address = text before the first comma, cut to 40 chars; description = whitespace collapsed, cut to 170 chars
   "pts": [[daysSinceWindowStart, typIdx, x, y, nb, topicBitmask], ...] }  # filings in the last 365 days
 ```
 
@@ -130,9 +132,10 @@ Fetch every row (15,671 as of the pull): `case_type,case_num,address,filing_date
   - demolition: `demoli`
   - child care: `day ?care|child ?care|school`
 - **`dec`**: since 2016, `previous_meeting_status` starting with approv (or containing "modified approval") counts as appr. Starting with deni/denial counts as den. Exactly "withdrawn" counts as wd.
-- **The `pts` window start is hard-coded** as 2025-11-18 in `src/cpc.js` (`startDay`). Make it data-driven, for example by adding `"windowStart"` to the JSON.
+- `typeY` and `themeY` start at 2004 (the few December 2003 filings are left off). `pts` is in API (`:id`) order.
+- The `pts` window starts 365 days before the pull date and is stored as `windowStart`.
 - `up` has duplicate rows. The front end dedupes them on date + case number.
 
 ## Page copy that mentions specific numbers
 
-The headlines, subtitles and notes in `src/*.html` quote figures from this snapshot ("about 26,000 a month", "since Oct 13", "58 cases", and so on). Once data refreshes daily, either compute those sentences in JS from the data or rephrase them so they don't go stale. The stat tiles are already computed from the data.
+Done. Headlines, subtitles and notes that quote numbers or dates are now filled in by each page's JS from the data (look for the `copy()` block at the end of each `src/*.js`), and the year, dataset id and pull date are filled in by `build.py`. Axis limits are computed from the data too. When editing copy in `src/*.html`, give any sentence with a number an `id` and set it from JS instead of typing the number.

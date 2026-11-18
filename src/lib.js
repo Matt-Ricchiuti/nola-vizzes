@@ -97,7 +97,28 @@ const NOLA = (() => {
     });
   }
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  const doyDate = d => { const t = new Date(Date.UTC(2026, 0, 1) + d * 864e5); return months[t.getUTCMonth()] + ' ' + t.getUTCDate(); };
+  const monthsLong = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  // the calendar year a page covers; day-of-year (doy) values count from Jan 1 of it
+  let YEAR = new Date().getFullYear();
+  const setYear = y => { YEAR = y; };
+  const doyTime = (d, y = YEAR) => new Date(Date.UTC(y, 0, 1) + d * 864e5);
+  const doyDate = (d, y = YEAR) => { const t = doyTime(d, y); return months[t.getUTCMonth()] + ' ' + t.getUTCDate(); };
+  const doyMonth = (d, y = YEAR) => doyTime(d, y).getUTCMonth();
+  // first doy of each month (only months that start on or before `last`, if given)
+  const monthStarts = (y = YEAR, last = 400) => d3.range(12).map(m => (Date.UTC(y, m, 1) - Date.UTC(y, 0, 1)) / 864e5).filter(d => d <= last);
+  // 'YYYY-MM-DD' -> 'Nov 18, 2026'
+  const isoDate = s => { const [y, m, d] = s.slice(0, 10).split('-').map(Number); return `${months[m - 1]} ${d}, ${y}`; };
+  // plain-language share: .33 -> 'about a third'
+  function share(p) {
+    const named = [[1 / 4, 'about a quarter'], [1 / 3, 'about a third'], [1 / 2, 'about half'], [2 / 3, 'about two-thirds'], [3 / 4, 'about three-quarters']];
+    const hit = named.find(([v]) => Math.abs(p - v) < 0.025);
+    return hit ? hit[1] : `about ${Math.round(p * 100)}%`;
+  }
+  const numWord = n => ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'][n] || fmt(n);
+  const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
+  const setText = (id, s) => { const el = document.getElementById(id); if (el) el.textContent = s; };
+  const setHTML = (id, s) => { const el = document.getElementById(id); if (el) el.innerHTML = s; };
 
-  return { css, S, fmt, pct, tip, row, setGeo, get GEO() { return GEO; }, map, mapButtons, seqVar, seqLegend, frame, yGrid, chips, months, doyDate, title };
+  return { css, S, fmt, pct, tip, row, setGeo, get GEO() { return GEO; }, map, mapButtons, seqVar, seqLegend, frame, yGrid, chips, months, monthsLong,
+    setYear, get YEAR() { return YEAR; }, doyTime, doyDate, doyMonth, monthStarts, isoDate, share, numWord, cap, setText, setHTML, title };
 })();

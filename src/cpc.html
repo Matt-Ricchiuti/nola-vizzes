@@ -24,7 +24,7 @@
 {{NAV}}
 <h1>What's going before the City Planning Commission, and what New Orleans has been asking it for</h1>
 <p class="dek">Every variance, subdivision, zoning change and conditional use in the city goes through a City Planning case. This page shows what's on upcoming agendas, where recent requests are concentrated, and which topics come up most over twenty years of filings.</p>
-<div class="meta">Source: <a href="https://data.nola.gov/Housing-Land-Use-and-Blight/CPC-Projects/xxb5-5azv/about_data">CPC Projects</a>, data.nola.gov · 15,671 cases filed Dec 2003 – Nov 17, 2026 · Data pulled Nov 18, 2026</div>
+<div class="meta">Source: <a href="https://data.nola.gov/Housing-Land-Use-and-Blight/CPC-Projects/xxb5-5azv/about_data">CPC Projects</a>, data.nola.gov · <span id="metaRange"></span> · Data pulled {{PULLED}}</div>
 
 <div class="tiles" id="tiles"></div>
 
@@ -41,7 +41,7 @@
 
 <section>
 <h2>The past 12 months, mapped</h2>
-<p class="sub">Every case filed since Nov 18, 2025. Filter by case type or by topic. Topics come from keywords in each case's description, so "Short-term rentals" includes any case that mentions them.</p>
+<p class="sub" id="recSub"></p>
 <div class="chips" id="typeChips"></div>
 <div class="chips" id="themeChips"></div>
 <div class="grid2">
@@ -59,7 +59,7 @@
 
 <section>
 <h2>What the requests are about</h2>
-<p class="sub">Number of cases each year whose description mentions each topic, 2010–2026, all on the same scale. Short-term rental cases spiked in 2022 and are climbing again in 2026. Hotel and guest house cases peaked in 2023.</p>
+<p class="sub" id="themeSub"></p>
 <div class="sms" id="themes"></div>
 </section>
 
@@ -70,7 +70,7 @@
 <li>Some cases list several types, for example "Zoning Change, Conditional Use." We grouped each case under its most consequential type: zoning change, then master plan, text amendment, major subdivision, conditional use, NPP, appeal, design review, variance, minor subdivision.</li>
 <li>Topic tags come from keyword matches in descriptions, so a case can have more than one topic or be missed if it's worded differently. An NPP notice and the case it leads to are separate records, so one project can count twice.</li>
 <li>The approval rate counts cases since 2016 whose last-meeting status says approved or denied. Most cases don't record a decision in that field, so treat the rate as a rough indicator.</li>
-<li>About 7,700 cases are still marked "Open," including many from years ago. That status doesn't appear to be cleaned up consistently.</li>
+<li id="openNote"></li>
 </ul>
 </div>
 </div>
