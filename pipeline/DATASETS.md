@@ -330,7 +330,7 @@ Worth adding to every map: 2020 population by neighborhood (`2w4d-xaw2`), so cou
 
 1. Add a `build_<name>()` function to `pipeline/fetch.py` that returns compact JSON (use the shared `X`/`Y` projection and the neighborhood lookup `nbp.lookup`), plus checks in `validate()`.
 2. Document its rules in `pipeline/REFERENCE.md`.
-3. Add `src/<name>.html` and `src/<name>.js`, and register the page in `PAGES` in `build.py`.
-4. Put every number quoted in the copy in an element with an `id` and set it from the page's `copy()` block, so it stays true as the data refreshes.
+3. Add `src/<name>.html` (copy an existing page's shell) and `src/<name>.js` with a `NOLA.views([...])` list of views, and register the page in `PAGES` in `build.py`.
+4. Keep text to view titles, axis labels and legends; put caveats on the About page.
 
 To redo this review: the catalog is at `https://data.nola.gov/api/catalog/v1?domains=data.nola.gov&search_context=data.nola.gov&limit=100&offset=0` (page through with `offset`). Check the newest record of anything that looks fresh with `$select=max(<date column>)`.

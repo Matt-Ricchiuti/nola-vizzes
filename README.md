@@ -38,6 +38,10 @@ python -m http.server 8765 --directory site   # then open http://localhost:8765
 
 Commit and push changes to `src/` together with the rebuilt `site/`.
 
+## Page layout
+
+Every page has a short title, one line linking to its City dataset, and a dropdown that switches between views of that subject. Each view shows only the filters that apply to it, and the selected view is kept in the URL (for example `cfs.html#map`). The switcher is `NOLA.views()` in `src/lib.js`: a page lists its views and gives each filter control a `data-for="viewId ..."` attribute. Keep text to titles, axis labels and legends; caveats go on the About page.
+
 ## Pages
 
 | Page | Dataset | Refreshed |
@@ -45,7 +49,7 @@ Commit and push changes to `src/` together with the rebuilt `site/`.
 | `cfs.html` | Calls for Service, current year + 2014 onward yearly files | daily |
 | `drone.html` | NOPD Drone Flights (`ay9z-ynxz`), current year | daily |
 | `cpc.html` | CPC Projects (`xxb5-5azv`) | daily |
-| `trees.html` | Street tree inventory (Oct 2026 export) | static |
+| `trees.html` | Tree Location (`3tyj-9x33`), Oct 2026 export in `data/trees.json` | static (street map daily) |
 | `about.html` | About the site, sources, disclaimer | with each build |
 
 ## Things to check now and then

@@ -74,7 +74,6 @@ const NOLA = (() => {
   // map control buttons
   function mapButtons(el, m, views) {
     const d = document.createElement('div'); d.className = 'row zoomhint';
-    d.innerHTML = 'Scroll or pinch to zoom, drag to pan. ';
     views.forEach(([label, ext]) => { const b = document.createElement('button'); b.className = 'btn'; b.textContent = label; b.onclick = () => m.zoomTo(ext, 450); d.appendChild(b); });
     el.appendChild(d);
   }
@@ -130,6 +129,33 @@ const NOLA = (() => {
   const setText = (id, s) => { const el = document.getElementById(id); if (el) el.textContent = s; };
   const setHTML = (id, s) => { const el = document.getElementById(id); if (el) el.innerHTML = s; };
 
-  return { css, S, fmt, pct, tip, row, setGeo, get GEO() { return GEO; }, map, mapButtons, seqVar, seqLegend, frame, yGrid, chips, months, monthsLong,
+  // ---------- one chart per page ----------
+  // views([{ id, label, cls, draw(el, first) }]): the #view dropdown picks a chart, drawn into its own pane in #chart.
+  // Filter controls carry data-for="viewId viewId ..." and only show for those charts.
+  // The chosen chart is kept in the URL hash, so a link can open a specific chart.
+  function views(list) {
+    const sel = document.getElementById('view'), host = document.getElementById('chart');
+    const panes = {}, drawn = new Set(); let cur = null;
+    list.forEach(v => {
+      const o = document.createElement('option'); o.value = v.id; o.textContent = v.label; sel.appendChild(o);
+      const p = document.createElement('div'); p.className = 'pane ' + (v.cls || 'card'); p.hidden = true; host.appendChild(p); panes[v.id] = p;
+    });
+    const draw = () => { cur.draw(panes[cur.id], !drawn.has(cur.id)); drawn.add(cur.id); };
+    function show(id, push) {
+      cur = list.find(v => v.id === id) || list[0]; sel.value = cur.id;
+      Object.entries(panes).forEach(([k, p]) => p.hidden = k !== cur.id);
+      document.querySelectorAll('[data-for]').forEach(el => el.hidden = !el.dataset.for.split(' ').includes(cur.id));
+      tip.hide(); draw();
+      if (push) history.replaceState(null, '', '#' + cur.id);
+    }
+    sel.onchange = () => show(sel.value, true);
+    addEventListener('hashchange', () => show(location.hash.slice(1)));
+    let rt; addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => { if (!cur.keep) draw(); }, 150); });
+    show(location.hash.slice(1));
+    return { refresh: draw, get id() { return cur.id; } };
+  }
+  const legendHTML = items => '<div class="legend">' + items.map(([c, l, round]) => `<span><i style="background:${c}${round ? ';border-radius:50%' : ''}"></i>${l}</span>`).join('') + '</div>';
+
+  return { css, S, fmt, pct, tip, row, setGeo, views, legendHTML, get GEO() { return GEO; }, map, mapButtons, seqVar, seqLegend, frame, yGrid, chips, months, monthsLong,
     setYear, get YEAR() { return YEAR; }, doyTime, doyDate, doyMonth, monthStarts, isoDate, share, numWord, cap, setText, setHTML, title };
 })();

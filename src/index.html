@@ -2,19 +2,20 @@
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>NOLA Open Data, visualized</title>
 <style>{{CSS}}
-.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
 .cards a{display:block;text-decoration:none;color:inherit}
 .cards a:hover .card{border-color:var(--accent)}
-.cards h2{font-size:18px}
+.cards h2{font-size:17px;margin:0 0 2px}
+.cards .src{margin:0}
 </style></head><body><div class="wrap">
 {{NAV}}
-<h1>The City of New Orleans publishes hundreds of datasets. Here's what's in them.</h1>
-<p class="dek">Hand-built visualizations of data from data.nola.gov, refreshed daily from the City's API.</p>
-<div class="cards" style="margin-top:28px">
-<a href="cfs.html"><div class="card"><h2>Calls for service</h2><p class="sub">What people call NOPD about, when and where, how long it takes an officer to arrive, and every year since 2014.</p></div></a>
-<a href="drone.html"><div class="card"><h2>NOPD drone flights</h2><p class="sub">Every logged police drone flight in {{DRONE_YEAR}}: purposes, launch points and the fleet.</p></div></a>
-<a href="cpc.html"><div class="card"><h2>Planning cases</h2><p class="sub">What's on upcoming City Planning agendas, and twenty years of zoning and land-use requests.</p></div></a>
-<a href="trees.html"><div class="card"><h2>Street trees</h2><p class="sub">All 106,820 inventoried trees in the city, by species and neighborhood.</p></div></a>
+<h1>New Orleans open data, visualized</h1>
+<div class="src">Charts and maps of <a href="https://data.nola.gov">data.nola.gov</a> datasets · Updated {{PULLED}}</div>
+<div class="cards">
+<a href="cfs.html"><div class="card"><h2>NOPD calls for service</h2><div class="src">Calls for Service {{CFS_YEAR}}</div></div></a>
+<a href="drone.html"><div class="card"><h2>NOPD drone flights</h2><div class="src">NOPD Drone Flights</div></div></a>
+<a href="cpc.html"><div class="card"><h2>City Planning Commission cases</h2><div class="src">CPC Projects</div></div></a>
+<a href="trees.html"><div class="card"><h2>Street trees</h2><div class="src">Tree Location</div></div></a>
 </div>
-<div class="foot">Data: <a href="https://data.nola.gov">data.nola.gov</a>, last pulled {{PULLED}}. This site is an independent project and is not affiliated with the City of New Orleans. <a href="about.html">About this site</a>.</div>
+{{FOOT}}
 </div></body></html>

@@ -5,68 +5,12 @@
 {{D3}}
 </head><body><div class="wrap">
 {{NAV}}
-<h1 id="h1">Calls to NOPD in {{CFS_YEAR}}</h1>
-<p class="dek">Every 911 call, report and officer-initiated stop gets logged as a "call for service." This page covers what people call about, when and where, how long it takes an officer to arrive, and how {{CFS_YEAR}} compares with every year since 2014.</p>
-<div class="meta">Source: <a href="https://data.nola.gov/d/{{CFS_DS}}">Calls for Service {{CFS_YEAR}}</a> and the 2014–{{CFS_PREV}} yearly files, data.nola.gov · <span id="metaThrough"></span> · Data pulled {{PULLED}}</div>
-
-<div class="tiles" id="tiles"></div>
-
-<section>
-<h2>Calls since 2014</h2>
-<p class="sub" id="trendSub"></p>
-<div class="legend"><span><i style="background:var(--s1)"></i>From the public</span><span><i style="background:var(--s2)"></i>Started by officers</span></div>
-<div class="card"><div id="trend"></div></div>
-<p class="note">Calls aren't crimes. Call volume also moves with how people report (for example, online reports instead of phone calls), how NOPD categorizes calls, and how many officers are on patrol. Treat this chart as a measure of demand on the police, not a crime rate.</p>
-</section>
-
-<section>
-<div class="grid2b">
-<div>
-<h2>{{CFS_YEAR}}, day by day</h2>
-<p class="sub">Dots are single days. Lines are 7-day averages.</p>
-<div class="card"><div id="daily"></div></div>
-</div>
-<div>
-<h2>When people call</h2>
-<p class="sub">Calls from the public by weekday and hour. Weekday calls ramp up at 7 a.m. Friday and Saturday stay busy past midnight.</p>
-<div class="card"><div id="heat"></div><div class="legend" id="heatLeg" style="margin-top:8px"></div></div>
-</div>
-</div>
-</section>
-
-<section>
-<h2>What the calls are about</h2>
-<p class="sub">The 24 most common call types, which make up most of the year's calls. Click a column to sort, or click a row to map that call type.</p>
-<div class="card" style="overflow-x:auto"><table id="ttable"></table></div>
-<p class="note">"Median arrival" is the time from when a call is created to when the first officer arrives, for calls from the public only. "Gone on arrival" means the officer found no one there. Area and business checks are almost all patrol activity started by officers.</p>
-</section>
-
-<section id="mapSec">
-<div class="row" style="justify-content:space-between"><h2>Where</h2><select id="metric" aria-label="Map measure"></select></div>
-<p class="sub" id="mapSub"></p>
-<div class="legend" id="mapLeg"></div>
-<div class="map card" id="map" style="padding:6px"></div>
-<p class="note" id="noLocNote"></p>
-</section>
-
-<section>
-<h2>How long until an officer arrives, by police district</h2>
-<p class="sub">Calls from the public only. The blue dot is the median for emergency (priority 2) calls. The open circle marks the slowest 10%. The orange dot is the median for non-emergency (priority 1) calls. Hover over a row for details.</p>
-<div class="legend"><span><i style="background:var(--s1);border-radius:50%"></i>Emergency, median</span><span><i style="border:2px solid var(--s1);border-radius:50%;width:8px;height:8px"></i>Emergency, 90th percentile</span><span><i style="background:var(--s2);border-radius:50%"></i>Non-emergency, median</span></div>
-<div class="card"><div id="dist"></div></div>
-<p class="note" id="distNote">District 7 (New Orleans East) covers by far the most ground.</p>
-</section>
-
-<div class="foot">
-<h3>About this data</h3>
-<ul>
-<li>The Orleans Parish Communication District (911) publishes one row per incident. NOPD can reclassify a call's type for up to 36 hours.</li>
-<li>Calls "started by officers" are marked self-initiated in the data. Everything else counts as from the public, including alarms and calls from other agencies.</li>
-<li>Response times exclude calls with no recorded arrival and arrivals over 24 hours. Priority codes come from the data's priority field. NOPD treats priority 2 as emergency and priority 1 as non-emergency.</li>
-<li>We assigned neighborhoods and districts from each call's mapped point, using the City's Neighborhood Statistical Area boundaries.</li>
-<li>The 2014–{{CFS_PREV}} history comes from the City's separate yearly Calls for Service datasets. <span id="cutNote"></span></li>
-</ul>
-</div>
+<h1>NOPD calls for service, {{CFS_YEAR}}</h1>
+<div class="src"><a href="https://data.nola.gov/d/{{CFS_DS}}">Calls for Service {{CFS_YEAR}}</a> and earlier yearly files · data.nola.gov · Updated {{PULLED}}</div>
+<div class="viewbar"><select id="view" class="viewsel" aria-label="Chart"></select></div>
+<div class="chips" data-for="map"><select id="metric" aria-label="Map measure"></select></div>
+<div id="chart"></div>
+{{FOOT}}
 </div>
 <script>const DATA={{DATA}};</script>
 <script>{{LIB}}</script>

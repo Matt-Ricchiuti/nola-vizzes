@@ -152,4 +152,4 @@ Fetch every row (15,671 as of the pull): `case_type,case_num,address,filing_date
 
 ## Page copy that mentions specific numbers
 
-Done. Headlines, subtitles and notes that quote numbers or dates are now filled in by each page's JS from the data (look for the `copy()` block at the end of each `src/*.js`), and the year, dataset id and pull date are filled in by `build.py`. Axis limits are computed from the data too. When editing copy in `src/*.html`, give any sentence with a number an `id` and set it from JS instead of typing the number.
+Pages no longer carry explanatory sentences: only titles, axis labels and legends. The year, dataset id and pull date are filled in by `build.py`, and axis limits and chart labels are computed from the data, so nothing goes stale as the data refreshes.

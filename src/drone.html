@@ -5,59 +5,13 @@
 {{D3}}
 </head><body><div class="wrap">
 {{NAV}}
-<h1 id="h1">NOPD drone flights in 2026: a long year of parades, then a sudden shift to daily dispatch flights</h1>
-<p class="dek" id="dek">For most of the year, police drones mostly flew over big events. Since mid-October, new drones have been launching from fixed downtown sites several times a day to respond to 911 calls, in shorter, more frequent flights.</p>
-<div class="meta">Source: <a href="https://data.nola.gov/dataset/NOPD-Drone-Flights/ay9z-ynxz/about_data">NOPD Drone Flights</a>, data.nola.gov · <span id="metaRange"></span> · Data pulled {{PULLED}}</div>
-
-<div class="tiles" id="tiles"></div>
-
-<section>
-<h2>Flights per week, by purpose</h2>
-<p class="sub" id="tlSub">Each bar is one week. Event spikes (Mardi Gras, French Quarter Fest, Essence) dominated until October, when dispatch flights took over. Hover over a bar for its breakdown.</p>
-<div class="legend" id="legend"></div>
-<div class="card"><div id="timeline"></div></div>
-<p class="note" id="noPurpose"></p>
-</section>
-
-<section>
-<h2>Filter the rest of the page</h2>
-<div class="chips" id="catChips"></div>
-<div class="chips" id="perChips"></div>
-</section>
-
-<section>
-<div class="grid2">
-<div>
-<h2>Where they take off</h2>
-<p class="sub" id="mapSub">Circles are launch points, sized by number of flights and colored by their most common purpose. Since October, two downtown spots account for most launches.</p>
-<div class="map card" id="map" style="padding:6px"></div>
-</div>
-<div>
-<h2>Purpose breakdown</h2>
-<p class="sub" id="durNote">Click a row to filter.</p>
-<div class="card"><table id="ptable"></table></div>
-<h2 style="margin-top:26px">Time of day</h2>
-<p class="sub">Takeoff hour, Central time.</p>
-<div class="card"><div id="hours"></div></div>
-</div>
-</div>
-</section>
-
-<section>
-<h2>The fleet</h2>
-<p class="sub" id="fleetSub"></p>
-<div class="card"><div id="fleet"></div></div>
-</section>
-
-<div class="foot">
-<h3>About this data</h3>
-<ul>
-<li>NOPD publishes one row per flight. The dataset description links to NOPD's drone policy and Skydio's public flight dashboard.</li>
-<li>Takeoff times in the dataset appear to be in UTC. For example, the first "January 1" flights are logged at 6–7 a.m., which is just after midnight local time on New Year's. We converted all times to Central time.</li>
-<li>Purposes come from a free-text field with many spellings. We grouped them into the categories above, for example combining "Bourbon St barricade check" variants into "Barricade & patrol checks."</li>
-<li id="noLoc"></li>
-</ul>
-</div>
+<h1>NOPD drone flights, {{DRONE_YEAR}}</h1>
+<div class="src"><a href="https://data.nola.gov/d/ay9z-ynxz">NOPD Drone Flights</a> · data.nola.gov · Updated {{PULLED}}</div>
+<div class="viewbar"><select id="view" class="viewsel" aria-label="Chart"></select></div>
+<div class="chips" id="catChips" data-for="week map hour fleet"></div>
+<div class="chips" id="perChips" data-for="map purpose hour fleet"></div>
+<div id="chart"></div>
+{{FOOT}}
 </div>
 <script>const DATA={{DATA}};</script>
 <script>{{LIB}}</script>

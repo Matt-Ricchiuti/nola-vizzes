@@ -30,20 +30,19 @@ a{color:var(--accent)}
 .site nav{display:flex;gap:16px;font-size:13px;flex-wrap:wrap}
 .site nav a{color:var(--ink2);text-decoration:none}
 .site nav a.on{color:var(--ink);font-weight:600}
-h1{font-size:34px;line-height:1.15;margin:0 0 10px;letter-spacing:-.01em;max-width:900px}
-.dek{font-size:18px;color:var(--ink2);max-width:780px;margin:0 0 8px}
-.meta{font-size:13px;color:var(--muted);margin-bottom:28px}
-h2{font-size:21px;margin:0 0 4px}
-.sub{color:var(--ink2);margin:0 0 14px;max-width:760px}
-section{margin:44px 0}
+h1{font-size:26px;line-height:1.2;margin:0 0 4px;letter-spacing:-.01em}
+h2{font-size:19px;margin:0 0 4px}
+.src{font-size:13px;color:var(--muted);margin:0 0 22px}
+.src a{color:var(--ink2)}
 .card{background:var(--surface);border:1px solid var(--ring);border-radius:12px;padding:18px}
-.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin:8px 0 8px}
-.tile{background:var(--surface);border:1px solid var(--ring);border-radius:12px;padding:14px 16px}
-.tile .v{font-size:30px;font-weight:650;line-height:1.1}
-.tile .l{font-size:13px;color:var(--ink2);margin-top:4px}
-.grid2{display:grid;grid-template-columns:1.4fr 1fr;gap:16px}
-.grid2b{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-@media(max-width:860px){.grid2,.grid2b{grid-template-columns:1fr} h1{font-size:27px}}
+.viewbar{margin:0 0 12px}
+.viewsel{font-size:17px;font-weight:600;padding:7px 38px 7px 12px;border-radius:10px;max-width:100%;cursor:pointer;
+  appearance:none;-webkit-appearance:none;background:var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%23898781' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 13px center}
+[hidden]{display:none!important}
+.pane.mapp{padding:6px}
+.split{display:grid;grid-template-columns:1.35fr 1fr;gap:16px;align-items:start}
+@media(max-width:860px){.split{grid-template-columns:1fr} h1{font-size:23px}}
+@media(max-width:600px){.wrap{padding:20px 16px 48px} .card{padding:12px}}
 .chips{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px}
 .chip{border:1px solid var(--ring);background:var(--chip);color:var(--ink);border-radius:999px;padding:4px 11px;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;font-family:inherit}
 .chip.on{background:var(--ink);color:var(--surface);border-color:var(--ink)}
@@ -52,7 +51,6 @@ select{font:inherit;font-size:13px;padding:4px 8px;border-radius:8px;border:1px 
 .legend{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:var(--ink2);margin:6px 0 8px}
 .legend span{display:inline-flex;align-items:center;gap:5px}
 .legend i{width:10px;height:10px;border-radius:3px;display:inline-block}
-.note{font-size:13px;color:var(--ink2);border-left:3px solid var(--grid);padding:2px 0 2px 12px;margin:10px 0;max-width:780px}
 svg{display:block;max-width:100%}
 svg text{fill:var(--muted);font-size:11px;font-family:inherit}
 .axis path,.axis line{stroke:var(--axis)}
@@ -81,53 +79,32 @@ tbody tr:hover td{background:var(--chip)}
 .bar{height:8px;border-radius:0 4px 4px 0;background:var(--s1);display:inline-block;vertical-align:middle}
 .zoomhint{font-size:12px;color:var(--muted);margin-top:6px}
 .btn{font:inherit;font-size:12px;border:1px solid var(--ring);background:var(--surface);color:var(--ink2);border-radius:8px;padding:3px 9px;cursor:pointer}
-.foot{margin-top:56px;border-top:1px solid var(--grid);padding-top:16px;font-size:13px;color:var(--ink2)}
-.foot h3{font-size:14px;margin:0 0 6px;color:var(--ink)}
-.foot ul{margin:0;padding-left:18px}
+.foot{margin-top:40px;border-top:1px solid var(--grid);padding-top:14px;font-size:12px;color:var(--muted)}
+.foot a{color:var(--muted)}
 .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .sr{position:absolute;left:-9999px}
 .halo{paint-order:stroke;stroke:var(--surface);stroke-width:5px;stroke-linejoin:round}
 .maplab{font-weight:600;letter-spacing:.02em}
 
-.prose{max-width:720px}
+.prose{max-width:720px;font-size:14px}
 .prose p,.prose li{color:var(--ink2)}
-.prose h2{margin-top:32px}
-.prose table{margin-top:8px}
+.prose h2{font-size:16px;margin:26px 0 4px}
+.prose ul{margin:4px 0;padding-left:18px}
 </style></head><body><div class="wrap">
 <div class="site"><b><a href="index.html" style="color:inherit;text-decoration:none">NOLA Open Data, visualized</a></b><nav><a class="" href="drone.html">NOPD drone flights</a><a class="" href="cfs.html">Calls for service</a><a class="" href="cpc.html">Planning cases</a><a class="" href="trees.html">Street trees</a><a class="on" href="about.html">About</a></nav></div>
-<h1>About this site</h1>
-<p class="dek">Hand-built charts and maps of the City of New Orleans' open data, refreshed automatically every morning.</p>
+<h1>About</h1>
+<div class="src">Updated daily from <a href="https://data.nola.gov">data.nola.gov</a> · Last pulled Nov 18, 2026</div>
 <div class="prose">
+<p>An independent project, not affiliated with the City of New Orleans. Every page links to the City dataset it uses. The street map under every map is the City's <a href="https://data.nola.gov/d/22q2-dqpb">Centerline</a> dataset. Source code: <a href="https://github.com/Matt-Ricchiuti/nola-vizzes">GitHub</a>.</p>
 
-<h2>What this is</h2>
-<p>The City of New Orleans publishes hundreds of datasets at <a href="https://data.nola.gov">data.nola.gov</a>. The portal's built-in charts make it hard to see what's in them. Each page here takes one dataset and explains it: what's in it, what changed recently, and where the data has gaps or quirks.</p>
-<p>This is an independent project. It is <b>not affiliated with, endorsed by, or produced by the City of New Orleans</b> or any of its departments. For official figures, go to the City's own datasets, linked at the top of every page.</p>
-
-<h2>How it's updated</h2>
-<p>Every morning, an automated job downloads the latest data from the City's public API, recomputes every chart, and republishes the site. The "Data pulled" date at the top of each page shows when that last happened. The data was last pulled Nov 18, 2026.</p>
-<p>If the City's data comes back empty, a column disappears, or counts suddenly drop, the job stops and the site keeps showing the last good version, rather than publishing something broken.</p>
-<p>The street trees page is the exception. It's built from a one-time export of the City's tree inventory (October 2026) and isn't refreshed daily.</p>
-
-<h2>Datasets used</h2>
-<table>
-<thead><tr><th>Page</th><th>City dataset</th></tr></thead>
-<tbody>
-<tr><td><a href="cfs.html">Calls for service</a></td><td><a href="https://data.nola.gov/d/es9j-6y5d">Calls for Service 2026</a>, plus the yearly files back to 2014</td></tr>
-<tr><td><a href="drone.html">NOPD drone flights</a></td><td><a href="https://data.nola.gov/d/ay9z-ynxz">NOPD Drone Flights</a></td></tr>
-<tr><td><a href="cpc.html">Planning cases</a></td><td><a href="https://data.nola.gov/d/xxb5-5azv">CPC Projects</a></td></tr>
-<tr><td><a href="trees.html">Street trees</a></td><td>Tree inventory and street centerline exports</td></tr>
-<tr><td>All maps</td><td><a href="https://data.nola.gov/d/7fw3-kdpf">Neighborhood Statistical Areas</a> and <a href="https://data.nola.gov/d/evki-aju8">NOPD police districts</a></td></tr>
-</tbody></table>
-
-<h2>Caveats</h2>
+<h2>Notes on the data</h2>
 <ul>
-<li>Every page has an "About this data" section listing what we changed or grouped, such as combining free-text categories or converting time zones.</li>
-<li>Neighborhood totals are counts, not rates per resident.</li>
-<li>Records can be corrected or reclassified by the City after the fact, so a number on this site can change from one day to the next.</li>
+<li><b>Calls for service.</b> "Started by officers" means self-initiated. Arrival time runs from call creation to the first officer's arrival, for calls from the public only. The current month is left off the monthly chart until it's complete. NOPD withholds locations for medical and mental-health calls.</li>
+<li><b>Drone flights.</b> Takeoff times appear to be UTC and are shown in Central time. Purposes are grouped from a free-text field; when it's blank, the activity summary is used. Locations are takeoff points, not flight paths.</li>
+<li><b>Planning cases.</b> Cases with several types are grouped under the most consequential one. Topics come from keywords in case descriptions. A neighborhood notice (NPP) and the case it leads to are separate records.</li>
+<li><b>Street trees.</b> A one-time inventory export from October 2026, not refreshed daily.</li>
+<li>Neighborhood figures are totals, not per resident.</li>
 </ul>
-
-<h2>Source code</h2>
-<p>The code that downloads, processes and draws everything is public on <a href="https://github.com/Matt-Ricchiuti/nola-vizzes">GitHub</a>. If you spot an error, you can open an issue there.</p>
 </div>
-<div class="foot">Data: <a href="https://data.nola.gov">data.nola.gov</a>. This site is an independent project and is not affiliated with the City of New Orleans.</div>
+<div class="foot">Data: <a href="https://data.nola.gov">data.nola.gov</a> · Not affiliated with the City of New Orleans · <a href="about.html">About</a></div>
 </div></body></html>
