@@ -252,6 +252,19 @@ table.static tbody tr{cursor:auto}
 .cpc-kt b{font-weight:600}
 .cpc-kt p{margin:1px 0 0;color:var(--ink2)}
 @media(max-width:600px){.cpc-key{grid-template-columns:1fr;gap:10px}}
+/* the map panel is wider here: it holds the agenda, which matters more than the map's width */
+@media(min-width:761px){.stage.mapstage.cpc-stage>.fpanel{width:380px}}
+/* meeting dates: small boxes per month, the month on its side at the left with a thin rule; groups wrap as wholes */
+.cpc-days{display:flex;flex-wrap:wrap;gap:8px 14px;margin:4px 0 2px}
+.cpc-days .mo{display:flex;gap:5px;max-width:100%}
+.cpc-days .ml{writing-mode:vertical-rl;transform:rotate(180deg);font:600 9.5px/1 "IBM Plex Mono",ui-monospace,monospace;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);text-align:center;padding-left:4px;border-left:1px solid var(--axis)}
+.cpc-days .bx{display:flex;flex-wrap:wrap;gap:4px;min-width:0}
+.cpc-days button{width:28px;height:28px;padding:0;font:500 12px/1 "IBM Plex Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums;color:var(--ink);background:var(--surface);border:1px solid var(--axis);border-radius:5px;cursor:pointer}
+.cpc-days button:hover{background:var(--chip)}
+.cpc-days button.none{color:var(--muted);border-color:var(--grid)}
+.cpc-days button.off{box-shadow:inset 0 -2px 0 var(--s8)}
+.cpc-days button[aria-pressed="true"]{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.cpc-days button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 
 /* ===================== 311 service requests page (src/311.js) ===================== */
 .srmini svg text{fill:var(--ink2)}
