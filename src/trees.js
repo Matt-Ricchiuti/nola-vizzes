@@ -164,7 +164,7 @@
   // ---------- canvas map ----------
   let ctx, panelEl, W = 0, H = 0, DPR = 1, view = { s: 1, tx: 0, ty: 0 }, C = {}, raf = 0, hoverHood = -1, hoverTree = -1, hoverGS = -1, scaleEl = null;
   const req = () => { if (cv && !raf) raf = requestAnimationFrame(draw); };
-  const insetL = () => (panelEl && getComputedStyle(panelEl).position === 'absolute') ? panelEl.offsetWidth + 24 : 0;
+  const insetL = () => NOLA.panelInset(panelEl, W);
   function fitBox([x0, y0, x1, y1], padPx) {
     const L = insetL(), w = W - L - 2 * padPx, h = H - 2 * padPx, s = Math.min(w / (x1 - x0), h / (y1 - y0));
     view.s = s; view.tx = L + padPx + (w - (x1 - x0) * s) / 2 - x0 * s; view.ty = padPx + (h - (y1 - y0) * s) / 2 - y0 * s;
@@ -313,12 +313,12 @@
     refresh();
   }
   function initMap(plot) {
-    plot.innerHTML = '<canvas class="tmap" aria-label="Map of street trees in New Orleans, colored by species"></canvas><div class="scalebar"><span></span><i></i></div><div class="mapctl"></div>';
+    plot.innerHTML = '<canvas class="tmap" aria-label="Map of street trees in New Orleans, colored by species"></canvas><div class="scalebar"><span></span><i></i></div>';
     cv = plot.querySelector('canvas'); ctx = cv.getContext('2d'); scaleEl = plot.querySelector('.scalebar');
     const zoomAt = (f, x, y) => { const ns = Math.max(700, Math.min(600000, view.s * f)); f = ns / view.s; view.tx = x - (x - view.tx) * f; view.ty = y - (y - view.ty) * f; view.s = ns; userView = true; req(); };
-    const ctl = plot.querySelector('.mapctl');
-    [['+', 'Zoom in', () => zoomAt(1.8, (insetL() + W) / 2, H / 2)], ['−', 'Zoom out', () => zoomAt(1 / 1.8, (insetL() + W) / 2, H / 2)], ['⤢', 'Reset view', () => zoomToHood()]].forEach(([t, l, fn]) => {
-      const b = document.createElement('button'); b.type = 'button'; b.textContent = t; b.title = l; b.setAttribute('aria-label', l); b.onclick = fn; ctl.appendChild(b); });
+    // the shared map controls (full screen, zoom, reset); entering or leaving full screen resizes the canvas, and fit() follows
+    NOLA.mapButtons(plot, { zoomIn: () => zoomAt(1.8, (insetL() + W) / 2, H / 2), zoomOut: () => zoomAt(1 / 1.8, (insetL() + W) / 2, H / 2),
+      reset: () => zoomToHood(), onFull: () => fit() });
     // Input, as on the other maps: the wheel (or a trackpad pinch) zooms, dragging pans, and the page never scrolls
     // under the map (NOLA.stage also stops the wheel on the zoom buttons). On touch screens one finger scrolls the
     // page (touch-action in lib.css) and two fingers pan and pinch; once two are down, the gesture stays the map's
@@ -345,7 +345,7 @@
         view.tx += cx - pinch.cx; view.ty += cy - pinch.cy; zoomAt(d / pinch.d, cx, cy); pinch = { d, cx, cy }; moved = true; return; }
       const dx = e.offsetX - last.x, dy = e.offsetY - last.y; if (Math.abs(dx) + Math.abs(dy) > 2) moved = true;
       last = { x: e.offsetX, y: e.offsetY };
-      if (isTouch(e) && !twoFinger) return; // one finger: the browser scrolls the page (or it's a tap)
+      if (isTouch(e) && !twoFinger && !cv.closest('.mapfs')) return; // one finger: the browser scrolls the page (or it's a tap); in full screen it moves the map
       view.tx += dx; view.ty += dy; userView = true; tip.hide(); req(); });
     const endPtr = e => { pointers.delete(e.pointerId); if (pointers.size < 2) pinch = null; if (!pointers.size) { cv.classList.remove('drag'); twoFinger = false; }
       if (pointers.size === 1) { const p = [...pointers.values()][0]; last = { x: p.x, y: p.y }; }
@@ -356,7 +356,7 @@
     // follow the canvas's box (window resizes, the page's scrollbar appearing, rotating a phone): an untouched map is
     // refitted; one the reader has moved keeps its center and scale. Redrawn at once, since resizing clears the canvas.
     const fit = () => {
-      if (!cv.clientWidth || !cv.clientHeight || (cv.clientWidth === W && cv.clientHeight === H)) return;
+      if (!cv.clientWidth || !cv.clientHeight || (cv.clientWidth === W && cv.clientHeight === H && Math.min(devicePixelRatio || 1, 2) === DPR)) return;
       const ow = W, oh = H; resize();
       if (userView) { view.tx += (W - ow) / 2; view.ty += (H - oh) / 2; } else zoomToHood();
       draw();
