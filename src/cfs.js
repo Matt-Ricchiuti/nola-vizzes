@@ -95,14 +95,14 @@
     const f = NOLA.frame(el.lastChild, { h: 340, m: { t: 6, r: 8, b: 24, l: 36 } });
     const x = d3.scaleBand().domain(d3.range(24)).range([0, f.iw]).paddingInner(.08);
     const y = d3.scaleBand().domain(order).range([0, f.ih]).paddingInner(.1);
-    const mx = d3.max(C.heat.flat()), mn = d3.min(C.heat.flat()), wks = (C.last + 1) / 7;
+    const wks = (C.last + 1) / 7, cl = NOLA.classes(C.heat.flat(), { even: true }); // evenly spaced, round steps
     order.forEach(d => C.heat[d].forEach((v, h) => {
-      f.g.append('rect').attr('x', x(h)).attr('y', y(d)).attr('width', x.bandwidth()).attr('height', y.bandwidth()).attr('rx', 3).style('fill', NOLA.seqVar((v - mn) / (mx - mn + 1)))
+      f.g.append('rect').attr('x', x(h)).attr('y', y(d)).attr('width', x.bandwidth()).attr('height', y.bandwidth()).attr('rx', 3).style('fill', cl.color(v))
         .on('mousemove', ev => tip.show(`<b>${names[d]}, ${hl(h)}–${hl(h + 1)}</b>` + row('Calls from the public', fmt(v)) + row('Per week (avg)', Math.round(v / wks)), ev)).on('mouseleave', tip.hide);
     }));
     order.forEach(d => f.g.append('text').attr('x', -6).attr('y', y(d) + y.bandwidth() / 2 + 4).attr('text-anchor', 'end').text(names[d]));
     [0, 6, 12, 18].forEach(h => f.g.append('text').attr('x', x(h)).attr('y', f.ih + 16).text(hl(h)));
-    NOLA.seqLegend(leg, [mn, mx], v => fmt(v), '', false);
+    NOLA.stepLegend(leg, cl, NOLA.short);
   }
 
   // ---------- call types table ----------
@@ -142,7 +142,6 @@
     const ts = document.createElement('select'); ts.className = 'fsel'; ts.setAttribute('aria-label', 'Call type');
     ts.innerHTML = '<option value="">Or one call type…</option>' + C.TOP.map((t, k) => unmappable(k) ? '' : `<option value="t${k}">${tcase(t)}</option>`).join('');
     ts.value = st.metric.startsWith('t') ? st.metric : ''; ts.onchange = () => { st.metric = ts.value || 'res'; V.refresh(); }; ms.appendChild(ts);
-    if (!isTime()) NOLA.seg(NOLA.fsec(panel, 'Count'), [['n', 'Total'], ['pc', 'Per 1,000 residents']], st.basis, v => { st.basis = v; V.refresh(); });
     const ls = NOLA.fsec(panel, isTime() ? 'Legend · minutes' : 'Legend'), leg = document.createElement('div'); leg.className = 'legend'; ls.appendChild(leg);
     if (perRes()) ls.insertAdjacentHTML('beforeend', NOLA.POP_NOTE);
     return leg;
@@ -159,15 +158,16 @@
             + row('Median arrival, emergency', r[4] >= 30 ? r[2] + ' min' : 'too few calls') + row('Median arrival, non-emergency', r[3] == null ? '—' : r[3] + ' min'); } });
       m.lastNb = -1;
     }
+    NOLA.mapChecks(plot, [!isTime() && { key: 'per', label: 'Per 1k residents', checked: st.basis === 'pc', onChange: on => { st.basis = on ? 'pc' : 'n'; V.refresh(); } }]);
     // seven equal-count classes: each shade holds about ten neighborhoods
     const cl = NOLA.classes(nb.map((r, i) => metricVal(i)));
     m.setFill(i => cl.color(metricVal(i)));
     const none = nb.some((r, i) => metricVal(i) == null) ? (perRes() ? 'Under 1,000 residents' : isTime() ? 'Too few calls' : 'No data') : null;
-    const lf = v => isTime() ? v.toFixed(1) : NOLA.short(v);
-    NOLA.stepLegend(leg, cl.edges, lf, none);
+    const lf = NOLA.short;
+    NOLA.stepLegend(leg, cl, lf, none);
     // on phones the panel folds away, so the map carries its own copy of the legend
     if (first) plot.insertAdjacentHTML('beforeend', '<div class="maplegend"></div>');
-    NOLA.stepLegend(plot.querySelector('.maplegend'), cl.edges, lf, none);
+    NOLA.stepLegend(plot.querySelector('.maplegend'), cl, lf, none);
     plot.querySelector('.maplegend').insertAdjacentHTML('afterbegin', `<div class="mlh">${metricLabel()}${isTime() ? ' (min)' : ''}</div>`);
     if (m.lastNb !== st.nb) { m.focus(st.nb, first ? 0 : 450); m.lastNb = st.nb; }
   }

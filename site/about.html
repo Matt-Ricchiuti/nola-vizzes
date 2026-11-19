@@ -83,13 +83,17 @@ svg text{fill:var(--muted);font-size:11px;font-family:inherit}
 /* maps on touch screens: one finger scrolls the page, two fingers move the map (NOLA.map / trees.js handle those) */
 .map>svg,.stage.mapstage .plot canvas{touch-action:pan-x pan-y}
 .nbpath{fill:var(--land);stroke:var(--landline);stroke-width:.8;vector-effect:non-scaling-stroke}
-.nbpath.hot:hover{stroke:var(--ink);stroke-width:1.6}
+.nbhover{fill:none;stroke:var(--ink);stroke-width:1.6;vector-effect:non-scaling-stroke}
 .streets{pointer-events:none}
 .st{fill:none;vector-effect:non-scaling-stroke;stroke-linecap:round;stroke-linejoin:round}
 .st3{stroke:var(--road);stroke-width:.5}
 .st2{stroke:var(--road-major);stroke-width:.9}
 .st1{stroke:var(--road-major);stroke-width:.8}
 .st0{stroke:var(--road-fwy);stroke-width:1.7}
+/* shaded maps (map.setFill): streets in the surface color show over every shade, light or dark */
+svg.shaded .st3{stroke:color-mix(in srgb,var(--surface) 45%,transparent)}
+svg.shaded .st2,svg.shaded .st1{stroke:color-mix(in srgb,var(--surface) 70%,transparent)}
+svg.shaded .st0{stroke:color-mix(in srgb,var(--surface) 85%,transparent)}
 .tip{position:fixed;pointer-events:none;background:var(--surface);color:var(--ink);border:1px solid var(--ring);box-shadow:0 6px 24px rgba(0,0,0,.14);border-radius:10px;padding:9px 11px;font-size:12.5px;max-width:300px;z-index:20;opacity:0;transition:opacity .08s}
 .tip b{font-size:13px}
 .tip .r{display:flex;justify-content:space-between;gap:14px;color:var(--ink2)}
@@ -152,14 +156,14 @@ a.btn{text-decoration:none;display:inline-block}
 .eyebrow{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
 .fsec{display:flex;flex-direction:column;gap:6px}
 .fsec-h{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
-.linkbtn{background:none;border:0;padding:2px 0;color:var(--accent);font:500 12px inherit;font-family:inherit;cursor:pointer}
+.linkbtn{flex:none;white-space:nowrap;background:none;border:0;padding:2px 0;color:var(--accent);font:500 12px inherit;font-family:inherit;cursor:pointer}
 .flist{display:flex;flex-direction:column;gap:1px;margin:0;padding:0;list-style:none}
 .flist button{all:unset;box-sizing:border-box;width:100%;display:grid;grid-template-columns:12px minmax(0,1fr) auto;gap:9px;align-items:center;padding:5px 6px;border-radius:6px;cursor:pointer}
 .flist button:hover{background:var(--chip)}
 .flist button:focus-visible,.seg button:focus-visible,.mapctl button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .flist .sw{width:11px;height:11px;border-radius:50%}
 .flist .nm{min-width:0;display:flex;flex-direction:column;gap:3px}
-.flist .nm>span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.flist .nm>span:first-child{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden;line-height:1.3} /* long names wrap to a second line */
 .flist .nm em{font-style:normal;font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .flist .fb{height:3px;border-radius:2px;background:var(--grid);overflow:hidden}
 .flist .fb i{display:block;height:100%}
@@ -171,7 +175,8 @@ a.btn{text-decoration:none;display:inline-block}
 .flist.toggles button[aria-pressed="true"]{background:none;box-shadow:none}
 /* tabs at the top of a filter panel: switch one section between related charts */
 .ftabs{display:flex;gap:2px;padding:3px;background:var(--chip);border-radius:9px}
-.ftabs button{flex:1 1 0;font:inherit;font-size:12.5px;line-height:1.25;border:0;border-radius:7px;background:none;color:var(--ink2);padding:6px 8px;cursor:pointer}
+.ftabs button{flex:1 1 auto;font:inherit;font-size:12.5px;line-height:1.25;border:0;border-radius:7px;background:none;color:var(--ink2);padding:6px 8px;cursor:pointer}
+.ftabs.grid{display:grid;grid-template-columns:1fr 1fr}
 .ftabs button[aria-selected="true"]{background:var(--surface);color:var(--ink);font-weight:600;box-shadow:0 1px 3px rgb(0 0 0 / .12)}
 .ftabs button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .seg{display:flex;border:1px solid var(--ring);border-radius:8px;overflow:hidden;width:max-content;max-width:100%}
@@ -188,6 +193,15 @@ a.btn{text-decoration:none;display:inline-block}
 .mapctl button:hover{background:var(--chip)}
 .scalebar{position:absolute;right:14px;bottom:12px;font-size:11px;color:var(--ink2);display:flex;flex-direction:column;align-items:flex-end;gap:3px;pointer-events:none;z-index:2}
 .scalebar i{display:block;height:5px;border:1.5px solid var(--ink2);border-top:0}
+/* map options (NOLA.mapChecks): a small box of checkboxes just above the scale bar */
+.mapchecks{position:absolute;right:12px;bottom:42px;z-index:2;display:flex;flex-direction:column;padding:2px;
+  background:var(--surface);border:1px solid var(--ring);border-radius:8px;font-size:12px;line-height:1.3;color:var(--ink)}
+.mapchecks label{display:flex;align-items:center;gap:6px;padding:3px 8px 3px 6px;border-radius:6px;cursor:pointer;user-select:none;white-space:nowrap}
+.mapchecks label:hover{background:var(--chip)}
+.mapchecks label.off{color:var(--muted);cursor:default}
+.mapchecks label.off:hover{background:none}
+.mapchecks input{margin:0;width:13px;height:13px;accent-color:var(--accent);cursor:inherit}
+.mapchecks label:has(input:focus-visible){outline:2px solid var(--accent);outline-offset:-1px}
 .ftoggle{display:none}
 .maphint{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:3;pointer-events:none;opacity:0;transition:opacity .2s;
   background:rgb(11 11 11 / .78);color:#fff;font-size:13px;font-weight:500;padding:8px 14px;border-radius:999px;white-space:nowrap}
@@ -195,14 +209,14 @@ a.btn{text-decoration:none;display:inline-block}
 .stlab{font-weight:500;pointer-events:none;paint-order:stroke;stroke:var(--surface);stroke-linejoin:round}
 .stlab.major{font-weight:650}
 /* stepped legend for equal-count classes (NOLA.stepLegend): the value under each boundary is where that color starts */
-.legend .steps{flex:1 1 100%;display:flex;max-width:290px;padding:0 14px 0 0}
+.legend .steps{flex:1 1 100%;display:flex;max-width:290px;padding:0 22px 0 0}
 .legend .steps span,.steps span{flex:1;display:flex;flex-direction:column;align-items:stretch;gap:3px;min-width:0}
 .steps i{width:auto!important;height:10px;border-radius:0!important}
 .steps span:first-child i{border-radius:3px 0 0 3px!important}
-.steps span:nth-child(7) i{border-radius:0 3px 3px 0!important}
+.steps span:last-child i{border-radius:0 3px 3px 0!important}
+.steps span:only-child i{border-radius:3px!important}
 .steps em{align-self:flex-start;font-style:normal;font-size:10.5px;color:var(--ink2);white-space:nowrap;font-variant-numeric:tabular-nums;transform:translateX(-50%)}
 .steps span:first-child em{transform:none}
-.steps .end{flex:0 0 0;padding-top:13px}
 .nonekey{font-size:11.5px}
 .maplegend{display:none}
 @media(max-width:760px){
@@ -217,6 +231,7 @@ a.btn{text-decoration:none;display:inline-block}
   .maplegend .nonekey{display:flex;align-items:center;gap:5px;margin-top:3px}
   .maplegend .nonekey i{width:10px;height:10px;border-radius:3px;display:inline-block}
   .mlh{margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .mapchecks{top:162px;bottom:auto} /* phones: the map's own legend fills the bottom left, so the options sit under the map controls */
   .fpanel.collapsed{display:none}
 }
 
@@ -267,15 +282,14 @@ table.static tbody tr{cursor:auto}
 .cpc-days button[aria-pressed="true"]{background:var(--ink);color:var(--surface);border-color:var(--ink)}
 .cpc-days button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 
-/* ===================== 311 service requests page (src/311.js) ===================== */
+/* ---------- a key that isn't a filter (NOLA.kv): swatch, label, value; lines up with .flist rows ---------- */
+.kvl{display:flex;flex-direction:column;gap:5px;font-size:12.5px;color:var(--ink2);padding:0 6px}
+.kvl span{display:grid;grid-template-columns:12px minmax(0,1fr) auto;gap:9px;align-items:center}
+.kvl i{width:11px;height:11px;border-radius:3px}
+.kvl i.tick{width:2px;height:14px;border-radius:0;justify-self:center}
+.kvl b{font:400 12px "IBM Plex Mono",ui-monospace,monospace;color:var(--muted);font-variant-numeric:tabular-nums}
+/* small yearly bars inside a map's panel (311) */
 .srmini svg text{fill:var(--ink2)}
-.srages{display:flex;flex-direction:column;gap:5px;font-size:12.5px;color:var(--ink2)}
-.srages span{display:grid;grid-template-columns:12px 1fr auto;gap:8px;align-items:center}
-.srages i{width:11px;height:11px;border-radius:3px}
-.srages b{font:400 12px "IBM Plex Mono",ui-monospace,monospace;color:var(--muted)}
-/* ===================== short-term rentals page (src/str.js): uses the 311 page's .srages lists ===================== */
-/* ===================== blight and code enforcement page (src/blight.js); also uses .srages ===================== */
-.srages i.tickkey{width:2px;height:14px;border-radius:0;background:var(--ink);margin-left:4px}
 
 .prose{max-width:720px;font-size:14px}
 .prose p,.prose li{color:var(--ink2)}
@@ -308,8 +322,8 @@ table.static tbody tr{cursor:auto}
 <li data-p="cpc 311 str blight permits biz trees cfs drone"><b>Supporting data.</b> Every page also uses the City's <a href="https://data.nola.gov/d/7fw3-kdpf">Neighborhood Statistical Areas</a> (boundaries) and <a href="https://data.nola.gov/d/22q2-dqpb">Centerline</a> (the street map). Rates per resident or per home use <a href="https://data.nola.gov/d/2w4d-xaw2">Neighborhood Statistical Areas Demographics 2020</a>, the City's table of <a href="https://www.census.gov/programs-surveys/decennial-census/decade/2020/2020-census-results.html">2020 Census</a> population and housing units. The calls page also uses <a href="https://data.nola.gov/d/evki-aju8">Police Districts</a>. Each chart's <b>Download CSV</b> opens the dataset it's about on data.nola.gov.</li>
 <li data-p="311 cfs"><b>Population.</b> Resident counts come from the 2020 Census, the most recent official count. The site will keep using them until the 2030 Census results are released, so population data is slightly out of date.</li>
 <li data-p="cpc 311 str blight permits biz trees cfs drone">Every neighborhood is counted. Maps open on the populated city, so Lake Catherine and Viavant–Venetian Isles (under 100 residents per square mile) start out of view: zoom out or pick them from the menu.</li>
-<li data-p="311 str blight permits biz cfs">Shaded maps use seven shades with about the same number of neighborhoods in each; the legend shows where each shade starts.</li>
-<li data-p="311 str blight permits biz cfs">Neighborhood figures are totals unless the map says per 1,000 residents.</li>
+<li data-p="311 str blight permits biz cfs">Shaded maps use up to seven shades with about the same number of neighborhoods in each (fewer when many neighborhoods share a value, such as zero); the key shows where each shade starts, rounded to a round number where that moves no more than one neighborhood into another shade.</li>
+<li data-p="311 str blight permits biz cfs">Neighborhood figures are totals unless the key says per 1,000 residents or per 100 or 1,000 homes.</li>
 </ul>
 <h3 class="eyebrow" data-g="cpc"><a href="cpc.html">City Planning Cases</a></h3>
 <ul data-g="cpc"><li>Cases with several types are grouped under the most consequential one. Topics come from keywords in case descriptions. A neighborhood notice (NPP) and the case it leads to are separate records; NPP notices start in 2016, which raises yearly totals from then on. Rows the City's file repeats exactly are counted once. Hearing dates are the next meeting dates the City lists; a few fall on weekends or holidays and are flagged as listed.</li></ul>
@@ -318,7 +332,7 @@ table.static tbody tr{cursor:auto}
 <h3 class="eyebrow" data-g="str"><a href="str.html">Short-Term Rentals (STRs)</a></h3>
 <ul data-g="str"><li>The map shows active licenses for commercial, non-commercial and exempt lodging rentals. Operator permits, which license the person running a rental rather than a place, are not mapped. "Per 100 homes" divides licenses by 2020 Census housing units; neighborhoods with fewer than 500 are left out. The City's license types changed with its rules in 2017, late 2019 and 2023, so the applications chart groups them into commercial, residential (accessory, residential owner and non-commercial), temporary and other. Outcomes are each application's current status; "since expired" means the license was issued and has expired. A few applications have no date and are left off the chart.</li></ul>
 <h3 class="eyebrow" data-g="blight"><a href="blight.html">Blight/Code-enforcement</a></h3>
-<ul data-g="blight"><li>Yearly charts start in 2016: the City's records date about 76,000 cases and 59,000 hearings to 2009, when older records were moved into its system. Open cases are shown by the stage the City lists and by time since the case was filed. "New cases" are grouped by the result of the first inspection. Overgrown-lot cases are the City's grass-cutting (lot abatement) cases, which start in earnest in 2021. The abatement records show no property entering abatement since 2019, so the map shows only properties still in abatement. "Per 1,000 homes" divides by 2020 Census housing units; neighborhoods with fewer than 500 are left out.</li></ul>
+<ul data-g="blight"><li>Yearly charts start in 2016: the City's records date about 76,000 cases and 59,000 hearings to 2009, when older records were moved into its system. Open cases are shown by the stage the City lists and by time since the case was filed. "New cases" are grouped by the result of the first inspection. Overgrown-lot cases are the City's grass-cutting (lot abatement) cases, which start in earnest in 2021. The abatement records show no property entering abatement since 2019, so the map shows only properties still in abatement; how closed abatement cases ended is counted for the whole city. Maps count cases with a location (all but about 1%), so their totals run slightly below the charts'. "Per 1,000 homes" divides by 2020 Census housing units; neighborhoods with fewer than 500 are left out.</li></ul>
 <h3 class="eyebrow" data-g="permits"><a href="permits.html">Permits</a></h3>
 <ul data-g="permits"><li>Counts are permits issued, by the date the City issued them. The City's permit codes are grouped into nine types; interior demolition counts as renovation, and City demolitions count as demolitions. New construction, demolition and solar permits are mapped one by one at their address. Days to permit run from the application date to the issue date. Construction values are left out because some are clearly entry errors. "Per 1,000 homes" divides by 2020 Census housing units; neighborhoods with fewer than 500 are left out.</li></ul>
 <h3 class="eyebrow" data-g="trees"><a href="trees.html">Trees</a></h3>

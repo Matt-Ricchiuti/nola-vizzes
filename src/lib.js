@@ -15,6 +15,7 @@ const NOLA = (() => {
       let x = ev.clientX + 14, y = ev.clientY + 14;
       if (x + w > innerWidth - 8) x = ev.clientX - w - 14;
       if (y + h > innerHeight - 8) y = ev.clientY - h - 14;
+      x = Math.max(8, x); y = Math.max(8, Math.min(y, innerHeight - h - 8)); // a tall tooltip stays on screen
       tipEl.style.left = x + 'px'; tipEl.style.top = y + 'px';
     },
     hide() { tipEl.style.opacity = 0; }
@@ -31,7 +32,7 @@ const NOLA = (() => {
   const MIN_POP = 1000; // rates for neighborhoods smaller than this swing wildly, so they're left out
   const popOf = i => GEO.pop ? GEO.pop[i] : null;
   const perK = (n, pop) => n != null && pop >= MIN_POP ? 1000 * n / pop : null;
-  const fmtRate = v => v == null ? '—' : v >= 100 ? d3.format(',')(Math.round(v)) : v >= 10 ? v.toFixed(0) : v.toFixed(1);
+  const fmtRate = v => v == null ? '—' : v === 0 ? '0' : v >= 100 ? d3.format(',')(Math.round(v)) : v >= 10 ? v.toFixed(0) : v.toFixed(1);
   const POP_NOTE = '<div class="legend popnote">Per 1,000 residents (2020 Census). Visitors, workers and highway traffic also generate calls, so rates run high where few people live, like the CBD and French Quarter. Neighborhoods under 1,000 residents are left out.</div>';
   // Total / Per 1,000 residents switch
   const basisChips = (el, onSel, sel = 'n') => chips(el, [{ label: 'Total', value: 'n' }, { label: 'Per 1,000 residents', value: 'pc' }], onSel, { sel });
@@ -94,12 +95,18 @@ const NOLA = (() => {
       sg.append('path').attr('class', 'st st0').attr('d', ST.d[0]);
     }
     const streetZoom = k => { if (localSt) localSt.style('opacity', Math.max(0.35, Math.min(1, (k - 0.6) / 2.4))); };
+    // the hovered neighborhood's outline, drawn over the streets and its neighbors' fills (an outline only, so the
+    // streets and shading underneath stay visible)
+    const hoverP = root.append('path').attr('class', 'nbhover').style('pointer-events', 'none').attr('d', null);
     const focusG = root.append('g').style('pointer-events', 'none');
     if (o.districts) root.append('g').selectAll('path').data(GEO.pd).join('path').attr('d', f => f.d)
       .attr('fill', 'none').attr('stroke', 'var(--ink2)').attr('stroke-width', 1.4).attr('vector-effect', 'non-scaling-stroke').attr('opacity', .55).style('pointer-events', 'none');
     const stLabG = root.append('g').attr('aria-hidden', 'true');
     const layer = root.append('g');
-    if (o.tip) nbSel.on('mousemove', (ev, f) => tip.show(o.tip(f.idx), ev)).on('mouseleave', tip.hide);
+    // o.tip(i) can return nothing (a map whose own marks carry the tooltips): then hovering a neighborhood shows nothing
+    const unhover = () => { tip.hide(); hoverP.datum(null).attr('d', null); };
+    if (o.tip) nbSel.on('mousemove', (ev, f) => { const h = o.tip(f.idx); if (!h) return unhover(); tip.show(h, ev); if (hoverP.datum() !== f) hoverP.datum(f).attr('d', f.d); })
+      .on('mouseleave', unhover);
 
     // ---- street names, placed after each zoom so they never overlap; longer streets first ----
     const SL = ST && ST.lab, q = ST ? ST.q : 1;
@@ -189,7 +196,9 @@ const NOLA = (() => {
     addEventListener('resize', fit);
     const api = {
       svg, layer, nbSel, zoomTo, k: () => k, onZoom: f => listeners.push(f), home,
-      setFill(fn) { nbSel.attr('fill', f => fn(f.idx) || null).style('fill', f => fn(f.idx) || null); },
+      // shade neighborhoods (fn(i) -> a color, or null for the plain land color); on a shaded map the streets are
+      // drawn in the page's surface color, so they stay visible over the darkest and lightest shades alike
+      setFill(fn) { let any = false; nbSel.each(function (f) { const c = fn(f.idx) || null; if (c) any = true; this.style.fill = c || ''; if (c) this.setAttribute('fill', c); else this.removeAttribute('fill'); }); svg.classed('shaded', any); },
       // outline one neighborhood and zoom to it (-1: clear and go back to the whole mapped city)
       focus(i, dur = 450) {
         focused = i;
@@ -327,6 +336,7 @@ const NOLA = (() => {
       const li = document.createElement('li'), b = document.createElement('button'); b.type = 'button';
       const on = !!pressed(r.key); if (on) any = true; b.setAttribute('aria-pressed', on);
       const col = r.color || 'var(--muted)';
+      b.title = String(r.name).replace(/<[^>]*>/g, '').replace(/&amp;/g, '&') + (r.sub ? ' · ' + String(r.sub).replace(/<[^>]*>/g, '').replace(/&amp;/g, '&') : ''); // the full name, in case it's cut short
       b.innerHTML = `<span class="sw" style="background:${col}${r.square ? ';border-radius:3px' : ''}"></span><span class="nm"><span>${r.name}</span>${r.sub ? `<em>${r.sub}</em>` : ''}${r.count != null ? `<span class="fb"><i style="width:${(100 * r.count / mx).toFixed(1)}%;background:${col}"></i></span>` : ''}</span><span class="ct">${r.count != null ? fmt(r.count) : ''}</span>`;
       b.onclick = () => onClick(r.key); li.appendChild(b); ul.appendChild(li);
     });
@@ -342,44 +352,50 @@ const NOLA = (() => {
   // ftabs(panel, [[value, label], ...], value, onChange): a tab row at the very top of a filter panel, for one chart
   // section that switches between closely related charts of the same data (e.g. two maps). Returns the row.
   function ftabs(panel, opts, value, onChange) {
-    const d = document.createElement('div'); d.className = 'ftabs'; d.setAttribute('role', 'tablist');
+    const d = document.createElement('div'); d.className = 'ftabs' + (opts.length > 3 ? ' grid' : ''); d.setAttribute('role', 'tablist'); // four or more: two per row
     opts.forEach(([v, l]) => {
       const b = document.createElement('button'); b.type = 'button'; b.textContent = l; b.setAttribute('role', 'tab');
       b.setAttribute('aria-selected', v === value); b.onclick = () => { if (v !== value) onChange(v); }; d.appendChild(b);
     });
     panel.prepend(d); return d;
   }
-  // ---------- the map's switches: one box at the bottom right, just above the scale bar ----------
-  // Dots are every map's base; the neighborhood shading is an optional layer under them. mapCheck(plot, key, label,
-  // checked, onChange, { disabled, title }) adds or updates one checkbox in the box (made once per map, kept across
-  // redraws); label null hides it. heatToggle() is the usual pair: "Heatmap", and under it the per-resident or
-  // per-home version of the shading, which only applies while the heatmap is on.
-  function toggleBox(plot) {
-    let b = plot.querySelector(':scope>.maptoggles');
-    if (!b) { b = document.createElement('div'); b.className = 'maptoggles'; plot.appendChild(b); }
-    return b;
+  // mapChecks(plot, [{ key, label, checked, disabled, sub, title, onChange(checked) }, ...]): a small box of checkboxes on
+  // the map, bottom right just above the scale bar (under the zoom buttons on phones), for map options such as
+  // "Per 1k residents". Items that are null or false are left out; an empty list hides the box. Call it on every
+  // redraw with the current state: rows are matched by key, so they keep their place (and keyboard focus).
+  function mapChecks(plot, items) {
+    items = (items || []).filter(Boolean);
+    let box = plot.querySelector(':scope>.mapchecks');
+    if (!items.length) { if (box) box.hidden = true; return box; }
+    if (!box) { box = document.createElement('div'); box.className = 'mapchecks'; box.setAttribute('role', 'group'); box.setAttribute('aria-label', 'Map options'); plot.appendChild(box); }
+    box.hidden = false;
+    const old = new Map([...box.children].map(l => [l.dataset.key, l]));
+    items.forEach(it => {
+      let l = old.get(it.key); old.delete(it.key);
+      if (!l) { l = document.createElement('label'); l.dataset.key = it.key; l.innerHTML = '<input type="checkbox"><span></span>'; }
+      box.appendChild(l); // in the order given
+      const cb = l.firstChild; l.lastChild.textContent = it.label;
+      cb.checked = !!it.checked; cb.disabled = !!it.disabled; l.classList.toggle('off', !!it.disabled); l.classList.toggle('sub', !!it.sub);
+      if (it.title) l.title = it.title; else l.removeAttribute('title');
+      cb.onchange = () => it.onChange && it.onChange(cb.checked);
+    });
+    old.forEach(l => l.remove());
+    return box;
   }
-  function mapCheck(plot, key, label, checked, onChange, { disabled = false, title = '', sub = false } = {}) {
-    const box = toggleBox(plot); let el = box.querySelector(`:scope>[data-k="${key}"]`);
-    if (label && !el) {
-      el = document.createElement('label'); el.className = 'mapcheck' + (sub ? ' sub' : ''); el.dataset.k = key;
-      el.innerHTML = '<input type="checkbox"><span></span>';
-      const after = [...box.children].find(c => (+c.dataset.o || 0) > (sub ? 1 : 0)); el.dataset.o = sub ? 1 : 0;
-      box.insertBefore(el, after || null);
-    }
-    if (el) {
-      el.hidden = !label;
-      if (label) { const cb = el.firstChild; el.lastChild.textContent = label; cb.checked = !!checked; cb.disabled = !!disabled; el.classList.toggle('off', !!disabled); el.title = title; cb.onchange = () => onChange(cb.checked); }
-    }
-    box.hidden = ![...box.children].some(c => !c.hidden);
-    plot.classList.toggle('has-toggles', !box.hidden);
-    return el;
+  // a key that isn't a filter: rows of [label, color (a square swatch; null leaves the space), value] inside a panel
+  // section. A color starting with '|' draws a tick mark in that color instead of a square.
+  function kv(sec, rows) {
+    const d = document.createElement('div'); d.className = 'kvl';
+    d.innerHTML = rows.map(([l, c, n]) => `<span>${!c ? '<i></i>' : c[0] === '|' ? `<i class="tick" style="background:${c.slice(1)}"></i>` : `<i style="background:${c}"></i>`}${l}<b>${n}</b></span>`).join('');
+    sec.appendChild(d); return d;
   }
-  // heatToggle(plot, on, onChange, per): per = { label: 'Per 1k residents', checked, onChange } or null (a count that
-  // isn't shown per person or per home)
-  function heatToggle(plot, on, onChange, per) {
-    mapCheck(plot, 'heat', 'Heatmap', on, onChange, { title: 'Shade each neighborhood by how many of the dots shown are in it' });
-    mapCheck(plot, 'per', per ? per.label : null, per && per.checked, per && per.onChange, { sub: true, disabled: !on, title: on ? '' : 'Applies to the heatmap' });
+  // heatToggle(plot, on, onChange, per, extra): the map's options box with the heatmap switch. Dots are every map's base;
+  // shading neighborhoods is optional, under them. per = { label: 'Per 1k residents', checked, onChange } or null (a
+  // count not shown per resident or per home): its row sits under Heatmap and only applies while the heatmap is on.
+  // extra: more option rows for mapChecks, after these.
+  function heatToggle(plot, on, onChange, per, extra = []) {
+    return mapChecks(plot, [{ key: 'heat', label: 'Heatmap', checked: on, onChange, title: 'Shade each neighborhood by how many of the dots shown are in it' },
+      per && { key: 'per', label: per.label, checked: per.checked, onChange: per.onChange, disabled: !on, title: on ? '' : 'Applies to the heatmap', sub: true }, ...extra]);
   }
   // heatKey(panel, plot, cl, label, fmtf, none): the heatmap's key, as a panel section and, on phones, a legend on the
   // map (.maplegend). cl is what classes() returned; null (heatmap off) leaves the panel without it and hides the legend.
@@ -408,22 +424,59 @@ const NOLA = (() => {
   const seqVar = t => `var(${SEQ[Math.max(0, Math.min(6, Math.floor(t * 7)))]})`;
   // breaks = [low, high]; the top swatch gets a "+" only when values run past `high` (open = true)
   function seqLegend(el, breaks, fmtf, label, open = true) {
-    el.innerHTML = `<span>${label}</span>` + SEQ.map((s, i) => `<span><i style="background:var(${s})"></i>${i === 0 ? fmtf(breaks[0]) : i === 6 ? fmtf(breaks[1]) + (open ? '+' : '') : ''}</span>`).join('');
+    el.innerHTML = (label ? `<span>${label}</span>` : '') + `<span>${fmtf(breaks[0])}</span><span style="gap:0">` + SEQ.map(s => `<i style="background:var(${s});border-radius:0"></i>`).join('') + '</span>' + `<span>${fmtf(breaks[1])}${open ? '+' : ''}</span>`;
   }
-  // Seven equal-count classes, so each color holds about the same number of areas and differences across most of
-  // the city stay visible even when a few places are far above the rest. classes(values) -> { color(v), edges }
-  function classes(vals) {
+  // Up to seven equal-count classes, so each color holds about the same number of areas and differences across most
+  // of the city stay visible even when a few places are far above the rest. classes(values, { even }) -> { color(v), edges, shades }
+  // Class edges are round numbers where that's possible without changing the picture: each edge moves to the roundest
+  // nearby number (…, 10, 20, 50, 100, …, or 0.5, 0.2, 0.1 steps) only if that moves at most one area to the next color
+  // (and stays well clear of the neighboring edges), so classes stay close to equal-count; otherwise it keeps a finer value. Counts (whole numbers) only get
+  // whole-number edges. Edges are what the colors use, so the legend is exact. Classes that would hold nothing are
+  // dropped and the rest spread over the full ramp. { even: true } uses evenly spaced round edges instead (d3 ticks).
+  const STEPS = d3.range(-3, 7).flatMap(e => [1, 2, 5].map(m => +(m * 10 ** e).toPrecision(1))).sort((a, b) => b - a); // 5e6 … 0.001
+  const roundTo = (t, s) => +(Math.round(t / s) * s).toPrecision(12);
+  function classes(vals, { even = false } = {}) {
     const v = vals.filter(x => x != null && isFinite(x)).sort(d3.ascending);
-    const q = d3.scaleQuantile().domain(v).range(d3.range(7));
-    return { color: x => x == null ? 'var(--none)' : `var(${SEQ[q(x)]})`, edges: [v[0], ...q.quantiles(), v[v.length - 1]] };
+    if (!v.length) return { color: () => 'var(--none)', edges: [], shades: [] };
+    const lo = v[0], hi = v[v.length - 1], int = v.every(Number.isInteger);
+    let th;
+    if (even) th = d3.ticks(lo, hi, 7).filter(t => t > lo && t <= hi);
+    else {
+      th = d3.scaleQuantile().domain(v).range(d3.range(7)).quantiles();
+      if (int) th = th.map(Math.ceil); // for whole numbers, x >= t exactly when x >= ceil(t)
+      th = [...new Set(th)].filter(t => t > lo && t <= hi);
+      // round each edge as far as it can go while at most one area changes color and it stays well inside its neighbors
+      const crossing = (a, b) => { const x0 = Math.min(a, b), x1 = Math.max(a, b); return d3.bisectLeft(v, x1) - d3.bisectLeft(v, x0); };
+      th = th.map((t, i) => {
+        const room = 0.5 * Math.min(t - (i ? th[i - 1] : lo), (i < th.length - 1 ? th[i + 1] : hi) - t);
+        const s = STEPS.find(s => { const r = roundTo(t, s); return (!int || s >= 1) && Math.abs(r - t) <= room && crossing(t, r) <= 1; });
+        return s ? roundTo(t, s) : t;
+      });
+    }
+    th = [...new Set(th)].filter(t => t > lo && t <= hi).sort(d3.ascending);
+    // drop an edge whose class would be empty (merge it into the class below)
+    for (let i = th.length - 1; i >= 0; i--) { const top = i < th.length - 1 ? th[i + 1] : Infinity; if (!v.some(x => x >= th[i] && x < top)) th.splice(i, 1); }
+    const k = th.length + 1, shades = d3.range(k).map(i => SEQ[k === 1 ? 3 : Math.round(i * 6 / (k - 1))]);
+    // the legend's first label: the lowest value, or a round number just under it (nothing lies between the two)
+    const room0 = 0.3 * ((th[0] ?? hi) - lo), s0 = STEPS.find(s => (!int || s >= 1) && lo - Math.floor(lo / s) * s <= room0 && Math.floor(lo / s) * s >= 0);
+    const first = s0 ? +(Math.floor(lo / s0) * s0).toPrecision(12) : lo;
+    return { color: x => x == null ? 'var(--none)' : `var(${shades[d3.bisectRight(th, x)]})`, edges: [first, ...th, hi], shades };
   }
-  // legend for classes(): a stepped bar with the value where each color starts, and a swatch for areas with no value
-  function stepLegend(el, edges, fmtf, none) {
-    el.innerHTML = '<div class="steps">' + SEQ.map((s, i) => `<span><i style="background:var(${s})"></i><em>${fmtf(edges[i])}</em></span>`).join('')
-      + `<span class="end"><em>${fmtf(edges[7])}</em></span></div>` + (none ? `<span class="nonekey"><i style="background:var(--none)"></i>${none}</span>` : '');
+  // legend for classes(): a stepped bar with the value where each color starts (the top one "and up"), and a swatch
+  // for areas with no value. cl is what classes() returned (an older caller may pass its seven-class edges array)
+  function stepLegend(el, cl, fmtf, none) {
+    const edges = Array.isArray(cl) ? cl : cl.edges, shades = Array.isArray(cl) ? SEQ : cl.shades, n = shades.length;
+    el.innerHTML = (n ? '<div class="steps">' + shades.map((s, i) => `<span><i style="background:var(${s})"></i><em>${fmtf(edges[i])}${i === n - 1 && n > 1 ? '+' : ''}</em></span>`).join('') + '</div>' : '')
+      + (none ? `<span class="nonekey"><i style="background:var(--none)"></i>${none}</span>` : '');
+    // labels that would run into each other (a narrow legend): show every other one, always the first and last
+    // (checked again once the web fonts have loaded, since they set the labels' widths)
+    const ems = [...el.querySelectorAll('.steps em')];
+    const thin = () => { const r = ems.map(e => e.getBoundingClientRect());
+      if (r.some((b, i) => i && b.width && b.left < r[i - 1].right + 3)) ems.forEach((e, i) => { if (i % 2 && i < ems.length - 1) e.style.visibility = 'hidden'; }); };
+    thin(); if (document.fonts && document.fonts.status !== 'loaded') document.fonts.ready.then(thin);
   }
-  // compact numbers for legends: 950, 1.3k, 12k
-  const short = v => v >= 1000 ? d3.format('.2~s')(v).replace('G', 'B') : fmtRate(v);
+  // compact numbers for legends, exact to the value given (class edges are already round): 0, 3, 8.4, 0.05, 950, 1.25k, 12k
+  const short = v => v >= 1000 ? d3.format('.3~s')(v).replace('G', 'B') : String(+(+v).toPrecision(4));
 
   // ---------- small chart helpers ----------
   function frame(el, { h = 260, m = { t: 12, r: 16, b: 28, l: 44 } } = {}) {
@@ -489,6 +542,9 @@ const NOLA = (() => {
   // Download CSV links to the open chart's City dataset on data.nola.gov (its export is there): the view's `ds`, which
   // can be a function of the filters when one chart switches between datasets, else the page's `opts.ds`.
   // Below it, each chart is its own section (heading `label`, then the chart); only the open one shows.
+  // `label` can be a function, for a chart whose subject follows its filters; the heading is set again on each draw
+  // (give such a chart a `tab`). Redrawing keeps the filter panel's scroll and the page's, so a click low in a long
+  // panel doesn't jump it back to the top.
   // With a single chart there are no tabs: its heading takes their place in the bar.
   // Filters are shared page state: refresh() redraws the open chart, and the others redraw when next opened.
   // state() returns the filters that differ from their defaults; they're written into the link.
@@ -524,12 +580,13 @@ const NOLA = (() => {
     const one = list.length === 1;
     if (one) bar.classList.add('one');
     bar.append(one ? document.createElement('h2') : tabRow, tools); host.appendChild(bar);
+    const labelOf = v => typeof v.label === 'function' ? v.label() : v.label, heads = {};
     list.forEach(v => {
-      const t = document.createElement('button'); t.type = 'button'; t.textContent = v.tab || v.label;
+      const t = document.createElement('button'); t.type = 'button'; t.textContent = v.tab || labelOf(v);
       t.id = 'vt-' + v.id; t.setAttribute('role', 'tab'); t.setAttribute('aria-controls', 'v-' + v.id);
       t.onclick = () => open(v.id); tabRow.appendChild(t); tabs[v.id] = t;
       const sec = document.createElement('section'); sec.className = 'vsec'; sec.id = 'v-' + v.id;
-      const h = one ? bar.firstChild : document.createElement('h2'); h.textContent = v.label;
+      const h = one ? bar.firstChild : document.createElement('h2'); h.textContent = labelOf(v); heads[v.id] = h;
       const p = document.createElement('div'); p.className = 'pane ' + (v.cls || 'card');
       if (one) { h.id = 'vh-' + v.id; sec.setAttribute('aria-labelledby', h.id); sec.append(p); }
       else {
@@ -542,7 +599,21 @@ const NOLA = (() => {
     const dataLink = document.getElementById('dataLink'), ds = opts.ds || (list.find(v => v.ds) || {}).ds;
     if (dataLink && ds) { dataLink.href = 'https://data.nola.gov/d/' + ds[0]; dataLink.textContent = ds[1] + ' on data.nola.gov'; }
     // charts are drawn only while shown (hidden ones have no size); a hidden chart whose filters changed redraws when opened
-    const drawOne = v => { v.draw(panes[v.id], !drawn.has(v.id)); drawn.add(v.id); stale.delete(v.id); };
+    // keyboard focus survives a redraw: the control with the same label (or in the same place) takes it back
+    const focusKey = el => el.tagName + '|' + (el.getAttribute('aria-label') || (el.querySelector('.nm>span') || el).textContent.trim());
+    const focusables = p => [...p.querySelectorAll('button,select,input,[tabindex]')];
+    const drawOne = v => {
+      const p = panes[v.id], fp = p.querySelector(':scope>.fpanel'), keep = [fp ? fp.scrollTop : 0, scrollX, scrollY];
+      const a = document.activeElement, had = a && a !== document.body && p.contains(a) ? [focusKey(a), focusables(p).indexOf(a)] : null;
+      if (typeof v.label === 'function') heads[v.id].textContent = v.label();
+      v.draw(p, !drawn.has(v.id)); drawn.add(v.id); stale.delete(v.id);
+      if (had && !p.contains(document.activeElement)) {
+        const fs = focusables(p), t = fs.find(e => focusKey(e) === had[0]) || fs[Math.min(had[1], fs.length - 1)];
+        if (t) t.focus({ preventScroll: true });
+      }
+      if (fp && fp.scrollTop !== keep[0]) fp.scrollTop = keep[0];
+      if (scrollY !== keep[2] || scrollX !== keep[1]) scrollTo(keep[1], keep[2]);
+    };
     const draw = () => { tip.hide(); list.forEach(v => { if (v !== cur && drawn.has(v.id)) stale.add(v.id); }); drawOne(cur); writeHash(); setDs(); setSbw(); };
     function show(v) {
       cur = v;
@@ -583,6 +654,6 @@ const NOLA = (() => {
   }
   const legendHTML = items => '<div class="legend">' + items.map(([c, l, round]) => `<span><i style="background:${c}${round ? ';border-radius:50%' : ''}"></i>${l}</span>`).join('') + '</div>';
 
-  return { css, S, fmt, pct, tip, row, setGeo, views, hashState, legendHTML, stage, fsec, flist, seg, ftabs, nbPick, mapCheck, heatToggle, heatKey, phoneToggle, popOf, perK, fmtRate, POP_NOTE, basisChips, shown, nbList, nbSelect, get FULL() { return FULL; }, get GEO() { return GEO; }, map, mapButtons, panelInset, seqVar, seqLegend, classes, stepLegend, short, frame, yGrid, chips, months, monthsLong,
+  return { css, S, fmt, pct, tip, row, setGeo, views, hashState, legendHTML, stage, fsec, flist, seg, ftabs, nbPick, kv, mapChecks, heatToggle, heatKey, phoneToggle, popOf, perK, fmtRate, POP_NOTE, basisChips, shown, nbList, nbSelect, get FULL() { return FULL; }, get GEO() { return GEO; }, map, mapButtons, panelInset, seqVar, seqLegend, classes, stepLegend, short, frame, yGrid, chips, months, monthsLong,
     setYear, get YEAR() { return YEAR; }, monthTicks, doyTime, doyDate, doyISO, doyMonth, monthStarts, isoDate, share, numWord, cap, setText, setHTML, title };
 })();

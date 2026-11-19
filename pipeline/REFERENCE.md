@@ -10,36 +10,80 @@ API basics: `https://data.nola.gov/resource/<id>.json?$select=...&$where=...&$gr
 
 ## The daily refresh: what gets downloaded and committed
 
-The workflow runs at 10:30 UTC. The City loads CPC Projects at about 06:00 UTC, Calls for Service at about 09:00 UTC (3 a.m. Central), and drone flights in occasional batches. `fetch.py` reads each dataset's metadata (`/api/views/<id>.json`, which it needs anyway to check the schema) and rebuilds a data file only when one of its inputs changed:
+The workflow runs at 10:30 UTC. The City reloads most datasets between 04:30 and 06:00 UTC, 311 at about 08:10 UTC, Calls for Service at about 09:00 UTC (3 a.m. Central), and drone flights in occasional batches.
+
+**The change check: one request.** `fetch.py` starts with one request to the Socrata catalog (`/api/catalog/v1?ids=…&ids=…`), which returns every dataset's `data_updated_at` and column names. `data_updated_at` equals the dataset's `rowsUpdatedAt` to the second (checked on all 20 catalogued datasets, and through a nightly load), and the column names are enough for the schema check, so the per-dataset `/api/views/<id>.json` requests (20 a day, 0.9 MB) are gone. The two boundary layers aren't in the catalog; they're checked with `/api/views/<id>.json` on the 1st of the month (they haven't changed since 2015). Past years of Calls for Service join the catalog request on the 1st, and last year's every day in January and February. If the catalog request fails, each dataset is checked on its own as before.
+
+**What gets rebuilt.** A data file is rebuilt only when one of its inputs changed (recorded in `data/sources.json`, below). Nothing about an unchanged file is downloaded or parsed; `geo.json` and the point-in-polygon lookups are built only when some file needs them.
 
 | File | Rebuilt when | Notes |
 |---|---|---|
-| `geo.json` | every run, from cached downloads | Boundaries (`7fw3-kdpf`, `evki-aju8`) and population (`2w4d-xaw2`) are kept in `.cache/raw/` under their `rowsUpdatedAt`, so they are downloaded again only when the City changes them. Features are kept in the order of the last good `geo.json`, because every `nb`/`pd` index (including the hand-built `trees.json`) points into it. |
-| `streets.json` | the centerline's segment count or newest `lastupdate` changed | The centerline is re-synced from the City's GIS often without edits, so its `rowsUpdatedAt` isn't used. |
+| `geo.json` | a boundary layer (checked monthly) or the population table (`2w4d-xaw2`) changed | Otherwise the last good file is used as is. Features are kept in the order of the last good `geo.json`, because every `nb`/`pd` index (including the hand-built `trees.json`) points into it. |
+| `streets.json` | the centerline's segment count or newest `lastupdate` changed | Those two are queried only on a day the centerline's `rowsUpdatedAt` moved: it's re-synced from the City's GIS without edits now and then. |
 | `drone.json` | `ay9z-ynxz`'s `rowsUpdatedAt`, `geo.json` or the calendar year changed | |
 | `cfs.json` | the current year's dataset id or `rowsUpdatedAt`, or `geo.json`, changed | |
 | `hist.json` | with `cfs.json` (current year); a past year when its dataset's `rowsUpdatedAt` moved | Past years are checked daily for last year in January–February, and all years on the 1st of the month. The City loads each year's final rows on January 1. |
 | `cpc.json` | `xxb5-5azv`'s `rowsUpdatedAt` or `geo.json` changed | "Today" for upcoming hearings and the 365-day window is the day the City loaded the data. |
 | `311.json` | `2jgv-pqrq`'s `rowsUpdatedAt` or `geo.json` changed | Incremental download (see below). "Today" is the newest request in the data. |
 | `treereq.json` | with `311.json` (same rows, same key) | No requests of its own: built from the 311 rows already downloaded. |
-| `str.json` | any of `ufdg-ajws`, `en36-xvxg`, `2ei9-wqw2` or `geo.json` changed | Three small whole downloads (about 8 requests, 9 MB). |
-| `permits.json` | `rcm3-fn58`'s `rowsUpdatedAt` or `geo.json` changed | Also reloaded in full nightly. API counts by year, plus the past 12 months' rows (about 6 requests, 4 MB). |
-| `biz.json` | `abc4-h3u3`'s or `hjcd-grvu`'s `rowsUpdatedAt`, or `geo.json`, changed | Two whole downloads (about 6 requests, 11 MB). |
-| `blight.json` | any of the six code enforcement datasets or `geo.json` changed | The City reloads these every night (every row gets a new `:updated_at`), so incremental downloads don't help; most numbers are counted by the API instead (about 16 requests, 11 MB). |
+| `str.json` | any of `ufdg-ajws`, `en36-xvxg`, `2ei9-wqw2` or `geo.json` changed | All three are replaced by the City every night, so they're downloaded whole (3 requests). A dataset whose date didn't move is read from the saved answers. |
+| `permits.json` | `rcm3-fn58`'s `rowsUpdatedAt` or `geo.json` changed | The City rewrites 99% of rows every night, so incremental downloads don't help. API counts by year and code (with the newest issue date in the same request), plus the past 12 months' rows: 2 requests. |
+| `biz.json` | `abc4-h3u3`'s or `hjcd-grvu`'s `rowsUpdatedAt`, or `geo.json`, changed | Both replaced every night: two whole downloads. |
+| `blight.json` | any of the six code enforcement datasets or `geo.json` changed | The City reloads five of them every night (every row gets a new `:updated_at`), so incremental downloads don't help; most numbers are counted by the API instead (6 requests). Abatements change every week or two; on other days its answer comes from the saved answers. |
 
-On the 1st of every month (and with `--full`, or the workflow's "full" checkbox) everything is downloaded and rebuilt regardless. Queries are ordered (`:id` as the tie-breaker), so the same City data always produces byte-identical files. Rebuilt files are written only when their content changed, and pages embed only the date their own data last changed, so a day without new City data changes nothing and the workflow commits and deploys nothing.
+**Saved answers.** Every API answer is kept in `.cache/raw/q/` (gzipped) under the dataset's `rowsUpdatedAt`. Queries are ordered (`:id` as the tie-breaker), so while the City hasn't changed a dataset the same query returns the same rows, and it's read from disk. This matters when a page rebuilds because one of its datasets changed (STR, blight, licenses), when `geo.json` changes, and when a failed run is re-run. Answers replaced by a newer version are deleted at the end of the run. The saved copies of the incrementally downloaded datasets live next to them (below). The workflow restores `.cache/raw` before the run and saves it afterwards, even when a later step fails.
+
+**The monthly check (1st of the month).** The boundary layers and past years of Calls for Service get their dates checked, and each saved copy's row ids are compared with the City's (one request of ids only; see "Large datasets"). Nothing else is downloaded again: a full re-download of datasets the City replaces every night anyway would only repeat the day's download, and every other answer is tied to the dataset's version. `--full` (or the workflow's "full" checkbox) ignores `.cache/raw` and downloads and rebuilds everything.
+
+Rebuilt files are written only when their content changed, and pages embed only the date their own data last changed, so a day without new City data changes nothing and the workflow commits and deploys nothing. `fetch.py` runs `build.py` only when a data file changed, and `build.py` rewrites only the pages whose output changed. When a rebuilt file comes out identical, its new key isn't saved until the next real change, so it may be rebuilt again the next day, from the saved answers and without requests.
+
+### What each dataset costs
+
+Measured 2026-11-19 (MB as the API sends it, uncompressed; about a sixth of that is transferred, gzipped). "How the City updates it" comes from each dataset's `:updated_at` spread and newest records; working notes are in `research/api-minimum.md` (not committed). A typical day is one where every nightly dataset moved, which is most days.
+
+| Dataset | How the City updates it | Checked | Downloaded when it changes | Typical day before | Typical day now |
+|---|---|---|---|---|---|
+| (change check) | | | | 20 metadata requests, 0.8 MB | 1 catalog request, 0.16 MB |
+| Neighborhoods `7fw3-kdpf`, police districts `evki-aju8` | unchanged since 2015 | monthly (2 metadata requests; not in the catalog) | whole layer, 0.7 MB | in the 20 above | 0 |
+| Population 2020 `2w4d-xaw2` | unchanged since 2023 | daily (catalog) | whole table, 4 KB | in the 20 above | 0 |
+| Centerline `22q2-dqpb` | in place, a few edits a month; re-synced now and then | daily (catalog); count + newest edit only when its date moves | whole layer, 9.7 MB, only when streets were edited | 1 request | 0 |
+| Drone flights `ay9z-ynxz` | batches every few weeks | daily (catalog) | the year's flights, 0.2 MB | 0 | 0 |
+| Calls for Service 2026 `es9j-6y5d` | in place, nightly at ~09:00 UTC (~1,800 of 305,000 rows) | daily (catalog) | count + changed rows | 2 requests, 0.2–0.5 MB | 2 requests, 0.2–0.5 MB |
+| Calls for Service 2014–2025 | closed; final rows loaded January 1 | monthly, and last year daily in Jan–Feb (catalog) | monthly counts, when a year's date moved | 0 (13 metadata requests on the 1st) | 0 |
+| CPC projects `xxb5-5azv` | replaced nightly at ~06:00 UTC | daily (catalog) | all rows | 1 request, 9.2 MB | 1 request, 9.2 MB |
+| 311 `2jgv-pqrq` (311.json and the trees page's treereq.json, built from the same rows) | in place, nightly at ~08:10 UTC (~1,500 of 1,048,000 rows) | daily (catalog) | count + changed rows; treereq.json adds none | 2 requests, 0.1–0.3 MB | 2 requests, 0.1–0.3 MB |
+| STR licenses `ufdg-ajws`, `2ei9-wqw2`, applications `en36-xvxg` | replaced nightly | daily (catalog) | all rows of each one that moved | 3 requests, 8.5 MB | 3 requests, 8.5 MB |
+| Code enforcement cases `u6yx-v2tw` | replaced nightly | daily (catalog) | open cases and cases since 2016 | 1 request, 7.2 MB | 1 request, 7.2 MB |
+| Violations `3ehi-je3s`, hearings `44ct-56tr`, inspections `uh5a-f7uw` | replaced nightly | daily (catalog) | API counts | 5 requests, 0.1 MB | 3 requests, 0.1 MB |
+| Grass cutting `xhih-vxs6` | 99% of rows rewritten nightly | daily (catalog) | all rows | 1 request, 2.8 MB | 1 request, 2.8 MB |
+| Abatements `xv8z-gn8b` | in place, every week or two | daily (catalog) | all rows, 0.6 MB | 1 request, 0.6 MB | 0 (saved answer) |
+| Permits `rcm3-fn58` | 99% of rows rewritten nightly | daily (catalog) | counts by year + past 12 months' rows | 3 requests, 4.2 MB | 2 requests, 4.2 MB |
+| License applications `abc4-h3u3`, current licenses `hjcd-grvu` | replaced nightly | daily (catalog) | all rows of each | 2 requests, 10.8 MB | 2 requests, 10.8 MB |
+| **Typical day** | | | | **42 requests, 44.5 MB (6.8 MB transferred)** | **18 requests, 43.6 MB (6.7 MB transferred)** |
+| **Day without new City data** | | | | 21 requests, 0.8 MB | **1 request, 0.16 MB (20 KB transferred)** |
+| **1st of the month** (on top of the day) | | | | everything again: 79 requests, 248 MB (53 MB transferred) | 4 requests: 2 boundary checks, row ids of 311 and calls, 22 MB (11 MB transferred) |
+| **Empty cache** (first run, or no run for 7 days) | | | | 79 requests, 248 MB | 46 requests, 237 MB (50 MB transferred), mostly the 311 and calls copies |
+
+Most of a typical day's bytes are the datasets the City replaces every night. Their content changes most days (new records daily, including weekends: 3–14% of a year's STR, license, 311 and violation records are dated on weekends), so downloading them whenever their date moves is what keeps the pages a day fresh. An incremental download wouldn't help: every row's `:updated_at` changes nightly, so the "changed rows" are all of them.
 
 `data/sources.json` is the pipeline's memory, rewritten only along with a data change:
 
 ```
 { "files": { "cfs.json": {"key": "<inputs it was built from>", "changed": "2026-11-18"}, ... },
   "histVersions": { "2026": "<rowsUpdatedAt when hist.json last counted that year>", ... },
-  "cfsIds": { "2027": "<id found in the catalog>" } }        # years not in CFS_IDS, so the catalog is searched once
+  "cfsIds": { "2027": "<id found in the catalog>" },        # years not in CFS_IDS, so the catalog is searched once
+  "copies": { "2jgv-pqrq": "2026-11-19" } }                 # last day a saved copy had to be downloaded again in full, unasked
 ```
+
+Keys hold the inputs: dataset versions plus `geo_key` (a hash of `geo.json`) for the data files, the two boundary versions and the population version for `geo.json`, and the centerline version, segment count and newest edit for `streets.json`. When only a key changes (the centerline re-synced without edits), it's noted with the next real data change.
 
 `build.py` shows each data page's "Updated" date as the latest `changed` of that page's files (and `geo.json`), and passes it to the page as `DATA.meta.pulled`. The About page shows the latest date of any page.
 
-**When something fails.** A file that fails to fetch or validate keeps its last good version, and the other files still refresh and publish. The run then ends failed (the `report` job), so GitHub emails the owner. If the boundaries fail, nothing is published. Datasets that stop updating (no calls for 7 days, no flights for 45, no filings for 30) show as warnings on the run.
+**When something fails.** A file that fails to fetch or validate keeps its last good version, and the other files still refresh and publish. The run then ends failed (the `report` job), so GitHub emails the owner. If the boundaries fail, nothing is published. Datasets whose newest record is old (no calls for 7 days, no flights for 45, no filings for 30, no new records for 7–14 days on the newer pages) show as warnings on the run.
+
+**Alerts (the run fails, after publishing).**
+- A dataset's "last updated" date stands still longer than `DATASETS` in `fetch.py` allows: 5 days for everything the City reloads nightly (and this year's Calls for Service), 60 for drone flights and abatements, no limit for boundaries, population, the centerline and past years. The page keeps showing the last data with its true "Updated" date; the alert says the City's feed stopped.
+- A saved copy (311, Calls for Service) had to be downloaded in full again within 3 days of the last time (`copies` in `sources.json`). Once is a warning (expected after the cache expires, i.e. no run for 7 days); twice means the cache isn't surviving between runs, which would otherwise quietly cost a full download every day.
 
 **The schedule.** GitHub switches off scheduled workflows after 60 days without commits. If 45 days pass without a commit, the workflow re-enables itself through the API.
 
@@ -195,11 +239,13 @@ Fetch every row (15,671 as of the pull; 15,579 after dropping rows the dataset r
 
 ## Large datasets: incremental downloads (`synced_rows` in `fetch.py`)
 
-The 311 page (and any other page built from a dataset of hundreds of thousands of rows) keeps a copy of the rows it needs in `.cache/raw/<id>.csv.gz`, with each row's Socrata `:id` and `:updated_at`. Each run asks only for rows with `:updated_at` at or after the newest one in the copy (one request of a few hundred to a few thousand rows) and merges them in by `:id`. If the merged copy's row count differs from the City's `count(*)` for the same filter (rows deleted, or moved out of the filter), the copy is missing or unreadable, its columns changed, or it's a full run (the 1st of the month or `--full`), every row is downloaded again in pages of 50,000. Rows are always sorted by `:id` before aggregating, so an incremental build and a full download give identical files.
+The 311 page and the calls for service page keep a copy of the rows they need in `.cache/raw/<id>.csv.gz` (`cfs-<id>.csv.gz` for calls), with each row's Socrata `:id` and `:updated_at`. Each run asks only for rows with `:updated_at` at or after 15 minutes before the newest one in the copy (one request of a few thousand rows; the overlap covers a load that was still in progress last time) and merges them in by `:id`. Every run compares the merged copy's row count with the City's `count(*)` for the same filter. On the 1st of the month it also downloads the City's row ids alone (one request, about 13 MB for 311) and compares them with the copy's, which catches a deletion offset by an addition. If either differs (rows deleted, or moved out of the filter), the copy is missing or unreadable, its columns changed, or it's a `--full` run, every row is downloaded again in pages of 50,000. Rows are always sorted by `:id` before aggregating, so an incremental build and a full download give identical files.
+
+This only pays off for datasets the City updates in place. Measured on 2026-11-19: 311 changes about 1,500 of 1,048,000 rows a night and Calls for Service about 1,800 of 305,000, but permits (99% of 350,000 rows) and grass cutting (99% of 23,500) get a new `:updated_at` on nearly every row every night, and CPC, STR, licenses and the other code enforcement datasets are replaced outright, so a "delta" would be the whole dataset.
 
 ## `data/311.json`: 311 OPCD Calls (`2jgv-pqrq`)
 
-Rows with `date_created >= 2019-02-01` (about 730,000), columns `request_type, request_reason, date_created, case_close_date, request_status, longitude, latitude`, downloaded incrementally (above). A full download is about 19 requests and 136 MB; a normal day is one small request. The City's file dates about 313,000 older (2012–2018) requests to January 1–2, 2019, when they were moved into the current system, so the page starts with February 2019.
+Rows with `date_created >= 2019-02-01` (about 730,000), columns `request_type, request_reason, date_created, case_close_date, request_status, longitude, latitude`, downloaded incrementally (above). A full download is about 19 requests and 136 MB (about 30 MB as transferred); a normal day is two small requests (the count and the changed rows). The City's file dates about 313,000 older (2012–2018) requests to January 1–2, 2019, when they were moved into the current system, so the page starts with February 2019.
 
 ```
 { "ds", "start": "2019-02", "last": newest date_created (YYYY-MM-DD), "winStart": first day of the past 12 months,
@@ -239,13 +285,13 @@ Checked against the API on 2026-11-19: 1,706 tree requests filed in the 182 days
 
 Three datasets, each downloaded whole (ordered by `:id`):
 
-- **Active Short-Term Rental Licenses** (`ufdg-ajws`, about 4,300 rows): `license_type, residential_subtype, bedroom_limit, issue_date, longitude, latitude`. Licenses of type "Short Term Rental Operator" are permits for the person running a rental, not a place, so they're counted separately (`operators`, by subtype) and left off the map. The other three types (`cat`) are mapped: 0 "Short Term Rental Commercial Owner", 1 "Non-Commercial Short Term Rental", 2 "Lodging Exempt from STR Regulation". A new type fails the build (add it to `STR_CAT`).
+- **Active Short-Term Rental Licenses** (`ufdg-ajws`, about 4,300 rows): `license_type, residential_subtype, bedroom_limit, issue_date, longitude, latitude, license_number, address, expiration_date` (the license's public details for the map's tooltips; operator and holder names and contacts are not kept). Licenses of type "Short Term Rental Operator" are permits for the person running a rental, not a place, so they're counted separately (`operators`, by subtype) and left off the map. The other three types (`cat`) are mapped: 0 "Short Term Rental Commercial Owner", 1 "Non-Commercial Short Term Rental", 2 "Lodging Exempt from STR Regulation". A new type fails the build (add it to `STR_CAT`).
 - **Non-Commercial Short-Term Rental Licenses** (`2ei9-wqw2`, about 1,200 rows): `type_of_building, partial_whole, operator_type, bedrooms_rented, current_status, location`.
 - **Short-Term Rental Permit Applications** (`en36-xvxg`, about 39,000 rows since 2017): `application_date, license_type, residential_subtype, current_status, x, y`. This dataset has no lon/lat columns, only Louisiana South state plane x/y in US feet (EPSG:3452), converted with `sp_lonlat` (an inverse Lambert conformal conic; it matches the City's own lon/lat in the other STR datasets to 1e-7°). x/y of -1 means no location.
 
 ```
 { "ds": [ids], "last": newest application_date,
-  "cat": [3 license types], "pts": [[x, y, cat, nb, bedroomLimit], ...]   # sorted, so the file only changes with the data
+  "cat": [3 license types], "pts": [[x, y, cat, nb, bedroomLimit, address, licenseNumber, issueDate, expirationDate], ...]   # sorted; dates YYYY-MM-DD or ""
   "operators": [[subtype, n], ...],
   "nc": { "B": [building types], "OP": [operator types], "ST": [statuses],
           "rows": [[nb, building, whole(1)/partial(0)/not stated(2), bedrooms, operatorType, status], ...] },

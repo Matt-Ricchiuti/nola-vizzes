@@ -23,6 +23,13 @@ def d3_tag():
     if not os.path.exists(p): sys.exit('preview mode needs `npm i d3@7` in this folder')
     return '<script>' + open(p, encoding='utf-8').read() + '</script>'
 def load(f): return json.load(open(P('data', f), encoding='utf-8'))
+def write(name, text):
+    """Write site/<name> only when its content changed, so pages whose data didn't change keep their file as it was."""
+    path = P('site', name)
+    if os.path.exists(path) and open(path, encoding='utf-8').read() == text:
+        return False
+    open(path, 'w', encoding='utf-8').write(text)
+    return True
 
 PAGES = {'drone': ('NOPD drone flights', {'drone': 'drone.json'}),
          'cfs': ('Calls for service', {'cfs': 'cfs.json', 'hist': 'hist.json'}),
@@ -103,9 +110,8 @@ STREETS_TAG = '<script src="streets.js"></script>'
 if os.path.exists(P('data', 'streets.json')):
     streets_js = 'window.STREETS=' + json.dumps(load('streets.json'), separators=(',', ':')) + ';'
     os.makedirs(P('site'), exist_ok=True)
-    open(P('site', 'streets.js'), 'w', encoding='utf-8').write(streets_js)
     if mode == 'preview': STREETS_TAG = '<script>' + streets_js + '</script>'
-    print('built streets.js', len(streets_js))
+    print('built streets.js', len(streets_js), '' if write('streets.js', streets_js) else '(unchanged)')
 
 def fill(h, key):
     h = h.replace('{{CSS}}', css).replace('{{NAV}}', nav(key)).replace('{{D3}}', d3_tag() + STREETS_TAG)
@@ -126,8 +132,6 @@ for key, (label, files) in PAGES.items():
         h = h.replace('{{LIB}}', lib).replace('{{JS}}', js).replace('{{DATA}}', json.dumps(data, separators=(',', ':'), ensure_ascii=False))
     else:
         h = fill(h, key)
-    open(P('site', f'{key}.html'), 'w', encoding='utf-8').write(h)
-    print('built', key, len(h))
+    print('built', key, len(h), '' if write(f'{key}.html', h) else '(unchanged)')
 for key in ['index', *EXTRA]:
-    open(P('site', f'{key}.html'), 'w', encoding='utf-8').write(fill(open(P('src', f'{key}.html'), encoding='utf-8').read(), key))
-    print('built', key)
+    print('built', key, '' if write(f'{key}.html', fill(open(P('src', f'{key}.html'), encoding='utf-8').read(), key)) else '(unchanged)')

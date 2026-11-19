@@ -83,13 +83,17 @@ svg text{fill:var(--muted);font-size:11px;font-family:inherit}
 /* maps on touch screens: one finger scrolls the page, two fingers move the map (NOLA.map / trees.js handle those) */
 .map>svg,.stage.mapstage .plot canvas{touch-action:pan-x pan-y}
 .nbpath{fill:var(--land);stroke:var(--landline);stroke-width:.8;vector-effect:non-scaling-stroke}
-.nbpath.hot:hover{stroke:var(--ink);stroke-width:1.6}
+.nbhover{fill:none;stroke:var(--ink);stroke-width:1.6;vector-effect:non-scaling-stroke}
 .streets{pointer-events:none}
 .st{fill:none;vector-effect:non-scaling-stroke;stroke-linecap:round;stroke-linejoin:round}
 .st3{stroke:var(--road);stroke-width:.5}
 .st2{stroke:var(--road-major);stroke-width:.9}
 .st1{stroke:var(--road-major);stroke-width:.8}
 .st0{stroke:var(--road-fwy);stroke-width:1.7}
+/* shaded maps (map.setFill): streets in the surface color show over every shade, light or dark */
+svg.shaded .st3{stroke:color-mix(in srgb,var(--surface) 45%,transparent)}
+svg.shaded .st2,svg.shaded .st1{stroke:color-mix(in srgb,var(--surface) 70%,transparent)}
+svg.shaded .st0{stroke:color-mix(in srgb,var(--surface) 85%,transparent)}
 .tip{position:fixed;pointer-events:none;background:var(--surface);color:var(--ink);border:1px solid var(--ring);box-shadow:0 6px 24px rgba(0,0,0,.14);border-radius:10px;padding:9px 11px;font-size:12.5px;max-width:300px;z-index:20;opacity:0;transition:opacity .08s}
 .tip b{font-size:13px}
 .tip .r{display:flex;justify-content:space-between;gap:14px;color:var(--ink2)}
@@ -152,14 +156,14 @@ a.btn{text-decoration:none;display:inline-block}
 .eyebrow{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
 .fsec{display:flex;flex-direction:column;gap:6px}
 .fsec-h{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
-.linkbtn{background:none;border:0;padding:2px 0;color:var(--accent);font:500 12px inherit;font-family:inherit;cursor:pointer}
+.linkbtn{flex:none;white-space:nowrap;background:none;border:0;padding:2px 0;color:var(--accent);font:500 12px inherit;font-family:inherit;cursor:pointer}
 .flist{display:flex;flex-direction:column;gap:1px;margin:0;padding:0;list-style:none}
 .flist button{all:unset;box-sizing:border-box;width:100%;display:grid;grid-template-columns:12px minmax(0,1fr) auto;gap:9px;align-items:center;padding:5px 6px;border-radius:6px;cursor:pointer}
 .flist button:hover{background:var(--chip)}
 .flist button:focus-visible,.seg button:focus-visible,.mapctl button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .flist .sw{width:11px;height:11px;border-radius:50%}
 .flist .nm{min-width:0;display:flex;flex-direction:column;gap:3px}
-.flist .nm>span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.flist .nm>span:first-child{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden;line-height:1.3} /* long names wrap to a second line */
 .flist .nm em{font-style:normal;font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .flist .fb{height:3px;border-radius:2px;background:var(--grid);overflow:hidden}
 .flist .fb i{display:block;height:100%}
@@ -171,7 +175,8 @@ a.btn{text-decoration:none;display:inline-block}
 .flist.toggles button[aria-pressed="true"]{background:none;box-shadow:none}
 /* tabs at the top of a filter panel: switch one section between related charts */
 .ftabs{display:flex;gap:2px;padding:3px;background:var(--chip);border-radius:9px}
-.ftabs button{flex:1 1 0;font:inherit;font-size:12.5px;line-height:1.25;border:0;border-radius:7px;background:none;color:var(--ink2);padding:6px 8px;cursor:pointer}
+.ftabs button{flex:1 1 auto;font:inherit;font-size:12.5px;line-height:1.25;border:0;border-radius:7px;background:none;color:var(--ink2);padding:6px 8px;cursor:pointer}
+.ftabs.grid{display:grid;grid-template-columns:1fr 1fr}
 .ftabs button[aria-selected="true"]{background:var(--surface);color:var(--ink);font-weight:600;box-shadow:0 1px 3px rgb(0 0 0 / .12)}
 .ftabs button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .seg{display:flex;border:1px solid var(--ring);border-radius:8px;overflow:hidden;width:max-content;max-width:100%}
@@ -188,6 +193,15 @@ a.btn{text-decoration:none;display:inline-block}
 .mapctl button:hover{background:var(--chip)}
 .scalebar{position:absolute;right:14px;bottom:12px;font-size:11px;color:var(--ink2);display:flex;flex-direction:column;align-items:flex-end;gap:3px;pointer-events:none;z-index:2}
 .scalebar i{display:block;height:5px;border:1.5px solid var(--ink2);border-top:0}
+/* map options (NOLA.mapChecks): a small box of checkboxes just above the scale bar */
+.mapchecks{position:absolute;right:12px;bottom:42px;z-index:2;display:flex;flex-direction:column;padding:2px;
+  background:var(--surface);border:1px solid var(--ring);border-radius:8px;font-size:12px;line-height:1.3;color:var(--ink)}
+.mapchecks label{display:flex;align-items:center;gap:6px;padding:3px 8px 3px 6px;border-radius:6px;cursor:pointer;user-select:none;white-space:nowrap}
+.mapchecks label:hover{background:var(--chip)}
+.mapchecks label.off{color:var(--muted);cursor:default}
+.mapchecks label.off:hover{background:none}
+.mapchecks input{margin:0;width:13px;height:13px;accent-color:var(--accent);cursor:inherit}
+.mapchecks label:has(input:focus-visible){outline:2px solid var(--accent);outline-offset:-1px}
 .ftoggle{display:none}
 .maphint{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:3;pointer-events:none;opacity:0;transition:opacity .2s;
   background:rgb(11 11 11 / .78);color:#fff;font-size:13px;font-weight:500;padding:8px 14px;border-radius:999px;white-space:nowrap}
@@ -195,14 +209,14 @@ a.btn{text-decoration:none;display:inline-block}
 .stlab{font-weight:500;pointer-events:none;paint-order:stroke;stroke:var(--surface);stroke-linejoin:round}
 .stlab.major{font-weight:650}
 /* stepped legend for equal-count classes (NOLA.stepLegend): the value under each boundary is where that color starts */
-.legend .steps{flex:1 1 100%;display:flex;max-width:290px;padding:0 14px 0 0}
+.legend .steps{flex:1 1 100%;display:flex;max-width:290px;padding:0 22px 0 0}
 .legend .steps span,.steps span{flex:1;display:flex;flex-direction:column;align-items:stretch;gap:3px;min-width:0}
 .steps i{width:auto!important;height:10px;border-radius:0!important}
 .steps span:first-child i{border-radius:3px 0 0 3px!important}
-.steps span:nth-child(7) i{border-radius:0 3px 3px 0!important}
+.steps span:last-child i{border-radius:0 3px 3px 0!important}
+.steps span:only-child i{border-radius:3px!important}
 .steps em{align-self:flex-start;font-style:normal;font-size:10.5px;color:var(--ink2);white-space:nowrap;font-variant-numeric:tabular-nums;transform:translateX(-50%)}
 .steps span:first-child em{transform:none}
-.steps .end{flex:0 0 0;padding-top:13px}
 .nonekey{font-size:11.5px}
 .maplegend{display:none}
 @media(max-width:760px){
@@ -217,6 +231,7 @@ a.btn{text-decoration:none;display:inline-block}
   .maplegend .nonekey{display:flex;align-items:center;gap:5px;margin-top:3px}
   .maplegend .nonekey i{width:10px;height:10px;border-radius:3px;display:inline-block}
   .mlh{margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .mapchecks{top:162px;bottom:auto} /* phones: the map's own legend fills the bottom left, so the options sit under the map controls */
   .fpanel.collapsed{display:none}
 }
 
@@ -267,15 +282,14 @@ table.static tbody tr{cursor:auto}
 .cpc-days button[aria-pressed="true"]{background:var(--ink);color:var(--surface);border-color:var(--ink)}
 .cpc-days button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 
-/* ===================== 311 service requests page (src/311.js) ===================== */
+/* ---------- a key that isn't a filter (NOLA.kv): swatch, label, value; lines up with .flist rows ---------- */
+.kvl{display:flex;flex-direction:column;gap:5px;font-size:12.5px;color:var(--ink2);padding:0 6px}
+.kvl span{display:grid;grid-template-columns:12px minmax(0,1fr) auto;gap:9px;align-items:center}
+.kvl i{width:11px;height:11px;border-radius:3px}
+.kvl i.tick{width:2px;height:14px;border-radius:0;justify-self:center}
+.kvl b{font:400 12px "IBM Plex Mono",ui-monospace,monospace;color:var(--muted);font-variant-numeric:tabular-nums}
+/* small yearly bars inside a map's panel (311) */
 .srmini svg text{fill:var(--ink2)}
-.srages{display:flex;flex-direction:column;gap:5px;font-size:12.5px;color:var(--ink2)}
-.srages span{display:grid;grid-template-columns:12px 1fr auto;gap:8px;align-items:center}
-.srages i{width:11px;height:11px;border-radius:3px}
-.srages b{font:400 12px "IBM Plex Mono",ui-monospace,monospace;color:var(--muted)}
-/* ===================== short-term rentals page (src/str.js): uses the 311 page's .srages lists ===================== */
-/* ===================== blight and code enforcement page (src/blight.js); also uses .srages ===================== */
-.srages i.tickkey{width:2px;height:14px;border-radius:0;background:var(--ink);margin-left:4px}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script><script src="streets.js"></script>
 </head><body><div class="wrap">
@@ -303,6 +317,7 @@ const NOLA = (() => {
       let x = ev.clientX + 14, y = ev.clientY + 14;
       if (x + w > innerWidth - 8) x = ev.clientX - w - 14;
       if (y + h > innerHeight - 8) y = ev.clientY - h - 14;
+      x = Math.max(8, x); y = Math.max(8, Math.min(y, innerHeight - h - 8)); // a tall tooltip stays on screen
       tipEl.style.left = x + 'px'; tipEl.style.top = y + 'px';
     },
     hide() { tipEl.style.opacity = 0; }
@@ -319,7 +334,7 @@ const NOLA = (() => {
   const MIN_POP = 1000; // rates for neighborhoods smaller than this swing wildly, so they're left out
   const popOf = i => GEO.pop ? GEO.pop[i] : null;
   const perK = (n, pop) => n != null && pop >= MIN_POP ? 1000 * n / pop : null;
-  const fmtRate = v => v == null ? '—' : v >= 100 ? d3.format(',')(Math.round(v)) : v >= 10 ? v.toFixed(0) : v.toFixed(1);
+  const fmtRate = v => v == null ? '—' : v === 0 ? '0' : v >= 100 ? d3.format(',')(Math.round(v)) : v >= 10 ? v.toFixed(0) : v.toFixed(1);
   const POP_NOTE = '<div class="legend popnote">Per 1,000 residents (2020 Census). Visitors, workers and highway traffic also generate calls, so rates run high where few people live, like the CBD and French Quarter. Neighborhoods under 1,000 residents are left out.</div>';
   // Total / Per 1,000 residents switch
   const basisChips = (el, onSel, sel = 'n') => chips(el, [{ label: 'Total', value: 'n' }, { label: 'Per 1,000 residents', value: 'pc' }], onSel, { sel });
@@ -382,12 +397,18 @@ const NOLA = (() => {
       sg.append('path').attr('class', 'st st0').attr('d', ST.d[0]);
     }
     const streetZoom = k => { if (localSt) localSt.style('opacity', Math.max(0.35, Math.min(1, (k - 0.6) / 2.4))); };
+    // the hovered neighborhood's outline, drawn over the streets and its neighbors' fills (an outline only, so the
+    // streets and shading underneath stay visible)
+    const hoverP = root.append('path').attr('class', 'nbhover').style('pointer-events', 'none').attr('d', null);
     const focusG = root.append('g').style('pointer-events', 'none');
     if (o.districts) root.append('g').selectAll('path').data(GEO.pd).join('path').attr('d', f => f.d)
       .attr('fill', 'none').attr('stroke', 'var(--ink2)').attr('stroke-width', 1.4).attr('vector-effect', 'non-scaling-stroke').attr('opacity', .55).style('pointer-events', 'none');
     const stLabG = root.append('g').attr('aria-hidden', 'true');
     const layer = root.append('g');
-    if (o.tip) nbSel.on('mousemove', (ev, f) => tip.show(o.tip(f.idx), ev)).on('mouseleave', tip.hide);
+    // o.tip(i) can return nothing (a map whose own marks carry the tooltips): then hovering a neighborhood shows nothing
+    const unhover = () => { tip.hide(); hoverP.datum(null).attr('d', null); };
+    if (o.tip) nbSel.on('mousemove', (ev, f) => { const h = o.tip(f.idx); if (!h) return unhover(); tip.show(h, ev); if (hoverP.datum() !== f) hoverP.datum(f).attr('d', f.d); })
+      .on('mouseleave', unhover);
 
     // ---- street names, placed after each zoom so they never overlap; longer streets first ----
     const SL = ST && ST.lab, q = ST ? ST.q : 1;
@@ -477,7 +498,9 @@ const NOLA = (() => {
     addEventListener('resize', fit);
     const api = {
       svg, layer, nbSel, zoomTo, k: () => k, onZoom: f => listeners.push(f), home,
-      setFill(fn) { nbSel.attr('fill', f => fn(f.idx) || null).style('fill', f => fn(f.idx) || null); },
+      // shade neighborhoods (fn(i) -> a color, or null for the plain land color); on a shaded map the streets are
+      // drawn in the page's surface color, so they stay visible over the darkest and lightest shades alike
+      setFill(fn) { let any = false; nbSel.each(function (f) { const c = fn(f.idx) || null; if (c) any = true; this.style.fill = c || ''; if (c) this.setAttribute('fill', c); else this.removeAttribute('fill'); }); svg.classed('shaded', any); },
       // outline one neighborhood and zoom to it (-1: clear and go back to the whole mapped city)
       focus(i, dur = 450) {
         focused = i;
@@ -615,6 +638,7 @@ const NOLA = (() => {
       const li = document.createElement('li'), b = document.createElement('button'); b.type = 'button';
       const on = !!pressed(r.key); if (on) any = true; b.setAttribute('aria-pressed', on);
       const col = r.color || 'var(--muted)';
+      b.title = String(r.name).replace(/<[^>]*>/g, '').replace(/&amp;/g, '&') + (r.sub ? ' · ' + String(r.sub).replace(/<[^>]*>/g, '').replace(/&amp;/g, '&') : ''); // the full name, in case it's cut short
       b.innerHTML = `<span class="sw" style="background:${col}${r.square ? ';border-radius:3px' : ''}"></span><span class="nm"><span>${r.name}</span>${r.sub ? `<em>${r.sub}</em>` : ''}${r.count != null ? `<span class="fb"><i style="width:${(100 * r.count / mx).toFixed(1)}%;background:${col}"></i></span>` : ''}</span><span class="ct">${r.count != null ? fmt(r.count) : ''}</span>`;
       b.onclick = () => onClick(r.key); li.appendChild(b); ul.appendChild(li);
     });
@@ -630,12 +654,42 @@ const NOLA = (() => {
   // ftabs(panel, [[value, label], ...], value, onChange): a tab row at the very top of a filter panel, for one chart
   // section that switches between closely related charts of the same data (e.g. two maps). Returns the row.
   function ftabs(panel, opts, value, onChange) {
-    const d = document.createElement('div'); d.className = 'ftabs'; d.setAttribute('role', 'tablist');
+    const d = document.createElement('div'); d.className = 'ftabs' + (opts.length > 3 ? ' grid' : ''); d.setAttribute('role', 'tablist'); // four or more: two per row
     opts.forEach(([v, l]) => {
       const b = document.createElement('button'); b.type = 'button'; b.textContent = l; b.setAttribute('role', 'tab');
       b.setAttribute('aria-selected', v === value); b.onclick = () => { if (v !== value) onChange(v); }; d.appendChild(b);
     });
     panel.prepend(d); return d;
+  }
+  // mapChecks(plot, [{ key, label, checked, disabled, title, onChange(checked) }, ...]): a small box of checkboxes on
+  // the map, bottom right just above the scale bar (under the zoom buttons on phones), for map options such as
+  // "Per 1k residents". Items that are null or false are left out; an empty list hides the box. Call it on every
+  // redraw with the current state: rows are matched by key, so they keep their place (and keyboard focus).
+  function mapChecks(plot, items) {
+    items = (items || []).filter(Boolean);
+    let box = plot.querySelector(':scope>.mapchecks');
+    if (!items.length) { if (box) box.hidden = true; return box; }
+    if (!box) { box = document.createElement('div'); box.className = 'mapchecks'; box.setAttribute('role', 'group'); box.setAttribute('aria-label', 'Map options'); plot.appendChild(box); }
+    box.hidden = false;
+    const old = new Map([...box.children].map(l => [l.dataset.key, l]));
+    items.forEach(it => {
+      let l = old.get(it.key); old.delete(it.key);
+      if (!l) { l = document.createElement('label'); l.dataset.key = it.key; l.innerHTML = '<input type="checkbox"><span></span>'; }
+      box.appendChild(l); // in the order given
+      const cb = l.firstChild; l.lastChild.textContent = it.label;
+      cb.checked = !!it.checked; cb.disabled = !!it.disabled; l.classList.toggle('off', !!it.disabled);
+      if (it.title) l.title = it.title; else l.removeAttribute('title');
+      cb.onchange = () => it.onChange && it.onChange(cb.checked);
+    });
+    old.forEach(l => l.remove());
+    return box;
+  }
+  // a key that isn't a filter: rows of [label, color (a square swatch; null leaves the space), value] inside a panel
+  // section. A color starting with '|' draws a tick mark in that color instead of a square.
+  function kv(sec, rows) {
+    const d = document.createElement('div'); d.className = 'kvl';
+    d.innerHTML = rows.map(([l, c, n]) => `<span>${!c ? '<i></i>' : c[0] === '|' ? `<i class="tick" style="background:${c.slice(1)}"></i>` : `<i style="background:${c}"></i>`}${l}<b>${n}</b></span>`).join('');
+    sec.appendChild(d); return d;
   }
   // neighborhood picker inside a panel section
   function nbPick(sec, value, onSel, label = 'All neighborhoods') {
@@ -653,22 +707,59 @@ const NOLA = (() => {
   const seqVar = t => `var(${SEQ[Math.max(0, Math.min(6, Math.floor(t * 7)))]})`;
   // breaks = [low, high]; the top swatch gets a "+" only when values run past `high` (open = true)
   function seqLegend(el, breaks, fmtf, label, open = true) {
-    el.innerHTML = `<span>${label}</span>` + SEQ.map((s, i) => `<span><i style="background:var(${s})"></i>${i === 0 ? fmtf(breaks[0]) : i === 6 ? fmtf(breaks[1]) + (open ? '+' : '') : ''}</span>`).join('');
+    el.innerHTML = (label ? `<span>${label}</span>` : '') + `<span>${fmtf(breaks[0])}</span><span style="gap:0">` + SEQ.map(s => `<i style="background:var(${s});border-radius:0"></i>`).join('') + '</span>' + `<span>${fmtf(breaks[1])}${open ? '+' : ''}</span>`;
   }
-  // Seven equal-count classes, so each color holds about the same number of areas and differences across most of
-  // the city stay visible even when a few places are far above the rest. classes(values) -> { color(v), edges }
-  function classes(vals) {
+  // Up to seven equal-count classes, so each color holds about the same number of areas and differences across most
+  // of the city stay visible even when a few places are far above the rest. classes(values, { even }) -> { color(v), edges, shades }
+  // Class edges are round numbers where that's possible without changing the picture: each edge moves to the roundest
+  // nearby number (…, 10, 20, 50, 100, …, or 0.5, 0.2, 0.1 steps) only if that moves at most one area to the next color
+  // (and stays well clear of the neighboring edges), so classes stay close to equal-count; otherwise it keeps a finer value. Counts (whole numbers) only get
+  // whole-number edges. Edges are what the colors use, so the legend is exact. Classes that would hold nothing are
+  // dropped and the rest spread over the full ramp. { even: true } uses evenly spaced round edges instead (d3 ticks).
+  const STEPS = d3.range(-3, 7).flatMap(e => [1, 2, 5].map(m => +(m * 10 ** e).toPrecision(1))).sort((a, b) => b - a); // 5e6 … 0.001
+  const roundTo = (t, s) => +(Math.round(t / s) * s).toPrecision(12);
+  function classes(vals, { even = false } = {}) {
     const v = vals.filter(x => x != null && isFinite(x)).sort(d3.ascending);
-    const q = d3.scaleQuantile().domain(v).range(d3.range(7));
-    return { color: x => x == null ? 'var(--none)' : `var(${SEQ[q(x)]})`, edges: [v[0], ...q.quantiles(), v[v.length - 1]] };
+    if (!v.length) return { color: () => 'var(--none)', edges: [], shades: [] };
+    const lo = v[0], hi = v[v.length - 1], int = v.every(Number.isInteger);
+    let th;
+    if (even) th = d3.ticks(lo, hi, 7).filter(t => t > lo && t <= hi);
+    else {
+      th = d3.scaleQuantile().domain(v).range(d3.range(7)).quantiles();
+      if (int) th = th.map(Math.ceil); // for whole numbers, x >= t exactly when x >= ceil(t)
+      th = [...new Set(th)].filter(t => t > lo && t <= hi);
+      // round each edge as far as it can go while at most one area changes color and it stays well inside its neighbors
+      const crossing = (a, b) => { const x0 = Math.min(a, b), x1 = Math.max(a, b); return d3.bisectLeft(v, x1) - d3.bisectLeft(v, x0); };
+      th = th.map((t, i) => {
+        const room = 0.5 * Math.min(t - (i ? th[i - 1] : lo), (i < th.length - 1 ? th[i + 1] : hi) - t);
+        const s = STEPS.find(s => { const r = roundTo(t, s); return (!int || s >= 1) && Math.abs(r - t) <= room && crossing(t, r) <= 1; });
+        return s ? roundTo(t, s) : t;
+      });
+    }
+    th = [...new Set(th)].filter(t => t > lo && t <= hi).sort(d3.ascending);
+    // drop an edge whose class would be empty (merge it into the class below)
+    for (let i = th.length - 1; i >= 0; i--) { const top = i < th.length - 1 ? th[i + 1] : Infinity; if (!v.some(x => x >= th[i] && x < top)) th.splice(i, 1); }
+    const k = th.length + 1, shades = d3.range(k).map(i => SEQ[k === 1 ? 3 : Math.round(i * 6 / (k - 1))]);
+    // the legend's first label: the lowest value, or a round number just under it (nothing lies between the two)
+    const room0 = 0.3 * ((th[0] ?? hi) - lo), s0 = STEPS.find(s => (!int || s >= 1) && lo - Math.floor(lo / s) * s <= room0 && Math.floor(lo / s) * s >= 0);
+    const first = s0 ? +(Math.floor(lo / s0) * s0).toPrecision(12) : lo;
+    return { color: x => x == null ? 'var(--none)' : `var(${shades[d3.bisectRight(th, x)]})`, edges: [first, ...th, hi], shades };
   }
-  // legend for classes(): a stepped bar with the value where each color starts, and a swatch for areas with no value
-  function stepLegend(el, edges, fmtf, none) {
-    el.innerHTML = '<div class="steps">' + SEQ.map((s, i) => `<span><i style="background:var(${s})"></i><em>${fmtf(edges[i])}</em></span>`).join('')
-      + `<span class="end"><em>${fmtf(edges[7])}</em></span></div>` + (none ? `<span class="nonekey"><i style="background:var(--none)"></i>${none}</span>` : '');
+  // legend for classes(): a stepped bar with the value where each color starts (the top one "and up"), and a swatch
+  // for areas with no value. cl is what classes() returned (an older caller may pass its seven-class edges array)
+  function stepLegend(el, cl, fmtf, none) {
+    const edges = Array.isArray(cl) ? cl : cl.edges, shades = Array.isArray(cl) ? SEQ : cl.shades, n = shades.length;
+    el.innerHTML = (n ? '<div class="steps">' + shades.map((s, i) => `<span><i style="background:var(${s})"></i><em>${fmtf(edges[i])}${i === n - 1 && n > 1 ? '+' : ''}</em></span>`).join('') + '</div>' : '')
+      + (none ? `<span class="nonekey"><i style="background:var(--none)"></i>${none}</span>` : '');
+    // labels that would run into each other (a narrow legend): show every other one, always the first and last
+    // (checked again once the web fonts have loaded, since they set the labels' widths)
+    const ems = [...el.querySelectorAll('.steps em')];
+    const thin = () => { const r = ems.map(e => e.getBoundingClientRect());
+      if (r.some((b, i) => i && b.width && b.left < r[i - 1].right + 3)) ems.forEach((e, i) => { if (i % 2 && i < ems.length - 1) e.style.visibility = 'hidden'; }); };
+    thin(); if (document.fonts && document.fonts.status !== 'loaded') document.fonts.ready.then(thin);
   }
-  // compact numbers for legends: 950, 1.3k, 12k
-  const short = v => v >= 1000 ? d3.format('.2~s')(v).replace('G', 'B') : fmtRate(v);
+  // compact numbers for legends, exact to the value given (class edges are already round): 0, 3, 8.4, 0.05, 950, 1.25k, 12k
+  const short = v => v >= 1000 ? d3.format('.3~s')(v).replace('G', 'B') : String(+(+v).toPrecision(4));
 
   // ---------- small chart helpers ----------
   function frame(el, { h = 260, m = { t: 12, r: 16, b: 28, l: 44 } } = {}) {
@@ -734,6 +825,9 @@ const NOLA = (() => {
   // Download CSV links to the open chart's City dataset on data.nola.gov (its export is there): the view's `ds`, which
   // can be a function of the filters when one chart switches between datasets, else the page's `opts.ds`.
   // Below it, each chart is its own section (heading `label`, then the chart); only the open one shows.
+  // `label` can be a function, for a chart whose subject follows its filters; the heading is set again on each draw
+  // (give such a chart a `tab`). Redrawing keeps the filter panel's scroll and the page's, so a click low in a long
+  // panel doesn't jump it back to the top.
   // With a single chart there are no tabs: its heading takes their place in the bar.
   // Filters are shared page state: refresh() redraws the open chart, and the others redraw when next opened.
   // state() returns the filters that differ from their defaults; they're written into the link.
@@ -769,12 +863,13 @@ const NOLA = (() => {
     const one = list.length === 1;
     if (one) bar.classList.add('one');
     bar.append(one ? document.createElement('h2') : tabRow, tools); host.appendChild(bar);
+    const labelOf = v => typeof v.label === 'function' ? v.label() : v.label, heads = {};
     list.forEach(v => {
-      const t = document.createElement('button'); t.type = 'button'; t.textContent = v.tab || v.label;
+      const t = document.createElement('button'); t.type = 'button'; t.textContent = v.tab || labelOf(v);
       t.id = 'vt-' + v.id; t.setAttribute('role', 'tab'); t.setAttribute('aria-controls', 'v-' + v.id);
       t.onclick = () => open(v.id); tabRow.appendChild(t); tabs[v.id] = t;
       const sec = document.createElement('section'); sec.className = 'vsec'; sec.id = 'v-' + v.id;
-      const h = one ? bar.firstChild : document.createElement('h2'); h.textContent = v.label;
+      const h = one ? bar.firstChild : document.createElement('h2'); h.textContent = labelOf(v); heads[v.id] = h;
       const p = document.createElement('div'); p.className = 'pane ' + (v.cls || 'card');
       if (one) { h.id = 'vh-' + v.id; sec.setAttribute('aria-labelledby', h.id); sec.append(p); }
       else {
@@ -787,7 +882,21 @@ const NOLA = (() => {
     const dataLink = document.getElementById('dataLink'), ds = opts.ds || (list.find(v => v.ds) || {}).ds;
     if (dataLink && ds) { dataLink.href = 'https://data.nola.gov/d/' + ds[0]; dataLink.textContent = ds[1] + ' on data.nola.gov'; }
     // charts are drawn only while shown (hidden ones have no size); a hidden chart whose filters changed redraws when opened
-    const drawOne = v => { v.draw(panes[v.id], !drawn.has(v.id)); drawn.add(v.id); stale.delete(v.id); };
+    // keyboard focus survives a redraw: the control with the same label (or in the same place) takes it back
+    const focusKey = el => el.tagName + '|' + (el.getAttribute('aria-label') || (el.querySelector('.nm>span') || el).textContent.trim());
+    const focusables = p => [...p.querySelectorAll('button,select,input,[tabindex]')];
+    const drawOne = v => {
+      const p = panes[v.id], fp = p.querySelector(':scope>.fpanel'), keep = [fp ? fp.scrollTop : 0, scrollX, scrollY];
+      const a = document.activeElement, had = a && a !== document.body && p.contains(a) ? [focusKey(a), focusables(p).indexOf(a)] : null;
+      if (typeof v.label === 'function') heads[v.id].textContent = v.label();
+      v.draw(p, !drawn.has(v.id)); drawn.add(v.id); stale.delete(v.id);
+      if (had && !p.contains(document.activeElement)) {
+        const fs = focusables(p), t = fs.find(e => focusKey(e) === had[0]) || fs[Math.min(had[1], fs.length - 1)];
+        if (t) t.focus({ preventScroll: true });
+      }
+      if (fp && fp.scrollTop !== keep[0]) fp.scrollTop = keep[0];
+      if (scrollY !== keep[2] || scrollX !== keep[1]) scrollTo(keep[1], keep[2]);
+    };
     const draw = () => { tip.hide(); list.forEach(v => { if (v !== cur && drawn.has(v.id)) stale.add(v.id); }); drawOne(cur); writeHash(); setDs(); setSbw(); };
     function show(v) {
       cur = v;
@@ -828,7 +937,7 @@ const NOLA = (() => {
   }
   const legendHTML = items => '<div class="legend">' + items.map(([c, l, round]) => `<span><i style="background:${c}${round ? ';border-radius:50%' : ''}"></i>${l}</span>`).join('') + '</div>';
 
-  return { css, S, fmt, pct, tip, row, setGeo, views, hashState, legendHTML, stage, fsec, flist, seg, ftabs, nbPick, phoneToggle, popOf, perK, fmtRate, POP_NOTE, basisChips, shown, nbList, nbSelect, get FULL() { return FULL; }, get GEO() { return GEO; }, map, mapButtons, panelInset, seqVar, seqLegend, classes, stepLegend, short, frame, yGrid, chips, months, monthsLong,
+  return { css, S, fmt, pct, tip, row, setGeo, views, hashState, legendHTML, stage, fsec, flist, seg, ftabs, nbPick, kv, mapChecks, phoneToggle, popOf, perK, fmtRate, POP_NOTE, basisChips, shown, nbList, nbSelect, get FULL() { return FULL; }, get GEO() { return GEO; }, map, mapButtons, panelInset, seqVar, seqLegend, classes, stepLegend, short, frame, yGrid, chips, months, monthsLong,
     setYear, get YEAR() { return YEAR; }, monthTicks, doyTime, doyDate, doyISO, doyMonth, monthStarts, isoDate, share, numWord, cap, setText, setHTML, title };
 })();
 </script>
@@ -849,15 +958,19 @@ const NOLA = (() => {
   const HEAR_L = { Guilty: 'Guilty', Dismissed: 'Dismissed', Reset: 'Reset to a later date', Pending: 'Result pending', Other: 'Other' };
   const INSP_C = ['var(--s1)', 'var(--s3)', 'var(--s4)', 'var(--muted)'];
   const MIN_HU = 500, perHU = (n, i) => HU[i] >= MIN_HU ? 1000 * n / HU[i] : null;
+  const sentence = s => s.charAt(0) + s.slice(1).toLowerCase();
 
   const H = NOLA.hashState();
   const TABS = ['open', 'new', 'grass', 'abate'];
   const st = { nb: H.nb != null ? +H.nb : -1, measure: TABS.includes(H.measure) ? H.measure : 'open', stage: H.stage != null ? +H.stage : -1, res: H.res != null ? +H.res : -1,
                basis: H.basis === 'hu' ? 'hu' : 'n', kind: H.kind === 'grass' ? 'grass' : 'ce', ig: H.ig != null ? +H.ig : -1 };
+  if (!(st.nb >= -1 && st.nb < 72)) st.nb = -1;
+  if (!(st.stage >= -1 && st.stage < STAGE.length)) st.stage = -1;
+  if (!(st.res >= -1 && st.res < NEW_L.length)) st.res = -1;
+  if (!(st.ig >= -1 && st.ig < D.inspGroups.length)) st.ig = -1;
   const staged = (el, first, isMap) => { if (first) el._s = NOLA.stage(el, { map: isMap }); return el._s; };
   const set = (k, v) => { st[k] = v; V.refresh(); };
   const toggle = k => v => set(k, st[k] === v ? -1 : v);
-  const kvList = (sec, items) => sec.insertAdjacentHTML('beforeend', '<div class="srages">' + items.map(([l, c, n]) => `<span>${c ? `<i style="background:${c}"></i>` : '<i></i>'}${l}<b>${n}</b></span>`).join('') + '</div>');
 
   // ---------- per-neighborhood numbers ----------
   const openOf = (nb, stage = st.stage) => { const a = D.openAge[nb]; return stage >= 0 ? d3.sum(a[stage]) : d3.sum(a, r => d3.sum(r)); };
@@ -865,6 +978,9 @@ const NOLA = (() => {
   const raw = i => st.measure === 'open' ? openOf(i) : st.measure === 'new' ? newOf(i) : st.measure === 'grass' ? D.g12[i] : D.abOpen[i];
   const val = i => st.basis === 'hu' ? perHU(raw(i), i) : raw(i);
   const MEAS = { open: 'Open code enforcement cases', new: 'Cases filed in the past 12 months', grass: 'Overgrown-lot cases, past 12 months', abate: 'Properties in abatement' };
+  const MAP_L = { open: 'Open code enforcement cases, by neighborhood', new: 'Code enforcement cases filed in the past 12 months, by neighborhood',
+                  grass: 'Overgrown-lot cases filed in the past 12 months, by neighborhood', abate: 'Properties in abatement, by neighborhood' };
+  const keyLabel = () => MEAS[st.measure] + (st.basis === 'hu' ? ' per 1,000 homes' : '');
 
   // ---------- map ----------
   let m;
@@ -873,62 +989,66 @@ const NOLA = (() => {
     panel.innerHTML = '';
     NOLA.ftabs(panel, [['open', 'Open cases'], ['new', 'New cases'], ['grass', 'Overgrown lots'], ['abate', 'Abatement']], st.measure, v => set('measure', v));
     NOLA.nbPick(NOLA.fsec(panel, 'Neighborhood'), st.nb, v => set('nb', v));
-    const nbs = d3.range(72).filter(nb => st.nb < 0 || nb === st.nb);
+    const nbs = st.nb >= 0 ? [st.nb] : d3.range(72);
     if (st.measure === 'open')
-      NOLA.flist(NOLA.fsec(panel, `Stage · ${fmt(d3.sum(nbs, nb => openOf(nb, -1)))} open`, st.stage >= 0 ? ['All stages', () => set('stage', -1)] : null),
+      NOLA.flist(NOLA.fsec(panel, `Stage · ${fmt(d3.sum(nbs, nb => openOf(nb, -1)))}`, st.stage >= 0 ? ['All stages', () => set('stage', -1)] : null),
         STAGE.map((s, k) => ({ key: k, name: s, color: STAGE_C[k], count: d3.sum(nbs, nb => openOf(nb, k)) })), { pressed: k => st.stage === k, onClick: toggle('stage') });
     else if (st.measure === 'new')
-      NOLA.flist(NOLA.fsec(panel, `First inspection · since ${NOLA.isoDate(D.winStart).replace(/, \d+$/, '')}`, st.res >= 0 ? ['Show all', () => set('res', -1)] : null),
+      NOLA.flist(NOLA.fsec(panel, `First inspection · ${fmt(d3.sum(nbs, nb => newOf(nb, -1)))}`, st.res >= 0 ? ['Show all', () => set('res', -1)] : null),
         NEW_L.map(([l, c], k) => ({ key: k, name: l, color: c, count: d3.sum(nbs, nb => D.new12[nb][k]) })), { pressed: k => st.res === k, onClick: toggle('res') });
     else if (st.measure === 'grass')
-      kvList(NOLA.fsec(panel, 'Since ' + NOLA.isoDate(D.winStart)), [['Cases filed', null, fmt(d3.sum(nbs, nb => D.g12[nb]))]]);
+      NOLA.kv(NOLA.fsec(panel, 'Overgrown lots'), [['Cases filed, past 12 months', null, fmt(d3.sum(nbs, nb => D.g12[nb]))]]);
     else {
-      kvList(NOLA.fsec(panel, 'In abatement now'), [['Properties', null, fmt(d3.sum(nbs, nb => D.abOpen[nb]))]]);
-      kvList(NOLA.fsec(panel, 'How closed abatement cases ended'), D.abEnd.slice(0, 6).map(([k, n]) => [k === 'Not stated' ? 'Closed, no reason given' : k, null, fmt(n)]));
+      NOLA.kv(NOLA.fsec(panel, 'Abatement'), [['Properties in abatement now', null, fmt(d3.sum(nbs, nb => D.abOpen[nb]))]]);
+      const top = D.abEnd.slice(0, 6), rest = d3.sum(D.abEnd.slice(6), d => d[1]);
+      NOLA.kv(NOLA.fsec(panel, 'How closed cases ended, citywide'), [...top.map(([k, n]) => [k === 'Not stated' ? 'No reason given' : sentence(k), null, fmt(n)]), ...(rest ? [['Other reasons', null, fmt(rest)]] : [])]);
     }
-    NOLA.seg(NOLA.fsec(panel, 'Count'), [['n', 'Total'], ['hu', 'Per 1,000 homes']], st.basis, v => set('basis', v));
-    const ls = NOLA.fsec(panel, 'Legend'), leg = document.createElement('div'); leg.className = 'legend'; ls.appendChild(leg);
-    if (st.basis === 'hu') ls.insertAdjacentHTML('beforeend', '<div class="legend popnote">Per 1,000 homes (2020 Census housing units)</div>');
+    const leg = document.createElement('div'); leg.className = 'legend'; NOLA.fsec(panel, keyLabel()).appendChild(leg);
     if (first) {
       m = NOLA.map(plot, { panel, label: 'Map of code enforcement by neighborhood', tip: mapTip });
       m.lastNb = -1;
       plot.insertAdjacentHTML('beforeend', '<div class="maplegend"></div>');
     }
+    NOLA.mapChecks(plot, [{ key: 'per', label: 'Per 1k homes', checked: st.basis === 'hu', onChange: on => set('basis', on ? 'hu' : 'n') }]);
     const cl = NOLA.classes(d3.range(72).map(val));
     m.setFill(i => cl.color(val(i)));
-    const none = d3.range(72).some(i => val(i) == null) ? `Under ${MIN_HU} homes` : null, lf = v => st.basis === 'hu' ? NOLA.fmtRate(v) : NOLA.short(v);
-    NOLA.stepLegend(leg, cl.edges, lf, none);
-    const ml = plot.querySelector('.maplegend'); NOLA.stepLegend(ml, cl.edges, lf, none);
-    ml.insertAdjacentHTML('afterbegin', `<div class="mlh">${MEAS[st.measure]}${st.basis === 'hu' ? ' per 1,000 homes' : ''}</div>`);
+    const none = d3.range(72).some(i => val(i) == null) ? `Under ${MIN_HU} homes` : null, lf = NOLA.short;
+    NOLA.stepLegend(leg, cl, lf, none);
+    const ml = plot.querySelector('.maplegend'); NOLA.stepLegend(ml, cl, lf, none);
+    const sub = st.measure === 'open' && st.stage >= 0 ? STAGE[st.stage] : st.measure === 'new' && st.res >= 0 ? NEW_L[st.res][0] : '';
+    ml.insertAdjacentHTML('afterbegin', `<div class="mlh">${keyLabel()}${sub ? ' · ' + sub : ''}</div>`);
     if (m.lastNb !== st.nb) { m.focus(st.nb, first ? 0 : 450); m.lastNb = st.nb; }
   }
   function mapTip(i) {
     const r = perHU(raw(i), i);
     return `<b>${GEO.nb[i].name}</b>` + row('Open cases', fmt(openOf(i, -1))) + (st.stage >= 0 && st.measure === 'open' ? row('Open, ' + STAGE[st.stage].toLowerCase(), fmt(openOf(i))) : '')
-      + row('Cases filed, past 12 months', fmt(newOf(i, -1))) + row('Overgrown-lot cases, past 12 months', fmt(D.g12[i])) + row('Properties in abatement', fmt(D.abOpen[i]))
-      + row('Housing units (2020)', fmt(HU[i] || 0)) + (r != null ? row('Shown per 1,000 homes', NOLA.fmtRate(r)) : '');
+      + row('Cases filed, past 12 months', fmt(newOf(i, -1))) + (st.res >= 0 && st.measure === 'new' ? row('Filed, ' + NEW_L[st.res][0].toLowerCase(), fmt(newOf(i))) : '')
+      + row('Overgrown-lot cases, past 12 months', fmt(D.g12[i])) + row('Properties in abatement', fmt(D.abOpen[i]))
+      + row('Housing units (2020)', fmt(HU[i] || 0)) + (r != null ? row(MEAS[st.measure] + ' per 1,000 homes', NOLA.fmtRate(r)) : '');
   }
 
   // ---------- cases filed per year ----------
+  const KIND_L = { ce: 'Code enforcement cases filed per year', grass: 'Overgrown-lot cases filed per year' };
+  const yearsData = () => ({ years: st.kind === 'grass' ? D.gyears : D.years, data: (st.kind === 'grass' ? D.gyr : D.yr)[st.nb >= 0 ? st.nb : 72] });
   function drawYears(pane, first) {
     const { panel, plot } = staged(pane, first);
     panel.innerHTML = '';
     NOLA.ftabs(panel, [['ce', 'Code enforcement'], ['grass', 'Overgrown lots']], st.kind, v => set('kind', v));
     NOLA.nbPick(NOLA.fsec(panel, 'Neighborhood'), st.nb, v => set('nb', v));
-    const years = st.kind === 'grass' ? D.gyears : D.years, data = (st.kind === 'grass' ? D.gyr : D.yr)[st.nb >= 0 ? st.nb : 72];
+    const { years, data } = yearsData();
     const C = [['Still open', 'var(--s2)'], ['Closed', 'var(--s1)']];
-    kvList(NOLA.fsec(panel, `Cases filed since ${years[0]}`), C.map(([l, c], k) => [l, c, fmt(d3.sum(data, d => d[k]))]));
+    NOLA.kv(NOLA.fsec(panel, `Filed since ${years[0]} · ${fmt(d3.sum(data, d => d[0] + d[1]))}`), C.map(([l, c], k) => [l, c, fmt(d3.sum(data, d => d[k]))]));
     plot.innerHTML = '';
     const f = NOLA.frame(plot, { h: 340, m: { t: 18, r: 10, b: 28, l: 44 } });
     const x = d3.scaleBand().domain(years).range([0, f.iw]).paddingInner(.22);
     const y = d3.scaleLinear().domain([0, (d3.max(data, d => d[0] + d[1]) || 1) * 1.05]).range([f.ih, 0]).nice();
-    NOLA.yGrid(f, y, 5, d3.format(','));
+    NOLA.yGrid(f, y, 5, d3.format(',~d'));
     data.forEach((d, k) => { let y0 = 0; [1, 0].forEach(s => { const v = d[s]; if (!v) return;
-      f.g.append('rect').attr('x', x(years[k])).attr('width', x.bandwidth()).attr('y', y(y0 + v)).attr('height', Math.max(.5, y(y0) - y(y0 + v))).attr('fill', C[s][1]).attr('opacity', partialYear(years[k]) ? .55 : 1); y0 += v; }); });
-    data.forEach((d, k) => { if (partialYear(years[k])) f.g.append('text').attr('class', 'halo').attr('x', x(years[k]) + x.bandwidth()).attr('y', y(d[0] + d[1]) - 5).attr('text-anchor', 'end').style('fill', 'var(--ink2)').text('to ' + lastLabel); });
-    f.g.selectAll('rect.h').data(years).join('rect').attr('class', 'h').attr('x', yy => x(yy) - 2).attr('width', x.step()).attr('height', f.ih).attr('fill', 'transparent')
+      f.g.append('rect').attr('x', x(years[k])).attr('width', x.bandwidth()).attr('y', y(y0 + v)).attr('height', Math.max(.5, y(y0) - y(y0 + v))).attr('fill', C[s][1]).attr('opacity', partialYear(years[k]) ? .45 : 1); y0 += v; }); });
+    data.forEach((d, k) => { if (partialYear(years[k]) && d[0] + d[1]) f.g.append('text').attr('class', 'halo').attr('x', x(years[k]) + x.bandwidth()).attr('y', y(d[0] + d[1]) - 5).attr('text-anchor', 'end').style('fill', 'var(--ink2)').text('to ' + lastLabel); });
+    f.g.selectAll('rect.h').data(years).join('rect').attr('class', 'h').attr('x', yy => x(yy) - x.step() * x.paddingInner() / 2).attr('width', x.step()).attr('height', f.ih).attr('fill', 'transparent')
       .on('mousemove', (ev, yy) => { const d = data[years.indexOf(yy)];
-        tip.show(`<b>Filed in ${yy}${partialYear(yy) ? ', through ' + lastLabel : ''}</b>` + (st.nb >= 0 ? `<div style="color:var(--ink2)">${nbName(st.nb)}</div>` : '') + row('Cases', fmt(d[0] + d[1])) + C.map(([l, c], s) => row(sw(c) + l, fmt(d[s]))).join(''), ev); }).on('mouseleave', tip.hide);
+        tip.show(`<b>Filed in ${yy}${partialYear(yy) ? ', through ' + lastLabel : ''}</b>` + `<div style="color:var(--ink2)">${st.kind === 'grass' ? 'Overgrown lots' : 'Code enforcement'}${st.nb >= 0 ? ' · ' + nbName(st.nb) : ''}</div>` + row('Cases', fmt(d[0] + d[1])) + C.map(([l, c], s) => row(sw(c) + l, fmt(d[s]))).join(''), ev); }).on('mouseleave', tip.hide);
     f.g.selectAll('text.x').data(years).join('text').attr('class', 'x').attr('x', yy => x(yy) + x.bandwidth() / 2).attr('y', f.ih + 18).attr('text-anchor', 'middle').text(yy => f.iw < 420 ? "'" + String(yy).slice(2) : yy);
     f.g.append('line').attr('x1', 0).attr('x2', f.iw).attr('y1', f.ih).attr('y2', f.ih).attr('stroke', 'var(--axis)');
   }
@@ -939,13 +1059,13 @@ const NOLA = (() => {
     const narrow = (plot.clientWidth || 600) < 600, rh = narrow ? 42 : 30;
     const f = NOLA.frame(plot, { h: 30 + rows.length * rh, m: { t: 4, r: 46, b: 24, l: narrow ? 6 : labelW } });
     const mx = d3.max(rows, r => Math.max(d3.sum(r.a), prev ? r.prev || 0 : 0)) || 1;
-    const x = d3.scaleLinear().domain([0, mx * 1.04]).range([0, f.iw]).nice();
+    const x = d3.scaleLinear().domain([0, Math.max(4, mx * 1.04)]).range([0, f.iw]).nice();
     f.g.append('g').attr('class', 'gridl').attr('transform', `translate(0,${f.ih})`).call(d3.axisBottom(x).ticks(5).tickSize(-f.ih).tickFormat(d3.format('~s'))).call(g => g.select('.domain').remove());
     f.g.selectAll('.gridl .tick line').attr('stroke', 'var(--grid)');
     rows.forEach((r, i) => {
       const y0 = i * rh, cy = y0 + rh - (narrow ? 11 : 15);
       f.g.append('text').attr('x', narrow ? 0 : -10).attr('y', narrow ? y0 + 13 : cy + 4).attr('text-anchor', narrow ? 'start' : 'end').style('fill', r.on ? 'var(--ink)' : 'var(--ink2)').style('font-weight', r.on ? 650 : null).text(r.name);
-      let x0 = 0; r.a.forEach((v, k) => { if (!v) return; f.g.append('rect').attr('x', x(x0)).attr('width', Math.max(.5, x(x0 + v) - x(x0) - .5)).attr('y', cy - 7).attr('height', 14).attr('fill', colors[k]); x0 += v; });
+      let x0 = 0; r.a.forEach((v, k) => { if (!v) return; f.g.append('rect').attr('x', x(x0)).attr('width', Math.max(.5, x(x0 + v) - x(x0) - .5)).attr('y', cy - 7).attr('height', 14).attr('fill', colors[k]).attr('opacity', r.dim ? .45 : 1); x0 += v; });
       if (prev && r.prev != null) f.g.append('line').attr('x1', x(r.prev)).attr('x2', x(r.prev)).attr('y1', cy - 10).attr('y2', cy + 10).attr('stroke', 'var(--ink)').attr('stroke-width', 2);
       f.g.append('text').attr('x', x(Math.max(x0, prev ? r.prev || 0 : 0)) + 6).attr('y', cy + 4).style('fill', 'var(--ink2)').text(fmt(x0));
       f.g.append('rect').attr('x', narrow ? 0 : -f.m.l).attr('width', f.iw + (narrow ? 0 : f.m.l)).attr('y', y0).attr('height', rh).attr('fill', 'transparent').style('cursor', onClick ? 'pointer' : null)
@@ -958,9 +1078,11 @@ const NOLA = (() => {
     const { panel, plot } = staged(pane, first);
     panel.innerHTML = '';
     NOLA.nbPick(NOLA.fsec(panel, 'Neighborhood'), st.nb, v => set('nb', v));
-    const A = D.openAge[st.nb >= 0 ? st.nb : 72];
-    kvList(NOLA.fsec(panel, `Open for · ${fmt(d3.sum(A, r => d3.sum(r)))} cases`), AGE_L.map((l, a) => [l, AGE_C[a], fmt(d3.sum(A, r => r[a]))]));
-    const rows = STAGE.map((s, k) => ({ k, name: s, a: A[k], on: k === st.stage })).filter(r => d3.sum(r.a));
+    const A = D.openAge[st.nb >= 0 ? st.nb : 72], sel = st.stage >= 0 ? [A[st.stage]] : A;
+    NOLA.kv(NOLA.fsec(panel, `Open for · ${st.stage >= 0 ? STAGE[st.stage] : 'all stages'}`, st.stage >= 0 ? ['All stages', () => set('stage', -1)] : null),
+      [...AGE_L.map((l, a) => [l, AGE_C[a], fmt(d3.sum(sel, r => r[a]))]), ['Total', null, fmt(d3.sum(sel, r => d3.sum(r)))]]);
+    const rows = STAGE.map((s, k) => ({ k, name: s, a: A[k], on: k === st.stage, dim: st.stage >= 0 && k !== st.stage })).filter(r => d3.sum(r.a));
+    if (!rows.length) { plot.innerHTML = `<div class="legend">No open cases${st.nb >= 0 ? ' in ' + nbName(st.nb) : ''}.</div>`; return; }
     barRows(plot, rows, AGE_C, { labelW: 130,
       tipFor: r => `<b>${r.name}</b><div style="color:var(--ink2)">Open cases${st.nb >= 0 ? ', ' + nbName(st.nb) : ''}</div>` + row('Total', fmt(d3.sum(r.a))) + AGE_L.map((l, a) => row(sw(AGE_C[a]) + l, fmt(r.a[a]))).join(''),
       onClick: r => set('stage', st.stage === r.k ? -1 : r.k) });
@@ -970,17 +1092,17 @@ const NOLA = (() => {
   function drawHear(pane, first) {
     const { panel, plot } = staged(pane, first);
     panel.innerHTML = '';
-    kvList(NOLA.fsec(panel, `Hearings held since ${D.years[0]}`), D.hearGroups.map((g, k) => [HEAR_L[g] || g, HEAR_C[k], fmt(d3.sum(D.hear, d => d[k]))]));
-    kvList(NOLA.fsec(panel, 'Scheduled'), [['After ' + lastLabel, null, fmt(D.upcoming)]]);
+    NOLA.kv(NOLA.fsec(panel, `Hearings since ${D.years[0]} · ${fmt(d3.sum(D.hear, d => d3.sum(d)))}`), D.hearGroups.map((g, k) => [HEAR_L[g] || g, HEAR_C[k], fmt(d3.sum(D.hear, d => d[k]))]));
+    NOLA.kv(NOLA.fsec(panel, 'Scheduled'), [['After ' + lastLabel, null, fmt(D.upcoming)]]);
     plot.innerHTML = '';
     const f = NOLA.frame(plot, { h: 340, m: { t: 18, r: 10, b: 28, l: 44 } });
     const x = d3.scaleBand().domain(D.years).range([0, f.iw]).paddingInner(.22);
-    const y = d3.scaleLinear().domain([0, (d3.max(D.hear, d => d3.sum(d)) || 1) * 1.05]).range([f.ih, 0]).nice();
-    NOLA.yGrid(f, y, 5, d3.format(','));
+    const y = d3.scaleLinear().domain([0, Math.max(4, (d3.max(D.hear, d => d3.sum(d)) || 0) * 1.05)]).range([f.ih, 0]).nice();
+    NOLA.yGrid(f, y, 5, d3.format(',~d'));
     D.hear.forEach((d, k) => { let y0 = 0; d.forEach((v, g) => { if (!v) return;
-      f.g.append('rect').attr('x', x(D.years[k])).attr('width', x.bandwidth()).attr('y', y(y0 + v)).attr('height', Math.max(.5, y(y0) - y(y0 + v))).attr('fill', HEAR_C[g]).attr('opacity', partialYear(D.years[k]) ? .55 : 1); y0 += v; }); });
+      f.g.append('rect').attr('x', x(D.years[k])).attr('width', x.bandwidth()).attr('y', y(y0 + v)).attr('height', Math.max(.5, y(y0) - y(y0 + v))).attr('fill', HEAR_C[g]).attr('opacity', partialYear(D.years[k]) ? .45 : 1); y0 += v; }); });
     D.hear.forEach((d, k) => { if (partialYear(D.years[k])) f.g.append('text').attr('class', 'halo').attr('x', x(D.years[k]) + x.bandwidth()).attr('y', y(d3.sum(d)) - 5).attr('text-anchor', 'end').style('fill', 'var(--ink2)').text('to ' + lastLabel); });
-    f.g.selectAll('rect.h').data(D.years).join('rect').attr('class', 'h').attr('x', yy => x(yy) - 2).attr('width', x.step()).attr('height', f.ih).attr('fill', 'transparent')
+    f.g.selectAll('rect.h').data(D.years).join('rect').attr('class', 'h').attr('x', yy => x(yy) - x.step() * x.paddingInner() / 2).attr('width', x.step()).attr('height', f.ih).attr('fill', 'transparent')
       .on('mousemove', (ev, yy) => { const d = D.hear[D.years.indexOf(yy)];
         tip.show(`<b>Hearings in ${yy}${partialYear(yy) ? ', through ' + lastLabel : ''}</b>` + row('Total', fmt(d3.sum(d))) + D.hearGroups.map((g, k) => d[k] ? row(sw(HEAR_C[k]) + (HEAR_L[g] || g), fmt(d[k])) : '').join(''), ev); }).on('mouseleave', tip.hide);
     f.g.selectAll('text.x').data(D.years).join('text').attr('class', 'x').attr('x', yy => x(yy) + x.bandwidth() / 2).attr('y', f.ih + 18).attr('text-anchor', 'middle').text(yy => f.iw < 420 ? "'" + String(yy).slice(2) : yy);
@@ -992,9 +1114,7 @@ const NOLA = (() => {
   function drawViol(pane, first) {
     const { panel, plot } = staged(pane, first);
     panel.innerHTML = '';
-    const sec = NOLA.fsec(panel, 'Violations cited');
-    kvList(sec, [['Past 12 months', 'var(--s1)', fmt(D.violTotal[0])], ['12 months before', null, fmt(D.violTotal[1])]]);
-    sec.querySelector('.srages span:last-child i').className = 'tickkey';
+    NOLA.kv(NOLA.fsec(panel, 'All violations cited'), [['Past 12 months', 'var(--s1)', fmt(D.violTotal[0])], ['12 months before', '|var(--ink)', fmt(D.violTotal[1])]]);
     const rows = D.viol.slice(0, 15).map(v => ({ name: vName(v[0]), code: vCode(v[0]), a: [v[1]], prev: v[2] }));
     barRows(plot, rows, ['var(--s1)'], { prev: true, labelW: 220,
       tipFor: r => `<b>${r.name}</b>${r.code ? `<div style="color:var(--ink2)">City Code section 26-${r.code}</div>` : ''}` + row('Cited, past 12 months', fmt(r.a[0])) + row('12 months before', fmt(r.prev)) });
@@ -1002,17 +1122,18 @@ const NOLA = (() => {
 
   // ---------- inspections per month ----------
   const imon = D.insp.map((a, k) => ({ k, y: D.years[0] + Math.floor(k / 12), mo: k % 12, a }));
+  const isMonthEnd = iso => { const d = new Date(iso + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + 1); return d.getUTCDate() === 1; };
   function drawInsp(pane, first) {
     const { panel, plot } = staged(pane, first);
     panel.innerHTML = '';
-    NOLA.flist(NOLA.fsec(panel, `Inspections since ${D.years[0]}`, st.ig >= 0 ? ['Show all', () => set('ig', -1)] : null),
+    NOLA.flist(NOLA.fsec(panel, 'Inspection type', st.ig >= 0 ? ['Show all', () => set('ig', -1)] : null),
       D.inspGroups.map((g, k) => ({ key: k, name: g, color: INSP_C[k], count: d3.sum(imon, d => d.a[k]) })), { pressed: k => st.ig === k, onClick: toggle('ig') });
     plot.innerHTML = '';
     const f = NOLA.frame(plot, { h: 320, m: { t: 14, r: 10, b: 28, l: 44 } });
     const x = d3.scaleBand().domain(imon.map(d => d.k)).range([0, f.iw]).paddingInner(.15);
     const show = g => st.ig < 0 || g === st.ig, tot = d => d3.sum(d.a.filter((v, g) => show(g)));
-    const y = d3.scaleLinear().domain([0, (d3.max(imon, tot) || 1) * 1.05]).range([f.ih, 0]).nice();
-    NOLA.yGrid(f, y, 5, d3.format(','));
+    const y = d3.scaleLinear().domain([0, Math.max(4, (d3.max(imon, tot) || 0) * 1.05)]).range([f.ih, 0]).nice();
+    NOLA.yGrid(f, y, 5, d3.format(',~d'));
     const lastMonthPartial = !isMonthEnd(D.last);
     imon.forEach(d => { let y0 = 0; d.a.forEach((v, g) => { if (!v || !show(g)) return;
       f.g.append('rect').attr('x', x(d.k)).attr('width', x.bandwidth()).attr('y', y(y0 + v)).attr('height', Math.max(.5, y(y0) - y(y0 + v))).attr('fill', INSP_C[g]).attr('opacity', d.k === imon.length - 1 && lastMonthPartial ? .45 : 1); y0 += v; }); });
@@ -1022,14 +1143,13 @@ const NOLA = (() => {
     f.g.selectAll('text.x').data(imon.filter(d => d.mo === 0 && d.y % step === 0)).join('text').attr('class', 'x').attr('x', d => x(d.k)).attr('y', f.ih + 18).text(d => d.y);
     f.g.append('line').attr('x1', 0).attr('x2', f.iw).attr('y1', f.ih).attr('y2', f.ih).attr('stroke', 'var(--axis)');
   }
-  const isMonthEnd = iso => { const d = new Date(iso + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + 1); return d.getUTCDate() === 1; };
 
   // each chart's City dataset (Download CSV links there)
   const DS = { cases: [D.ds[0], 'Code Enforcement All Cases'], viol: [D.ds[1], 'Code Enforcement All Violations'], insp: [D.ds[2], 'Code Enforcement All Inspections'],
                hear: [D.ds[3], 'Code Enforcement All Hearings'], grass: [D.ds[4], 'Grass Cutting (Lot Abatement/Chapter 66)'], abate: [D.ds[5], 'Code Enforcement - Abatements'] };
   const V = NOLA.views([
-    { id: 'map', label: 'Code enforcement by neighborhood', tab: 'Map of cases', keep: true, draw: drawMap, ds: () => DS[st.measure] || DS.cases },
-    { id: 'years', label: 'Cases filed per year', draw: drawYears, ds: () => st.kind === 'grass' ? DS.grass : DS.cases },
+    { id: 'map', label: () => MAP_L[st.measure], tab: 'Map of cases', keep: true, draw: drawMap, ds: () => DS[st.measure] || DS.cases },
+    { id: 'years', label: () => KIND_L[st.kind], tab: 'Cases filed per year', draw: drawYears, ds: () => st.kind === 'grass' ? DS.grass : DS.cases },
     { id: 'open', label: 'Open cases, by stage and how long they have been open', tab: 'Open cases', draw: drawOpen, ds: DS.cases },
     { id: 'violations', label: 'Most cited violations, past 12 months', tab: 'Violations', draw: drawViol, ds: DS.viol },
     { id: 'hearings', label: 'Hearing results per year', tab: 'Hearings', draw: drawHear, ds: DS.hear },
