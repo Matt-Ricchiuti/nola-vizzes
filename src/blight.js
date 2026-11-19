@@ -29,59 +29,98 @@
   const set = (k, v) => { st[k] = v; V.refresh(); };
   const toggle = k => v => set(k, st[k] === v ? -1 : v);
 
-  // ---------- per-neighborhood numbers ----------
-  const openOf = (nb, stage = st.stage) => { const a = D.openAge[nb]; return stage >= 0 ? d3.sum(a[stage]) : d3.sum(a, r => d3.sum(r)); };
-  const newOf = (nb, res = st.res) => res >= 0 ? D.new12[nb][res] : d3.sum(D.new12[nb]);
-  const raw = i => st.measure === 'open' ? openOf(i) : st.measure === 'new' ? newOf(i) : st.measure === 'grass' ? D.g12[i] : D.abOpen[i];
-  const val = i => st.basis === 'hu' ? perHU(raw(i), i) : raw(i);
-  const MEAS = { open: 'Open code enforcement cases', new: 'Cases filed in the past 12 months', grass: 'Overgrown-lot cases, past 12 months', abate: 'Properties in abatement' };
-  const MAP_L = { open: 'Open code enforcement cases, by neighborhood', new: 'Code enforcement cases filed in the past 12 months, by neighborhood',
-                  grass: 'Overgrown-lot cases filed in the past 12 months, by neighborhood', abate: 'Properties in abatement, by neighborhood' };
-  const keyLabel = () => MEAS[st.measure] + (st.basis === 'hu' ? ' per 1,000 homes' : '');
+  // ---------- map: a dot per case ----------
+  // Open cases (any age), cases filed in the past 12 months, grass-cutting cases (open, or filed in the past 12
+  // months) and properties in abatement, one dot each (D.dots, from the pipeline). The heatmap (a checkbox on the map)
+  // counts the dots shown per neighborhood.
+  const C = NOLA.dotData(D.dots.cases), G = NOLA.dotData(D.dots.grass), A = NOLA.dotData(D.dots.abate);
+  const LASTD = C.dayOf(D.last), WIN0 = C.dayOf(D.winStart);
+  const AGE_D = [90, 365, 730, 1826], ageBucket = (P, i) => { const a = LASTD - P.day[i]; let k = 0; while (k < 4 && a >= AGE_D[k]) k++; return k; };
+  st.per = ['1', '6', '12', 'all'].includes(H.p) ? H.p : '12';
+  st.stat = ['open', 'closed'].includes(H.stat) ? H.stat : 'all';
+  st.age = H.age != null && +H.age >= 0 && +H.age < 5 ? +H.age : -1;
+  st.heat = H.heat === '1';
+  const SETS = { open: C, new: C, grass: G, abate: A };
+  const statOk = o => st.stat === 'all' || (st.stat === 'open') === (o === 1);
+  // the tab's filters, apart from neighborhood
+  const base = {
+    open: i => C.o[i] === 1 && (st.stage < 0 || C.s[i] === st.stage) && (st.age < 0 || ageBucket(C, i) === st.age),
+    new: i => C.day[i] >= WIN0 && NOLA.inPeriod(C.day[i], LASTD, st.per === 'all' ? '12' : st.per) && (st.res < 0 || C.i[i] === st.res) && statOk(C.o[i]),
+    grass: i => (st.per === 'all' ? true : NOLA.inPeriod(G.day[i], LASTD, st.per)) && statOk(G.o[i]),
+    abate: () => true,
+  };
+  const COL = {
+    open: { colors: STAGE_C, color: i => Math.max(0, C.s[i]) },
+    new: { colors: [...NEW_L.map(([, c]) => [c, .5]), ...NEW_L.map(([, c]) => c)], color: i => (C.o[i] ? 3 : 0) + C.i[i] },
+    grass: { colors: [['var(--s4)', .5], 'var(--s4)'], color: i => G.o[i] },
+    abate: { colors: ['var(--s2)'], color: () => 0 },
+  };
+  let nbCnt = new Array(72).fill(0);
+  const MEAS = { open: 'Open code enforcement cases', new: 'Cases filed', grass: 'Overgrown-lot cases', abate: 'Properties in abatement' };
+  const perL = { 1: 'past month', 6: 'past 6 months', 12: 'past 12 months', all: '' };
+  const MAP_L = { open: 'Open code enforcement cases', new: () => `Code enforcement cases filed in the ${perL[st.per === 'all' ? '12' : st.per]}`,
+                  grass: () => st.per === 'all' ? 'Overgrown-lot cases, open or filed in the past 12 months' : `Overgrown-lot cases filed in the ${perL[st.per]}`, abate: 'Properties in abatement' };
+  const keyLabel = () => MEAS[st.measure] + ' shown' + (st.basis === 'hu' ? ' per 1,000 homes' : '') + ', by neighborhood';
+  const heatVal = i => st.basis === 'hu' ? perHU(nbCnt[i], i) : nbCnt[i];
+  const status = (P, i) => P.o && P.o[i] === 0 ? 'Closed' : 'Open' + (P.day[i] >= 0 ? `, ${fmt(LASTD - P.day[i])} days` : '');
 
-  // ---------- map ----------
   let m;
   function drawMap(pane, first) {
     const { panel, plot } = staged(pane, first, true);
     panel.innerHTML = '';
+    const P = SETS[st.measure], ok = base[st.measure], inNb = i => st.nb < 0 || P.nb[i] === st.nb;
+    nbCnt = new Array(72).fill(0); let shown = 0;
+    for (let i = 0; i < P.n; i++) if (ok(i)) { nbCnt[P.nb[i]]++; if (inNb(i)) shown++; }
+    // counts for a filter's rows: every other filter applies
+    const countBy = (key, nOf, test) => { const c = new Array(nOf).fill(0); for (let i = 0; i < P.n; i++) if (inNb(i) && test(i)) c[key(i)]++; return c; };
     NOLA.ftabs(panel, [['open', 'Open cases'], ['new', 'New cases'], ['grass', 'Overgrown lots'], ['abate', 'Abatement']], st.measure, v => set('measure', v));
     NOLA.nbPick(NOLA.fsec(panel, 'Neighborhood'), st.nb, v => set('nb', v));
-    const nbs = st.nb >= 0 ? [st.nb] : d3.range(72);
-    if (st.measure === 'open')
-      NOLA.flist(NOLA.fsec(panel, `Stage · ${fmt(d3.sum(nbs, nb => openOf(nb, -1)))}`, st.stage >= 0 ? ['All stages', () => set('stage', -1)] : null),
-        STAGE.map((s, k) => ({ key: k, name: s, color: STAGE_C[k], count: d3.sum(nbs, nb => openOf(nb, k)) })), { pressed: k => st.stage === k, onClick: toggle('stage') });
-    else if (st.measure === 'new')
-      NOLA.flist(NOLA.fsec(panel, `First inspection · ${fmt(d3.sum(nbs, nb => newOf(nb, -1)))}`, st.res >= 0 ? ['Show all', () => set('res', -1)] : null),
-        NEW_L.map(([l, c], k) => ({ key: k, name: l, color: c, count: d3.sum(nbs, nb => D.new12[nb][k]) })), { pressed: k => st.res === k, onClick: toggle('res') });
-    else if (st.measure === 'grass')
-      NOLA.kv(NOLA.fsec(panel, 'Overgrown lots'), [['Cases filed, past 12 months', null, fmt(d3.sum(nbs, nb => D.g12[nb]))]]);
-    else {
-      NOLA.kv(NOLA.fsec(panel, 'Abatement'), [['Properties in abatement now', null, fmt(d3.sum(nbs, nb => D.abOpen[nb]))]]);
+    if (st.measure === 'open') {
+      const sc = countBy(i => C.s[i], STAGE.length, i => C.o[i] === 1 && C.s[i] >= 0 && (st.age < 0 || ageBucket(C, i) === st.age));
+      NOLA.flist(NOLA.fsec(panel, `Stage · ${fmt(shown)} shown`, st.stage >= 0 ? ['All stages', () => set('stage', -1)] : null),
+        STAGE.map((s, k) => ({ key: k, name: s, color: STAGE_C[k], count: sc[k] })), { pressed: k => st.stage === k, onClick: toggle('stage') });
+      const ac = countBy(i => ageBucket(C, i), 5, i => C.o[i] === 1 && (st.stage < 0 || C.s[i] === st.stage));
+      NOLA.flist(NOLA.fsec(panel, 'Open for', st.age >= 0 ? ['Any time', () => set('age', -1)] : null),
+        AGE_L.map((l, k) => ({ key: k, name: l, color: AGE_C[k], count: ac[k], square: true })), { pressed: k => st.age === k, onClick: toggle('age') });
+    } else if (st.measure === 'new') {
+      NOLA.periodSeg(NOLA.fsec(panel, 'Filed in the last'), st.per === 'all' ? '12' : st.per, v => set('per', v), NOLA.PERIODS.slice(0, 3));
+      NOLA.seg(NOLA.fsec(panel, 'Status'), [['all', 'All'], ['open', 'Open'], ['closed', 'Closed']], st.stat, v => set('stat', v));
+      const rc = countBy(i => C.i[i], 3, i => C.day[i] >= WIN0 && NOLA.inPeriod(C.day[i], LASTD, st.per === 'all' ? '12' : st.per) && statOk(C.o[i]));
+      NOLA.flist(NOLA.fsec(panel, `First inspection · ${fmt(shown)} shown`, st.res >= 0 ? ['Show all', () => set('res', -1)] : null),
+        NEW_L.map(([l, c], k) => ({ key: k, name: l, color: c, count: rc[k] })), { pressed: k => st.res === k, onClick: toggle('res') });
+    } else if (st.measure === 'grass') {
+      NOLA.periodSeg(NOLA.fsec(panel, 'Filed in the last'), st.per, v => set('per', v), [...NOLA.PERIODS.slice(0, 3), ['all', 'Any time']]);
+      NOLA.seg(NOLA.fsec(panel, 'Status'), [['all', 'All'], ['open', 'Open'], ['closed', 'Closed']], st.stat, v => set('stat', v));
+      NOLA.kv(NOLA.fsec(panel, 'Overgrown lots'), [['Cases shown', null, fmt(shown)]]);
+    } else {
+      NOLA.kv(NOLA.fsec(panel, 'Abatement'), [['Properties in abatement now', 'var(--s2)', fmt(shown)]]);
       const top = D.abEnd.slice(0, 6), rest = d3.sum(D.abEnd.slice(6), d => d[1]);
       NOLA.kv(NOLA.fsec(panel, 'How closed cases ended, citywide'), [...top.map(([k, n]) => [k === 'Not stated' ? 'No reason given' : sentence(k), null, fmt(n)]), ...(rest ? [['Other reasons', null, fmt(rest)]] : [])]);
     }
-    const leg = document.createElement('div'); leg.className = 'legend'; NOLA.fsec(panel, keyLabel()).appendChild(leg);
     if (first) {
-      m = NOLA.map(plot, { panel, label: 'Map of code enforcement by neighborhood', tip: mapTip });
+      m = NOLA.map(plot, { panel, label: 'Map of code enforcement cases', tip: mapTip });
       m.lastNb = -1;
-      plot.insertAdjacentHTML('beforeend', '<div class="maplegend"></div>');
     }
-    NOLA.mapChecks(plot, [{ key: 'per', label: 'Per 1k homes', checked: st.basis === 'hu', onChange: on => set('basis', on ? 'hu' : 'n') }]);
-    const cl = NOLA.classes(d3.range(72).map(val));
-    m.setFill(i => cl.color(val(i)));
-    const none = d3.range(72).some(i => val(i) == null) ? `Under ${MIN_HU} homes` : null, lf = NOLA.short;
-    NOLA.stepLegend(leg, cl, lf, none);
-    const ml = plot.querySelector('.maplegend'); NOLA.stepLegend(ml, cl, lf, none);
-    const sub = st.measure === 'open' && st.stage >= 0 ? STAGE[st.stage] : st.measure === 'new' && st.res >= 0 ? NEW_L[st.res][0] : '';
-    ml.insertAdjacentHTML('afterbegin', `<div class="mlh">${keyLabel()}${sub ? ' · ' + sub : ''}</div>`);
+    const col = COL[st.measure];
+    m.dots({ x: P.x, y: P.y, n: P.n, colors: col.colors, color: col.color, visible: i => ok(i) && inNb(i), r: NOLA.dotR, tip: i => dotTip(P, i) });
+    NOLA.heatToggle(plot, st.heat, on => set('heat', on), { label: 'Per 1k homes', checked: st.basis === 'hu', onChange: on => set('basis', on ? 'hu' : 'n') });
+    const cl = st.heat ? NOLA.classes(d3.range(72).map(heatVal)) : null;
+    m.setFill(cl ? i => cl.color(heatVal(i)) : () => null);
+    NOLA.heatKey(panel, plot, cl, keyLabel(), NOLA.short, cl && d3.range(72).some(i => heatVal(i) == null) ? `Under ${MIN_HU} homes` : null);
     if (m.lastNb !== st.nb) { m.focus(st.nb, first ? 0 : 450); m.lastNb = st.nb; }
   }
+  function dotTip(P, i) {
+    const nb = row('Neighborhood', nbName(P.nb[i]));
+    if (P === A) return '<b>Property in abatement</b>' + nb;
+    const filed = row('Filed', NOLA.isoDate(P.iso(P.day[i])));
+    if (P === G) return '<b>Overgrown-lot case</b>' + filed + row('Status', status(G, i)) + nb;
+    return '<b>Code enforcement case</b>' + filed + row('Status', status(C, i)) + (C.o[i] === 1 && C.s[i] >= 0 ? row('Stage', STAGE[C.s[i]]) : '')
+      + row('First inspection', NEW_L[C.i[i]][0]) + nb;
+  }
   function mapTip(i) {
-    const r = perHU(raw(i), i);
-    return `<b>${GEO.nb[i].name}</b>` + row('Open cases', fmt(openOf(i, -1))) + (st.stage >= 0 && st.measure === 'open' ? row('Open, ' + STAGE[st.stage].toLowerCase(), fmt(openOf(i))) : '')
-      + row('Cases filed, past 12 months', fmt(newOf(i, -1))) + (st.res >= 0 && st.measure === 'new' ? row('Filed, ' + NEW_L[st.res][0].toLowerCase(), fmt(newOf(i))) : '')
-      + row('Overgrown-lot cases, past 12 months', fmt(D.g12[i])) + row('Properties in abatement', fmt(D.abOpen[i]))
-      + row('Housing units (2020)', fmt(HU[i] || 0)) + (r != null ? row(MEAS[st.measure] + ' per 1,000 homes', NOLA.fmtRate(r)) : '');
+    const r = perHU(nbCnt[i], i);
+    return `<b>${GEO.nb[i].name}</b>` + row(MEAS[st.measure] + ' shown', fmt(nbCnt[i]))
+      + row('Housing units (2020)', fmt(HU[i] || 0)) + (r != null ? row('Per 1,000 homes', NOLA.fmtRate(r)) : '');
   }
 
   // ---------- cases filed per year ----------
@@ -205,7 +244,7 @@
   const DS = { cases: [D.ds[0], 'Code Enforcement All Cases'], viol: [D.ds[1], 'Code Enforcement All Violations'], insp: [D.ds[2], 'Code Enforcement All Inspections'],
                hear: [D.ds[3], 'Code Enforcement All Hearings'], grass: [D.ds[4], 'Grass Cutting (Lot Abatement/Chapter 66)'], abate: [D.ds[5], 'Code Enforcement - Abatements'] };
   const V = NOLA.views([
-    { id: 'map', label: () => MAP_L[st.measure], tab: 'Map of cases', keep: true, draw: drawMap, ds: () => DS[st.measure] || DS.cases },
+    { id: 'map', label: () => { const l = MAP_L[st.measure]; return typeof l === 'function' ? l() : l; }, tab: 'Map of cases', keep: true, draw: drawMap, ds: () => DS[st.measure] || DS.cases },
     { id: 'years', label: () => KIND_L[st.kind], tab: 'Cases filed per year', draw: drawYears, ds: () => st.kind === 'grass' ? DS.grass : DS.cases },
     { id: 'open', label: 'Open cases, by stage and how long they have been open', tab: 'Open cases', draw: drawOpen, ds: DS.cases },
     { id: 'violations', label: 'Most cited violations, past 12 months', tab: 'Violations', draw: drawViol, ds: DS.viol },
@@ -213,5 +252,6 @@
     { id: 'inspections', label: 'Inspections per month', tab: 'Inspections', draw: drawInsp, ds: DS.insp },
   ], { ds: DS.cases,
        state: () => ({ measure: st.measure !== 'open' ? st.measure : null, stage: st.stage >= 0 ? st.stage : null, res: st.res >= 0 ? st.res : null, basis: st.basis !== 'n' ? st.basis : null,
-                       kind: st.kind !== 'ce' ? st.kind : null, ig: st.ig >= 0 ? st.ig : null, nb: st.nb >= 0 ? st.nb : null }) });
+                       kind: st.kind !== 'ce' ? st.kind : null, ig: st.ig >= 0 ? st.ig : null, nb: st.nb >= 0 ? st.nb : null,
+                       p: st.per !== '12' ? st.per : null, stat: st.stat !== 'all' ? st.stat : null, age: st.age >= 0 ? st.age : null, heat: st.heat ? 1 : null }) });
 })();

@@ -16,8 +16,6 @@
   const colorOf = name => { const k = D.S.indexOf(name); return k >= 0 && k < PAL.length ? PAL[k] : name === 'Event and street vendors' ? 'var(--ink2)' : /^(Not stated|Other or not stated)$/.test(name) ? 'var(--landline)' : 'var(--muted)'; };
   const OUT_C = ['var(--s3)', 'var(--s4)', 'var(--muted)', 'var(--s8)', 'var(--s7)', 'var(--s5)'];
   const lastLabel = NOLA.isoDate(D.last).replace(/, \d+$/, ''), YEAR = +D.last.slice(0, 4), partialYear = y => y === YEAR && !D.last.endsWith('-12-31');
-  const pairs = a => { const o = []; for (let i = 0; i < a.length; i += 2) o.push([a[i], a[i + 1]]); return o; };
-  const new12 = D.new12.map(pairs), now = D.now.map(pairs);
   const nby = D.nby.map(a => { const o = []; for (let i = 0; i < a.length; i += 3) o.push(a.slice(i, i + 3)); return o; });
 
   const H = NOLA.hashState();
@@ -28,44 +26,71 @@
   const staged = (el, first, isMap) => { if (first) el._s = NOLA.stage(el, { map: isMap }); return el._s; };
   const set = (k, v) => { st[k] = v; V.refresh(); };
   const toggle = k => v => set(k, st[k] === v ? -1 : v);
-  const sumOf = (list, s) => d3.sum(list.filter(([k]) => s < 0 || k === s), d => d[1]);
-  const newOf = (nb, s = st.sec) => sumOf(new12[nb], s), nowOf = (nb, s = st.sec2) => sumOf(now[nb], s);
-  const val = i => st.measure === 'now' ? nowOf(i) : newOf(i);
-  const keyLabel = () => st.measure === 'now' ? 'Businesses licensed now' : 'New license applications, past 12 months';
+  // ---------- map: a dot per license application (since 2018) or per business licensed now (D.dots) ----------
+  // The heatmap (a checkbox on the map) counts the dots shown per neighborhood.
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const PA = NOLA.dotData(D.dots.apps), PW = NOLA.dotData(D.dots.now), LASTD = PA.dayOf(D.last);
+  st.per = ['1', '6', '12', 'all'].includes(H.p) ? H.p : '12';
+  st.since = ['12', '60'].includes(H.since) ? H.since : 'all';
+  st.out = H.out != null && +H.out >= 0 && +H.out < D.out.length ? +H.out : -1;
+  st.home = ['1', '0'].includes(H.home) ? +H.home : -1;
+  st.heat = H.heat === '1';
+  const isNew = () => st.measure !== 'now';
+  const P = () => isNew() ? PA : PW, SEC = () => isNew() ? D.S : D.S2, sk = () => isNew() ? 'sec' : 'sec2';
+  const okTime = i => isNew() ? NOLA.inPeriod(PA.day[i], LASTD, st.per) : st.since === 'all' || (PW.day[i] >= 0 && PW.day[i] > LASTD - 365 * (+st.since / 12));
+  const okSec = i => st[sk()] < 0 || P().s[i] === st[sk()];
+  const okOut = i => !isNew() || st.out < 0 || PA.o[i] === st.out, okHome = i => !isNew() || st.home < 0 || PA.h[i] === st.home;
+  const okNb = i => st.nb < 0 || P().nb[i] === st.nb;
+  const SCOL = () => SEC().map(colorOf);
+  let nbCnt = new Array(72).fill(0);
+  const perL = { 1: 'past month', 6: 'past 6 months', 12: 'past 12 months', all: '' };
+  const mapLabel = () => isNew() ? (st.per === 'all' ? `Business license applications since ${D.years[0]}` : `New business license applications in the ${perL[st.per]}`) : 'Businesses licensed now';
+  const keyLabel = () => (isNew() ? 'Applications shown' : 'Businesses shown') + ', by neighborhood';
+  const HOME_L = { 1: 'Yes', 0: 'No', '-1': 'Not stated' };
 
-  // ---------- map ----------
   let m;
   function drawMap(pane, first) {
     const { panel, plot } = staged(pane, first, true);
     panel.innerHTML = '';
+    const p = P(), S = SEC(), sc = new Array(S.length).fill(0), oc = new Array(D.out.length).fill(0);
+    nbCnt = new Array(72).fill(0); let shown = 0;
+    for (let i = 0; i < p.n; i++) {
+      if (!okTime(i) || !okHome(i)) continue;
+      const a = okSec(i), b = okOut(i), nb = okNb(i);
+      if (nb && b) sc[p.s[i]]++;
+      if (nb && a && isNew()) oc[PA.o[i]]++;
+      if (a && b) { nbCnt[p.nb[i]]++; if (nb) shown++; }
+    }
     NOLA.ftabs(panel, [['new', 'New applications'], ['now', 'Licensed now']], st.measure, v => set('measure', v));
     NOLA.nbPick(NOLA.fsec(panel, 'Neighborhood'), st.nb, v => set('nb', v));
-    const nbs = st.nb >= 0 ? [st.nb] : d3.range(72);
-    if (st.measure === 'new')
-      NOLA.flist(NOLA.fsec(panel, 'Sector', st.sec >= 0 ? ['Show all', () => set('sec', -1)] : null),
-        D.S.map((s, k) => ({ key: k, name: nm(s), color: colorOf(s), count: d3.sum(nbs, nb => newOf(nb, k)) })), { pressed: k => st.sec === k, onClick: toggle('sec') });
-    else
-      NOLA.flist(NOLA.fsec(panel, 'Sector', st.sec2 >= 0 ? ['Show all', () => set('sec2', -1)] : null),
-        D.S2.map((s, k) => ({ key: k, name: nm(s), color: colorOf(s), count: d3.sum(nbs, nb => nowOf(nb, k)) })), { pressed: k => st.sec2 === k, onClick: toggle('sec2') });
-    const leg = document.createElement('div'); leg.className = 'legend'; NOLA.fsec(panel, keyLabel()).appendChild(leg);
-    if (first) {
-      m = NOLA.map(plot, { panel, label: 'Map of business licenses by neighborhood', tip: mapTip });
-      m.lastNb = -1;
-      plot.insertAdjacentHTML('beforeend', '<div class="maplegend"></div>');
+    if (isNew()) NOLA.periodSeg(NOLA.fsec(panel, 'Filed in the last'), st.per, v => set('per', v));
+    else NOLA.seg(NOLA.fsec(panel, 'Licensed since'), [['12', 'Past year'], ['60', 'Past 5 years'], ['all', 'Any time']], st.since, v => set('since', v));
+    NOLA.flist(NOLA.fsec(panel, `Sector · ${fmt(shown)} shown`, st[sk()] >= 0 ? ['Show all', () => set(sk(), -1)] : null),
+      S.map((s, k) => ({ key: k, name: nm(s), color: colorOf(s), count: sc[k] })), { pressed: k => st[sk()] === k, onClick: toggle(sk()) });
+    if (isNew()) {
+      NOLA.flist(NOLA.fsec(panel, 'Status now', st.out >= 0 ? ['Show all', () => set('out', -1)] : null),
+        D.out.map((o, k) => ({ key: k, name: o, color: OUT_C[k], count: oc[k], square: true })), { pressed: k => st.out === k, onClick: toggle('out') });
+      NOLA.seg(NOLA.fsec(panel, 'Home-based'), [[-1, 'All'], [1, 'Yes'], [0, 'No']], st.home, v => set('home', v));
     }
-    const cl = NOLA.classes(d3.range(72).map(val));
-    m.setFill(i => cl.color(val(i)));
-    NOLA.stepLegend(leg, cl, NOLA.short);
-    const ml = plot.querySelector('.maplegend'); NOLA.stepLegend(ml, cl, NOLA.short);
-    const sel = st.measure === 'now' ? (st.sec2 >= 0 ? nm(D.S2[st.sec2]) : '') : (st.sec >= 0 ? nm(D.S[st.sec]) : '');
-    ml.insertAdjacentHTML('afterbegin', `<div class="mlh">${keyLabel()}${sel ? ' · ' + sel : ''}</div>`);
+    if (first) {
+      m = NOLA.map(plot, { panel, label: 'Map of business licenses', tip: mapTip });
+      m.lastNb = -1;
+    }
+    m.dots({ x: p.x, y: p.y, n: p.n, colors: SCOL(), color: i => p.s[i], visible: i => okTime(i) && okHome(i) && okSec(i) && okOut(i) && okNb(i), r: NOLA.dotR, tip: dotTip });
+    NOLA.heatToggle(plot, st.heat, on => set('heat', on), null);
+    const cl = st.heat ? NOLA.classes(nbCnt) : null;
+    m.setFill(cl ? i => cl.color(nbCnt[i]) : () => null);
+    NOLA.heatKey(panel, plot, cl, keyLabel());
     if (m.lastNb !== st.nb) { m.focus(st.nb, first ? 0 : 450); m.lastNb = st.nb; }
   }
+  function dotTip(i) {
+    const p = P(), sec = SEC()[p.s[i]];
+    const head = `<b>${esc(p.T[p.t[i]])}</b><div style="color:var(--ink2)">${sw(colorOf(sec))}${esc(nm(sec))}</div>`;
+    if (isNew()) return head + row('Filed', NOLA.isoDate(PA.iso(PA.day[i]))) + row('Status now', D.out[PA.o[i]]) + row('Home-based', HOME_L[PA.h[i]]) + row('Neighborhood', nbName(PA.nb[i]));
+    return head + row('Licensed since', PW.day[i] >= 0 ? NOLA.isoDate(PW.iso(PW.day[i])) : 'Not recorded') + row('Neighborhood', nbName(PW.nb[i]));
+  }
   function mapTip(i) {
-    const top = new12[i].filter(([k]) => D.S[k] !== 'Not stated').sort((a, b) => b[1] - a[1] || nm(D.S[a[0]]).localeCompare(nm(D.S[b[0]]))).slice(0, 4);
-    const sel = st.measure === 'now' ? (st.sec2 >= 0 ? row(nm(D.S2[st.sec2]) + ', licensed now', fmt(nowOf(i))) : '') : (st.sec >= 0 ? row(nm(D.S[st.sec]) + ', new', fmt(newOf(i))) : '');
-    return `<b>${GEO.nb[i].name}</b>` + sel + row('New license applications, past 12 months', fmt(newOf(i, -1)))
-      + top.map(([k, n]) => row(sw(colorOf(D.S[k])) + nm(D.S[k]), fmt(n))).join('') + row('Businesses licensed now', fmt(nowOf(i, -1)));
+    return `<b>${GEO.nb[i].name}</b>` + row(isNew() ? 'Applications shown' : 'Businesses shown', fmt(nbCnt[i]));
   }
 
   // ---------- applications per year ----------
@@ -116,10 +141,11 @@
   }
 
   const V = NOLA.views([
-    { id: 'map', label: () => st.measure === 'now' ? 'Businesses licensed now, by neighborhood' : 'New business license applications in the past 12 months, by neighborhood', tab: 'Map of businesses', keep: true, draw: drawMap,
+    { id: 'map', label: mapLabel, tab: 'Map of businesses', keep: true, draw: drawMap,
       ds: () => st.measure === 'now' ? [D.ds[1], 'Occupational Business Licenses'] : [D.ds[0], 'Occupational Business License Data'] },
     { id: 'years', label: 'New business license applications per year', tab: 'Per year', draw: drawYears },
     { id: 'outcomes', label: 'License applications per year, by current status', tab: 'Status', draw: drawOut },
   ], { ds: [D.ds[0], 'Occupational Business License Data'],
-       state: () => ({ measure: st.measure !== 'new' ? st.measure : null, sec: st.sec >= 0 ? st.sec : null, sec2: st.sec2 >= 0 ? st.sec2 : null, nb: st.nb >= 0 ? st.nb : null }) });
+       state: () => ({ measure: st.measure !== 'new' ? st.measure : null, sec: st.sec >= 0 ? st.sec : null, sec2: st.sec2 >= 0 ? st.sec2 : null, nb: st.nb >= 0 ? st.nb : null,
+                       p: st.per !== '12' ? st.per : null, since: st.since !== 'all' ? st.since : null, out: st.out >= 0 ? st.out : null, home: st.home >= 0 ? st.home : null, heat: st.heat ? 1 : null }) });
 })();

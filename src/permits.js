@@ -6,7 +6,6 @@
   const nbName = i => i >= 0 ? GEO.nb[i].name : '—';
   const sw = c => `<i style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${c}"></i> `;
   const CCOL = ['var(--s1)', 'var(--s2)', 'var(--s8)', 'var(--s3)', 'var(--s5)', 'var(--s4)', 'var(--s7)', 'var(--s6)', 'var(--muted)'];
-  const POINTS = [0, 2, 3]; // new construction, demolition, solar and EV chargers: mapped permit by permit
   const lastLabel = NOLA.isoDate(D.last).replace(/, \d+$/, ''), YEAR = +D.last.slice(0, 4), partialYear = y => y === YEAR && !D.last.endsWith('-12-31');
   const win0 = new Date(D.winStart + 'T00:00:00Z'), dayISO = d => new Date(+win0 + d * 864e5).toISOString().slice(0, 10), dayDate = d => NOLA.isoDate(dayISO(d));
   const MIN_HU = 500, perHU = (n, i) => HU[i] >= MIN_HU ? 1000 * n / HU[i] : null;
@@ -20,59 +19,59 @@
   const set = (k, v) => { st[k] = v; V.refresh(); };
   const toggle = k => v => set(k, st[k] === v ? -1 : v);
 
-  // per neighborhood, past 12 months: nbc[nb] = [cat, landUse, n, ...]
-  const nbc = D.nbc.map(a => { const o = []; for (let i = 0; i < a.length; i += 3) o.push(a.slice(i, i + 3)); return o; });
-  const countOf = (nb, cat = st.cat, lu = st.lu) => d3.sum(nbc[nb].filter(([c, l]) => (cat < 0 || c === cat) && (lu < 0 || l === lu)), a => a[2]);
-  const val = i => st.basis === 'hu' ? perHU(countOf(i), i) : countOf(i);
-  const pts = D.pts.map(p => ({ x: p[0], y: p[1], cat: p[2], nb: p[3], lu: p[4], day: p[5] }));
-  const dots = () => POINTS.includes(st.cat);
-  const keyLabel = () => (st.cat >= 0 ? D.cats[st.cat] : 'Permits') + ', past 12 months' + (st.basis === 'hu' && !dots() ? ' per 1,000 homes' : '');
+  // ---------- map: a dot per permit issued in the past 12 months (D.dots, from the pipeline) ----------
+  // The heatmap (a checkbox on the map) counts the dots shown per neighborhood.
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const P = NOLA.dotData(D.dots), LASTD = P.dayOf(D.last);
+  st.per = ['1', '6', '12'].includes(H.p) ? H.p : '12';
+  st.heat = H.heat === '1';
+  const okPer = i => NOLA.inPeriod(P.day[i], LASTD, st.per), okCat = i => st.cat < 0 || P.c[i] === st.cat, okLu = i => st.lu < 0 || P.lu[i] === st.lu;
+  const okNb = i => st.nb < 0 || P.nb[i] === st.nb;
+  // drawn in reverse so the rarer types (listed first) sit on top
+  const ORDER = d3.range(NC).reverse(), COLORS = ORDER.map(c => CCOL[c]), cIdx = new Array(NC); ORDER.forEach((c, k) => cIdx[c] = k);
+  let nbCnt = new Array(72).fill(0);
+  const perL = { 1: 'past month', 6: 'past 6 months', 12: 'past 12 months' };
+  const mapLabel = () => `${st.cat >= 0 ? D.cats[st.cat] + ': permits' : 'Permits'} issued in the ${perL[st.per]}`;
+  const keyLabel = () => 'Permits shown' + (st.basis === 'hu' ? ' per 1,000 homes' : '') + ', by neighborhood';
+  const heatVal = i => st.basis === 'hu' ? perHU(nbCnt[i], i) : nbCnt[i];
 
-  // ---------- map ----------
-  let m, dotG;
+  let m;
   function drawMap(pane, first) {
     const { panel, plot } = staged(pane, first, true);
     panel.innerHTML = '';
+    const cc = new Array(NC).fill(0), lc = new Array(NL).fill(0); nbCnt = new Array(72).fill(0); let shown = 0;
+    for (let i = 0; i < P.n; i++) {
+      if (!okPer(i)) continue;
+      const a = okCat(i), b = okLu(i), nb = okNb(i);
+      if (nb && b) cc[P.c[i]]++;
+      if (nb && a) lc[P.lu[i]]++;
+      if (a && b) { nbCnt[P.nb[i]]++; if (nb) shown++; }
+    }
     NOLA.nbPick(NOLA.fsec(panel, 'Neighborhood'), st.nb, v => set('nb', v));
-    const nbs = st.nb >= 0 ? [st.nb] : d3.range(72);
-    NOLA.flist(NOLA.fsec(panel, 'Permit type', st.cat >= 0 ? ['Show all', () => set('cat', -1)] : null),
-      D.cats.map((c, k) => ({ key: k, name: c, sub: POINTS.includes(k) ? 'Mapped permit by permit' : null, color: CCOL[k], count: d3.sum(nbs, nb => countOf(nb, k, st.lu)) })), { pressed: k => st.cat === k, onClick: toggle('cat') });
+    NOLA.periodSeg(NOLA.fsec(panel, 'Issued in the last'), st.per, v => set('per', v), NOLA.PERIODS.slice(0, 3));
+    NOLA.flist(NOLA.fsec(panel, `Permit type · ${fmt(shown)} shown`, st.cat >= 0 ? ['Show all', () => set('cat', -1)] : null),
+      D.cats.map((c, k) => ({ key: k, name: c, color: CCOL[k], count: cc[k] })), { pressed: k => st.cat === k, onClick: toggle('cat') });
     NOLA.flist(NOLA.fsec(panel, 'Land use', st.lu >= 0 ? ['Show all', () => set('lu', -1)] : null),
-      D.lu.map((l, k) => ({ key: k, name: l, color: 'var(--ink2)', count: d3.sum(nbs, nb => countOf(nb, st.cat, k)) })), { pressed: k => st.lu === k, onClick: toggle('lu') });
-    // the smaller permit types are mapped permit by permit on the plain map; the rest shade neighborhoods
-    const ml = plot.querySelector('.maplegend');
-    let leg = null;
-    if (dots()) NOLA.fsec(panel, keyLabel()).insertAdjacentHTML('beforeend', NOLA.legendHTML([[CCOL[st.cat], 'One permit', 1]]));
-    else {
-      leg = document.createElement('div'); leg.className = 'legend'; NOLA.fsec(panel, keyLabel()).appendChild(leg);
-    }
+      D.lu.map((l, k) => ({ key: k, name: l, color: 'var(--ink2)', count: lc[k] })), { pressed: k => st.lu === k, onClick: toggle('lu') });
     if (first) {
-      m = NOLA.map(plot, { panel, label: 'Map of building permits by neighborhood', tip: mapTip });
-      dotG = m.layer.append('g'); m.lastNb = -1;
-      m.onZoom(k => dotG.selectAll('circle').attr('r', 4 / Math.sqrt(k)).attr('stroke-width', 1.2 / Math.sqrt(k)));
-      plot.insertAdjacentHTML('beforeend', '<div class="maplegend"></div>');
+      m = NOLA.map(plot, { panel, label: 'Map of building permits', tip: mapTip });
+      m.lastNb = -1;
     }
-    const mlg = ml || plot.querySelector('.maplegend');
-    NOLA.mapChecks(plot, [!dots() && { key: 'per', label: 'Per 1k homes', checked: st.basis === 'hu', onChange: on => set('basis', on ? 'hu' : 'n') }]);
-    if (dots()) { m.setFill(() => null); mlg.innerHTML = `<div class="mlh">${keyLabel()}</div>` + NOLA.legendHTML([[CCOL[st.cat], 'One permit', 1]]).replace('class="legend"', 'class="legend" style="margin:0"'); }
-    else {
-      const cl = NOLA.classes(d3.range(72).map(val));
-      m.setFill(i => cl.color(val(i)));
-      const none = d3.range(72).some(i => val(i) == null) ? `Under ${MIN_HU} homes` : null, lf = NOLA.short;
-      NOLA.stepLegend(leg, cl, lf, none); NOLA.stepLegend(mlg, cl, lf, none);
-      mlg.insertAdjacentHTML('afterbegin', `<div class="mlh">${keyLabel()}${st.lu >= 0 ? ' · ' + D.lu[st.lu] : ''}</div>`);
-    }
-    const k = m.k(), shown = dots() ? pts.filter(p => p.cat === st.cat && (st.lu < 0 || p.lu === st.lu) && (st.nb < 0 || p.nb === st.nb)) : [];
-    dotG.selectAll('circle').data(shown).join('circle').attr('cx', p => p.x).attr('cy', p => p.y).attr('r', 4 / Math.sqrt(k))
-      .attr('fill', CCOL[Math.max(0, st.cat)]).attr('stroke', 'var(--surface)').attr('stroke-width', 1.2 / Math.sqrt(k))
-      .on('mousemove', (ev, p) => tip.show(`<b>${D.cats[p.cat]}</b>` + row('Issued', dayDate(p.day)) + row('Land use', D.lu[p.lu]) + row('Neighborhood', nbName(p.nb)), ev)).on('mouseleave', tip.hide);
+    m.dots({ x: P.x, y: P.y, n: P.n, colors: COLORS, color: i => cIdx[P.c[i]], visible: i => okPer(i) && okCat(i) && okLu(i) && okNb(i), r: NOLA.dotR, tip: dotTip });
+    NOLA.heatToggle(plot, st.heat, on => set('heat', on), { label: 'Per 1k homes', checked: st.basis === 'hu', onChange: on => set('basis', on ? 'hu' : 'n') });
+    const cl = st.heat ? NOLA.classes(d3.range(72).map(heatVal)) : null;
+    m.setFill(cl ? i => cl.color(heatVal(i)) : () => null);
+    NOLA.heatKey(panel, plot, cl, keyLabel(), NOLA.short, cl && d3.range(72).some(i => heatVal(i) == null) ? `Under ${MIN_HU} homes` : null);
     if (m.lastNb !== st.nb) { m.focus(st.nb, first ? 0 : 450); m.lastNb = st.nb; }
   }
+  function dotTip(i) {
+    const f = P.f[i];
+    return `<b>${esc(P.T[P.t[i]])}</b><div style="color:var(--ink2)">${sw(CCOL[P.c[i]])}${D.cats[P.c[i]]}</div>` + row('Issued', NOLA.isoDate(P.iso(P.day[i])))
+      + (f >= 0 ? row('Days from application', f === 0 ? 'Same day' : fmt(f)) : '') + row('Land use', D.lu[P.lu[i]]) + row('Neighborhood', nbName(P.nb[i]));
+  }
   function mapTip(i) {
-    const byCat = D.cats.map((c, k) => [k, countOf(i, k, st.lu)]).filter(d => d[1]).sort((a, b) => b[1] - a[1] || D.cats[a[0]].localeCompare(D.cats[b[0]])), r = perHU(countOf(i), i);
-    return `<b>${GEO.nb[i].name}</b><div style="color:var(--ink2)">Permits issued, past 12 months${st.lu >= 0 ? ' · ' + D.lu[st.lu].toLowerCase() : ''}</div>`
-      + row('All types', fmt(countOf(i, -1, st.lu))) + byCat.slice(0, 6).map(([k, n]) => row(sw(CCOL[k]) + D.cats[k], fmt(n))).join('')
-      + row('Housing units (2020)', fmt(HU[i] || 0)) + (r != null ? row((st.cat >= 0 ? D.cats[st.cat] : 'Permits') + ' per 1,000 homes', NOLA.fmtRate(r)) : '');
+    const r = perHU(nbCnt[i], i);
+    return `<b>${GEO.nb[i].name}</b>` + row('Permits shown', fmt(nbCnt[i])) + row('Housing units (2020)', fmt(HU[i] || 0)) + (r != null ? row('Per 1,000 homes', NOLA.fmtRate(r)) : '');
   }
 
   // ---------- permits per year ----------
@@ -135,9 +134,10 @@
   }
 
   const V = NOLA.views([
-    { id: 'map', label: () => dots() ? `${D.cats[st.cat]}: permits issued in the past 12 months` : 'Permits issued in the past 12 months, by neighborhood', tab: 'Map of permits', keep: true, draw: drawMap },
+    { id: 'map', label: mapLabel, tab: 'Map of permits', keep: true, draw: drawMap },
     { id: 'years', label: 'Permits issued per year', tab: 'Per year', draw: drawYears },
     { id: 'days', label: 'Days from application to permit, past 12 months', tab: 'Days to permit', draw: drawDays },
   ], { ds: [D.ds, 'Permits'],
-       state: () => ({ cat: st.cat >= 0 ? st.cat : null, lu: st.lu >= 0 ? st.lu : null, basis: st.basis !== 'n' ? st.basis : null, nb: st.nb >= 0 ? st.nb : null }) });
+       state: () => ({ cat: st.cat >= 0 ? st.cat : null, lu: st.lu >= 0 ? st.lu : null, basis: st.basis !== 'n' ? st.basis : null, nb: st.nb >= 0 ? st.nb : null,
+                       p: st.per !== '12' ? st.per : null, heat: st.heat ? 1 : null }) });
 })();
