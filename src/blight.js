@@ -110,11 +110,11 @@
     if (m.lastNb !== st.nb) { m.focus(st.nb, first ? 0 : 450); m.lastNb = st.nb; }
   }
   function dotTip(P, i) {
-    const nb = row('Neighborhood', nbName(P.nb[i]));
-    if (P === A) return '<b>Property in abatement</b>' + nb;
+    const nb = row('Neighborhood', nbName(P.nb[i])), ad = NOLA.addrRow(P, i);
+    if (P === A) return '<b>Property in abatement</b>' + ad + nb;
     const filed = row('Filed', NOLA.isoDate(P.iso(P.day[i])));
-    if (P === G) return '<b>Overgrown-lot case</b>' + filed + row('Status', status(G, i)) + nb;
-    return '<b>Code enforcement case</b>' + filed + row('Status', status(C, i)) + (C.o[i] === 1 && C.s[i] >= 0 ? row('Stage', STAGE[C.s[i]]) : '')
+    if (P === G) return '<b>Overgrown-lot case</b>' + ad + filed + row('Status', status(G, i)) + nb;
+    return '<b>Code enforcement case</b>' + ad + filed + row('Status', status(C, i)) + (C.o[i] === 1 && C.s[i] >= 0 ? row('Stage', STAGE[C.s[i]]) : '')
       + row('First inspection', NEW_L[C.i[i]][0]) + nb;
   }
   function mapTip(i) {

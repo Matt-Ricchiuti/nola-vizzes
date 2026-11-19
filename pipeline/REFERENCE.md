@@ -6,7 +6,7 @@ The front-end expects exactly the shapes documented below. If you change a shape
 
 ## Dots (`dots` in 311, blight, permits and biz)
 
-Every map's base layer is one dot per record (`NOLA.map().dots`, a canvas). The builders write them from rows they already download, so they cost no extra requests. One `dots` object:
+Every map's base layer is one dot per record (`NOLA.map().dots`, a canvas). The builders write them from rows they already download, so they cost no extra requests (the address columns were added to those same downloads). One `dots` object:
 
 ```
 { "q": 4, "epoch": "2000-01-01", "n": records,
@@ -18,12 +18,14 @@ Every map's base layer is one dot per record (`NOLA.map().dots`, a canvas). The 
 
 Records are sorted by date (then x, y), so a new day's records only add to the end and the committed file changes little. `NOLA.dotData()` decodes one.
 
+Blight, permit and business dots also carry a street address: `a` indexes the list `A` (most shared first; -1 none, -2 withheld). Addresses are the City's, whitespace collapsed, cut to 48 characters, and all-capitals ones put in mixed case. Business addresses are withheld (-2) where the business may be someone's home: applications marked home-based (about 6,400), and current licenses at an address a home-based application names (about 5,900). `NOLA.addrRow(P, i, withheldText)` makes the tooltip row.
+
 | File | `dots` | Columns |
 |---|---|---|
 | 311.json | requests filed in the past 12 months, plus every request still open (any age) | `r` index into `R` ([type index, reason]: the page's `R` plus [type, "Other"] where needed), `c` days to close (-1 open, -2 closed without a close date) |
-| blight.json | `cases`: open, or filed in the past 12 months; `grass`: open, or filed in the past 12 months; `abate`: in abatement now (no dates) | cases: `o` open 1/0, `s` stage index (open cases; -1 closed), `i` first inspection (0 violation, 1 none, 2 not yet or other); grass: `o` |
-| permits.json | every permit issued in the past 12 months (day = issue date) | `c` type (`cats`), `lu` land use, `t` index into `T` (the City's permit type), `f` days from filing to issue (-1 unknown) |
-| biz.json | `apps`: every application since 2018 (day = filed); `now`: every business licensed now (day = business start date; 1900-01-01 counts as not recorded) | apps: `s` sector (`S`), `o` outcome (`out`), `h` home-based 1/0/-1, `t` business type (`T`); now: `s` sector (`S2`), `t` |
+| blight.json | `cases`: open, or filed in the past 12 months; `grass`: open, or filed in the past 12 months; `abate`: in abatement now (no dates) | cases: `o` open 1/0, `s` stage index (open cases; -1 closed), `i` first inspection (0 violation, 1 none, 2 not yet or other); grass: `o`; all three: `a`/`A` (from `geoaddress` for cases, `address` for the others) |
+| permits.json | every permit issued in the past 12 months (day = issue date) | `c` type (`cats`), `lu` land use, `t` index into `T` (the City's permit type), `f` days from filing to issue (-1 unknown), `a`/`A` (`address`) |
+| biz.json | `apps`: every application since 2018 (day = filed); `now`: every business licensed now (day = business start date; 1900-01-01 counts as not recorded) | apps: `s` sector (`S`), `o` outcome (`out`), `h` home-based 1/0/-1, `t` business type (`T`); now: `s` sector (`S2`), `t`; both: `a`/`A` (`address`) |
 
 `cpc.json` keeps its `pts` and adds `ptsInfo`: [address, case number, open 1/0] for each point, in the same order. Short-term rental `pts` carry their own address and license details.
 
@@ -339,9 +341,9 @@ Six datasets. The City replaces each of them in full every night, so the builder
 
 | Dataset | What's fetched |
 |---|---|
-| Code Enforcement All Cases `u6yx-v2tw` | rows with `o_c = 'Open' OR casefiled >= 2016-01-01` (about 47,000; 1 request): `casefiled, o_c, stage, xpos, ypos, initinspresult` |
-| Grass Cutting `xhih-vxs6` | all rows (about 23,500): `casefiled, o_c, longitude, latitude` |
-| Code Enforcement - Abatements `xv8z-gn8b` | all rows (about 7,200): `o_c, stage, xpos, ypos` |
+| Code Enforcement All Cases `u6yx-v2tw` | rows with `o_c = 'Open' OR casefiled >= 2016-01-01` (about 47,000; 1 request): `casefiled, o_c, stage, xpos, ypos, initinspresult, geoaddress` |
+| Grass Cutting `xhih-vxs6` | all rows (about 23,500): `casefiled, o_c, longitude, latitude, address` |
+| Code Enforcement - Abatements `xv8z-gn8b` | all rows (about 7,200): `o_c, stage, xpos, ypos, address` |
 | Code Enforcement All Hearings `44ct-56tr` | API counts by year and `judgment` for hearings from 2016 through "today", and a count of hearings after it |
 | Code Enforcement All Violations `3ehi-je3s` | API counts by `violation` for the past 12 months and the 12 before |
 | Code Enforcement All Inspections `uh5a-f7uw` | API counts by month and `inspectiontype` from 2016 |
@@ -373,7 +375,7 @@ Checked against the API on 2026-11-19: open cases by stage, cases filed in 2025 
 
 ## `data/permits.json`: building permits (`rcm3-fn58`)
 
-The City reloads this dataset in full nightly (about 350,000 rows). The builder asks the API for permits issued per year and `code` since 2012 (one request) and the newest `issuedate`, then downloads only permits issued in the past 12 months (about 17,500 rows): `code, type, filingdate, issuedate, landuse, location_1`. "Today" is the newest `issuedate`.
+The City reloads this dataset in full nightly (about 350,000 rows). The builder asks the API for permits issued per year and `code` since 2012 (one request) and the newest `issuedate`, then downloads only permits issued in the past 12 months (about 17,500 rows): `code, type, filingdate, issuedate, landuse, location_1, address`. "Today" is the newest `issuedate`.
 
 ```
 { "ds", "last", "winStart",
@@ -396,8 +398,8 @@ Checked against the API on 2026-11-19: permits issued in 2025, solar and EV perm
 
 Two datasets, each downloaded whole:
 
-- **Occupational Business License Data for the Office of Business and External Services** (`abc4-h3u3`, about 21,000 rows from 2018): one row per license application. `application_filed, currentstatus, category, businesstype, ishome, longitude, latitude`. This is the "new businesses" source: applications by year filed, NAICS sector (`category`) and neighborhood.
-- **Occupational Business Licenses** (`hjcd-grvu`, about 38,000 rows): businesses holding a license now. `businesstype, businessstartdate, longitude, latitude`. It has no sector column, so each business type gets the sector the applications most often pair with it (types are matched ignoring case and spacing before parentheses). Special event, Mardi Gras, flea market and street-artist licenses are "Event and street vendors"; unmatched types are "Other or not stated". It lists only businesses licensed now, so it isn't used to count openings over time (businesses that closed are missing).
+- **Occupational Business License Data for the Office of Business and External Services** (`abc4-h3u3`, about 21,000 rows from 2018): one row per license application. `application_filed, currentstatus, category, businesstype, ishome, longitude, latitude, address`. This is the "new businesses" source: applications by year filed, NAICS sector (`category`) and neighborhood.
+- **Occupational Business Licenses** (`hjcd-grvu`, about 38,000 rows): businesses holding a license now. `businesstype, businessstartdate, longitude, latitude, address`. It has no sector column, so each business type gets the sector the applications most often pair with it (types are matched ignoring case and spacing before parentheses). Special event, Mardi Gras, flea market and street-artist licenses are "Event and street vendors"; unmatched types are "Other or not stated". It lists only businesses licensed now, so it isn't used to count openings over time (businesses that closed are missing).
 
 "Today" is the newest `application_filed`.
 

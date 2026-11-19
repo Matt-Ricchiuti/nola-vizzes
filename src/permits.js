@@ -66,7 +66,7 @@
   }
   function dotTip(i) {
     const f = P.f[i];
-    return `<b>${esc(P.T[P.t[i]])}</b><div style="color:var(--ink2)">${sw(CCOL[P.c[i]])}${D.cats[P.c[i]]}</div>` + row('Issued', NOLA.isoDate(P.iso(P.day[i])))
+    return `<b>${esc(P.T[P.t[i]])}</b><div style="color:var(--ink2)">${sw(CCOL[P.c[i]])}${D.cats[P.c[i]]}</div>` + NOLA.addrRow(P, i) + row('Issued', NOLA.isoDate(P.iso(P.day[i])))
       + (f >= 0 ? row('Days from application', f === 0 ? 'Same day' : fmt(f)) : '') + row('Land use', D.lu[P.lu[i]]) + row('Neighborhood', nbName(P.nb[i]));
   }
   function mapTip(i) {
