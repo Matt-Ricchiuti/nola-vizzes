@@ -22,6 +22,7 @@ The workflow runs at 10:30 UTC. The City loads CPC Projects at about 06:00 UTC, 
 | `cpc.json` | `xxb5-5azv`'s `rowsUpdatedAt` or `geo.json` changed | "Today" for upcoming hearings and the 365-day window is the day the City loaded the data. |
 | `311.json` | `2jgv-pqrq`'s `rowsUpdatedAt` or `geo.json` changed | Incremental download (see below). "Today" is the newest request in the data. |
 | `str.json` | any of `ufdg-ajws`, `en36-xvxg`, `2ei9-wqw2` or `geo.json` changed | Three small whole downloads (about 8 requests, 9 MB). |
+| `permits.json` | `rcm3-fn58`'s `rowsUpdatedAt` or `geo.json` changed | Also reloaded in full nightly. API counts by year, plus the past 12 months' rows (about 6 requests, 4 MB). |
 | `blight.json` | any of the six code enforcement datasets or `geo.json` changed | The City reloads these every night (every row gets a new `:updated_at`), so incremental downloads don't help; most numbers are counted by the API instead (about 16 requests, 11 MB). |
 
 On the 1st of every month (and with `--full`, or the workflow's "full" checkbox) everything is downloaded and rebuilt regardless. Queries are ordered (`:id` as the tie-breaker), so the same City data always produces byte-identical files. Rebuilt files are written only when their content changed, and pages embed only the date their own data last changed, so a day without new City data changes nothing and the workflow commits and deploys nothing.
@@ -285,6 +286,27 @@ Six datasets. The City replaces each of them in full every night, so the builder
 - The map can show counts per 1,000 housing units (2020 Census); neighborhoods under 500 housing units get no rate.
 
 Checked against the API on 2026-11-19: open cases by stage, cases filed in 2025 and 2026, hearings in 2025, grass cases per year, weeds violations in the past 12 months, and the past-12-month totals of located new cases and grass cases all match `count(*)` queries. (These datasets have no usable point column for `within_polygon`, so neighborhood assignment uses the same point-in-polygon code that matched exactly on the 311 and short-term rental pages.)
+
+## `data/permits.json`: building permits (`rcm3-fn58`)
+
+The City reloads this dataset in full nightly (about 350,000 rows). The builder asks the API for permits issued per year and `code` since 2012 (one request) and the newest `issuedate`, then downloads only permits issued in the past 12 months (about 17,500 rows): `code, type, filingdate, issuedate, landuse, location_1`. "Today" is the newest `issuedate`.
+
+```
+{ "ds", "last", "winStart",
+  "cats": [9 permit types], "lu": [5 land uses], "years": [2012, ...], "yr": [[n per cat] per year issued],
+  "nbc": [[cat, landUse, n, ...] per nb],                     # issued in the past 12 months
+  "days": [[[n, medianDays, p90Days] per land use, then all land uses] per cat],   # filingdate -> issuedate, past 12 months
+  "pts": [[x, y, cat, nb, landUse, daysSinceWinStart], ...],  # new construction, demolition, solar/EV only
+  "total", "noLoc" }
+```
+
+- **Permit types** (`PERMIT_CODES`, by `code`): New construction `NEWC`; Renovation and repair `RNVN RNVS RENO REPR DEMI ROOF ROTF` (interior demolition counts as renovation); Demolition `DEMO` (including City demolitions); Solar and EV chargers `SOLR SAPP EVCH EVIN`; Pools and accessory buildings `ACCS POOL`; Electrical `SERV ERPR EVAC ECOA EGEN ETMP EFLO EANN MOVS`; Mechanical and plumbing `FGAS HVAC MECH HOOD MOVG PLMB HOIS MMAN`; Signs `SATT ESGN SBNR SBIL SMRL`; every other code (construction loops, brake tags, event permits, small cells and so on) is Other.
+- **Land use** (`PERMIT_LU_MAP`, by `landuse`): Single Family; Two-Family and Half of a Party Wall Double; Three to Four Family, Multi-Family and Single Unit in Multi-Family Dwelling; Business Use and Mixed Use; anything else is Other or not stated.
+- **Days to permit** = `issuedate − filingdate`, with the usual median / 90th percentile rule (null under 15).
+- Construction values (`constrval`) are left out: they include obvious entry errors (one category sums to tens of billions of dollars in a year).
+- The map can show permits per 1,000 housing units (2020 Census); neighborhoods under 500 housing units get no rate.
+
+Checked against the API on 2026-11-19: permits issued in 2025, solar and EV permits in 2026 and new construction in the past 12 months match `count(*)` queries; Mid-City and Gentilly Terrace match `within_polygon` counts on `location_1`.
 
 ## Page copy that mentions specific numbers
 

@@ -6,8 +6,8 @@ The site's rule is to chart only datasets with records added in the past year. T
 
 | Mark | Meaning | Count |
 |---|---|---|
-| ✅ | Already on the site | 28 |
-| ⭐ | Strong candidate for a new page | 5 |
+| ✅ | Already on the site | 29 |
+| ⭐ | Strong candidate for a new page | 4 |
 | 🔸 | Possible: smaller, harder, or best as part of another page | 21 |
 | 🗺️ | Map layer or supporting data (boundaries, population), not a page on its own | 40 |
 | · | Not a candidate (stale, archived, or superseded) | 116 |
@@ -136,7 +136,7 @@ Worth adding to every map: 2020 population by neighborhood (`2w4d-xaw2`), so cou
 | ✅ | [Code Enforcement All Violations](https://data.nola.gov/d/3ehi-je3s) `3ehi-je3s` | 2026-11-17 | 274,076 | Blight and code enforcement page. |
 | ✅ | [Grass Cutting (Lot Abatement/Chapter 66)](https://data.nola.gov/d/xhih-vxs6) `xhih-vxs6` | 2026-11-17 | 23,531 | Blight and code enforcement page. |
 | ✅ | [Non-Commercial Short-Term Rental Licenses](https://data.nola.gov/d/2ei9-wqw2) `2ei9-wqw2` | 2026-10-27 | 1,231 | Short-term rentals page: non-commercial licenses by building type. |
-| ⭐ | [Permits](https://data.nola.gov/d/rcm3-fn58) `rcm3-fn58` | 2026-11-17 | 350,562 | Permits page: construction and renovation by neighborhood and type, processing times. |
+| ✅ | [Permits](https://data.nola.gov/d/rcm3-fn58) `rcm3-fn58` | 2026-11-17 | 350,562 | Building permits page. |
 | ✅ | [Short-Term Rental Permit Applications](https://data.nola.gov/d/en36-xvxg) `en36-xvxg` | 2026-11-17 | 39,140 | Short-term rentals page: applications per year by outcome. |
 | 🔸 | [Adjudication Enforcement Cases for the Office of Business and External Services](https://data.nola.gov/d/wy29-i338) `wy29-i338` | 2026-11-18 | 114,916 | Adjudication cases, hearings, fines and fees. Fines collected vs. owed could be a story. |
 | 🔸 | [Adjudication Enforcement Detailed Hearings Data for the Office of Business and External Services](https://data.nola.gov/d/uzyk-jrck) `uzyk-jrck` | updated 2026-11-18 | 53,011 | Adjudication cases, hearings, fines and fees. Fines collected vs. owed could be a story. |

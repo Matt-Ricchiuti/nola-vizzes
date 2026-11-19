@@ -1228,11 +1228,71 @@ def build_blight(api, nbp):
     }
 
 
+# ---------------------------------------------------------------- building permits
+PERMITS = 'rcm3-fn58'
+PERMIT_START = 2012   # the first full year of permits in this dataset
+PERMIT_CATS = ['New construction', 'Renovation and repair', 'Demolition', 'Solar and EV chargers', 'Pools and accessory buildings',
+               'Electrical', 'Mechanical and plumbing', 'Signs', 'Other']
+PERMIT_CODES = {'NEWC': 0, 'RNVN': 1, 'RNVS': 1, 'RENO': 1, 'REPR': 1, 'DEMI': 1, 'ROOF': 1, 'ROTF': 1, 'DEMO': 2,
+                'SOLR': 3, 'SAPP': 3, 'EVCH': 3, 'EVIN': 3, 'ACCS': 4, 'POOL': 4,
+                'SERV': 5, 'ERPR': 5, 'EVAC': 5, 'ECOA': 5, 'EGEN': 5, 'ETMP': 5, 'EFLO': 5, 'EANN': 5, 'MOVS': 5,
+                'FGAS': 6, 'HVAC': 6, 'MECH': 6, 'HOOD': 6, 'MOVG': 6, 'PLMB': 6, 'HOIS': 6, 'MMAN': 6,
+                'SATT': 7, 'ESGN': 7, 'SBNR': 7, 'SBIL': 7, 'SMRL': 7}   # any other code: Other
+PERMIT_LU = ['Single-family', 'Two-family', 'Multi-family', 'Business or mixed use', 'Other or not stated']
+PERMIT_LU_MAP = {'Single Family': 0, 'Two-Family': 1, 'Half of a Party Wall Double': 1, 'Three to Four Family': 2, 'Multi-Family': 2,
+                 'Multi-Family (More than Four Units)': 2, 'Single Unit in Multi-Family Dwelling': 2, 'Business Use': 3, 'Mixed Use': 3}
+PERMIT_POINTS = (0, 2, 3)   # categories small enough to map permit by permit
+
+
+def build_permits(api, nbp):
+    cols = ['code', 'type', 'filingdate', 'issuedate', 'landuse', 'location_1']
+    api.require_columns(PERMITS, cols, 'Permits')
+    # permits issued per year and code, counted by the API
+    yrows = api.get(f'/resource/{PERMITS}.json', {'$select': 'date_extract_y(issuedate) as y, code, count(*) as n',
+                                                 '$where': f"issuedate >= '{PERMIT_START}-01-01'", '$group': 'y, code', '$order': 'y, code', '$limit': 5000})
+    need(len(yrows) > 100, f'Permits: only {len(yrows)} year/code counts')
+    last = parse_ts(api.get(f'/resource/{PERMITS}.json', {'$select': 'max(issuedate) as m', '$where': f"issuedate >= '{PERMIT_START}-01-01'"})[0]['m'])
+    today = last.date()
+    years = list(range(PERMIT_START, today.year + 1))
+    yr = [[0] * len(PERMIT_CATS) for _ in years]
+    for r in yrows:
+        y = int(r['y'])
+        if PERMIT_START <= y <= today.year:   # a few permits carry issue dates in the future
+            yr[y - PERMIT_START][PERMIT_CODES.get((r.get('code') or '').strip(), 8)] += int(r['n'])
+    # permits issued in the past 12 months, row by row
+    win0 = today - dt.timedelta(days=364)
+    rows = fetch_all(api, PERMITS, ','.join(cols), where=f"issuedate >= '{win0}' AND issuedate <= '{today}T23:59:59'")
+    need(len(rows) > 5000, f'Permits: only {len(rows)} issued in the past 12 months')
+    nbs, xy = points_to_nb(nbp, [{'longitude': (r.get('location_1') or {}).get('longitude'), 'latitude': (r.get('location_1') or {}).get('latitude')} for r in rows])
+    nbc = [Counter() for _ in range(72)]
+    days = [[[] for _ in PERMIT_LU] for _ in PERMIT_CATS]
+    pts = []
+    for r, nb, (x, y) in zip(rows, nbs, xy):
+        c = PERMIT_CODES.get((r.get('code') or '').strip(), 8)
+        lu = PERMIT_LU_MAP.get((r.get('landuse') or '').strip(), 4)
+        issued, filed = parse_ts(r.get('issuedate')), parse_ts(r.get('filingdate'))
+        if nb >= 0:
+            nbc[nb][(c, lu)] += 1
+        d = days_between(filed, issued)
+        if d is not None:
+            days[c][lu].append(d)
+        if c in PERMIT_POINTS and nb >= 0:
+            pts.append([x, y, c, nb, lu, (issued.date() - win0).days])
+    stat = lambda v: [len(v), median(v), p90(v)]
+    return {
+        'ds': PERMITS, 'last': today.isoformat(), 'winStart': win0.isoformat(),
+        'cats': PERMIT_CATS, 'lu': PERMIT_LU, 'years': years, 'yr': yr,
+        'nbc': [[v for k in sorted(c) for v in (*k, c[k])] for c in nbc],   # [cat, landUse, n, ...] per nb, past 12 months
+        'days': [[stat(v) for v in row] + [stat([d for v in row for d in v])] for row in days],  # [n, median, p90] per land use, then all
+        'pts': sorted(pts), 'total': len(rows), 'noLoc': sum(nb < 0 for nb in nbs),
+    }
+
+
 # Data files of the pages added with the 311 / housing / business set, and when each counts as stale
 # (file, label, field holding its newest record date, days without a new record before warning).
-NEW_FILES = ['311.json', 'str.json', 'blight.json']
+NEW_FILES = ['311.json', 'str.json', 'blight.json', 'permits.json']
 STALE = [('311.json', '311 calls', 'last', 7), ('str.json', 'Short-term rental permit applications', 'last', 14),
-         ('blight.json', 'Code enforcement cases', 'last', 14)]
+         ('blight.json', 'Code enforcement cases', 'last', 14), ('permits.json', 'Permits', 'last', 14)]
 
 
 # ---------------------------------------------------------------- sanity checks against the last good build
@@ -1293,6 +1353,11 @@ def validate(name, obj, prev, same_year=True):
         need(obj['open'] > 2000 and obj['total'] > 20000, 'blight: suspiciously few cases')
         need(obj['noLoc'] < 0.1 * obj['total'], 'blight: most cases failed to map to a neighborhood')
         check_not_collapsed('code enforcement cases', obj['total'], prev and prev.get('total'))
+    elif name == 'permits.json':
+        need(len(obj['nbc']) == 72 and len(obj['yr']) == len(obj['years']) and len(obj['days']) == len(obj['cats']), 'permits: shape')
+        need(obj['total'] > 5000, 'permits: suspiciously few permits in the past 12 months')
+        need(obj['noLoc'] < 0.1 * obj['total'], 'permits: most permits failed to map to a neighborhood')
+        check_not_collapsed('permits issued in the past 12 months', obj['total'], prev and prev.get('total'), floor=0.75)
 
 
 def central_date(iso_utc):
@@ -1451,6 +1516,12 @@ def main():
             out['blight.json'] = build_blight(api, nbp)
     print('blight and code enforcement ...', flush=True)
     attempt(['blight.json'], blight)
+
+    def permits():
+        if not unchanged('permits.json', f'{api.version(PERMITS)}|{geo_key}'):
+            out['permits.json'] = build_permits(api, nbp)
+    print('building permits ...', flush=True)
+    attempt(['permits.json'], permits)
 
     for name in [n for n in out if n != 'geo.json']:
         same_year = (prev[name] or {}).get('year') == out[name].get('year') if name in ('drone.json', 'cfs.json') else True
