@@ -68,7 +68,7 @@
       plot.insertAdjacentHTML('beforeend', '<div class="maplegend"></div>');
     }
     const ml = plot.querySelector('.maplegend');
-    NOLA.perToggle(plot, st.view === 'shade' ? 'Per 100 homes' : null, st.basis === 'hu', on => set('basis', on ? 'hu' : 'n'));
+    NOLA.mapChecks(plot, [st.view === 'shade' && { key: 'per', label: 'Per 100 homes', checked: st.basis === 'hu', onChange: on => set('basis', on ? 'hu' : 'n') }]);
     if (st.view === 'shade') {
       const cl = NOLA.classes(d3.range(72).map(val));
       m.setFill(i => cl.color(val(i)));

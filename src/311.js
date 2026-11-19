@@ -61,7 +61,7 @@
       m.lastNb = -1;
       plot.insertAdjacentHTML('beforeend', '<div class="maplegend"></div>');
     }
-    NOLA.perToggle(plot, 'Per 1k residents', st.basis === 'pc', on => set('basis', on ? 'pc' : 'n'));
+    NOLA.mapChecks(plot, [{ key: 'per', label: 'Per 1k residents', checked: st.basis === 'pc', onChange: on => set('basis', on ? 'pc' : 'n') }]);
     const cl = NOLA.classes(d3.range(72).map(val));
     m.setFill(i => cl.color(val(i)));
     const none = d3.range(72).some(i => val(i) == null) ? 'Under 1,000 residents' : null;

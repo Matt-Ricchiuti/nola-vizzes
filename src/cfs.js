@@ -158,7 +158,7 @@
             + row('Median arrival, emergency', r[4] >= 30 ? r[2] + ' min' : 'too few calls') + row('Median arrival, non-emergency', r[3] == null ? '—' : r[3] + ' min'); } });
       m.lastNb = -1;
     }
-    NOLA.perToggle(plot, isTime() ? null : 'Per 1k residents', st.basis === 'pc', on => { st.basis = on ? 'pc' : 'n'; V.refresh(); });
+    NOLA.mapChecks(plot, [!isTime() && { key: 'per', label: 'Per 1k residents', checked: st.basis === 'pc', onChange: on => { st.basis = on ? 'pc' : 'n'; V.refresh(); } }]);
     // seven equal-count classes: each shade holds about ten neighborhoods
     const cl = NOLA.classes(nb.map((r, i) => metricVal(i)));
     m.setFill(i => cl.color(metricVal(i)));

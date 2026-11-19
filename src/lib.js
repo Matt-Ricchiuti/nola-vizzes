@@ -361,16 +361,28 @@ const NOLA = (() => {
     });
     panel.prepend(d); return d;
   }
-  // perToggle(plot, label, checked, onChange): a small checkbox on the map, bottom right just above the scale bar,
-  // for showing the shading per resident or per home ("Per 1k residents"). label null hides it (e.g. for a measure
-  // that can't be a rate). It's made once per map and keeps its place across redraws.
-  function perToggle(plot, label, checked, onChange) {
-    let el = plot.querySelector(':scope>.pertoggle');
-    if (!label) { if (el) el.hidden = true; plot.classList.remove('has-per'); return el; }
-    if (!el) { el = document.createElement('label'); el.className = 'pertoggle'; el.innerHTML = '<input type="checkbox"><span></span>'; plot.appendChild(el); }
-    plot.classList.add('has-per');
-    const cb = el.firstChild; el.lastChild.textContent = label; cb.checked = !!checked; cb.onchange = () => onChange(cb.checked); el.hidden = false;
-    return el;
+  // mapChecks(plot, [{ key, label, checked, disabled, title, onChange(checked) }, ...]): a small box of checkboxes on
+  // the map, bottom right just above the scale bar (under the zoom buttons on phones), for map options such as
+  // "Per 1k residents". Items that are null or false are left out; an empty list hides the box. Call it on every
+  // redraw with the current state: rows are matched by key, so they keep their place (and keyboard focus).
+  function mapChecks(plot, items) {
+    items = (items || []).filter(Boolean);
+    let box = plot.querySelector(':scope>.mapchecks');
+    if (!items.length) { if (box) box.hidden = true; return box; }
+    if (!box) { box = document.createElement('div'); box.className = 'mapchecks'; box.setAttribute('role', 'group'); box.setAttribute('aria-label', 'Map options'); plot.appendChild(box); }
+    box.hidden = false;
+    const old = new Map([...box.children].map(l => [l.dataset.key, l]));
+    items.forEach(it => {
+      let l = old.get(it.key); old.delete(it.key);
+      if (!l) { l = document.createElement('label'); l.dataset.key = it.key; l.innerHTML = '<input type="checkbox"><span></span>'; }
+      box.appendChild(l); // in the order given
+      const cb = l.firstChild; l.lastChild.textContent = it.label;
+      cb.checked = !!it.checked; cb.disabled = !!it.disabled; l.classList.toggle('off', !!it.disabled);
+      if (it.title) l.title = it.title; else l.removeAttribute('title');
+      cb.onchange = () => it.onChange && it.onChange(cb.checked);
+    });
+    old.forEach(l => l.remove());
+    return box;
   }
   // a key that isn't a filter: rows of [label, color (a square swatch; null leaves the space), value] inside a panel
   // section. A color starting with '|' draws a tick mark in that color instead of a square.
@@ -603,6 +615,6 @@ const NOLA = (() => {
   }
   const legendHTML = items => '<div class="legend">' + items.map(([c, l, round]) => `<span><i style="background:${c}${round ? ';border-radius:50%' : ''}"></i>${l}</span>`).join('') + '</div>';
 
-  return { css, S, fmt, pct, tip, row, setGeo, views, hashState, legendHTML, stage, fsec, flist, seg, ftabs, nbPick, kv, perToggle, phoneToggle, popOf, perK, fmtRate, POP_NOTE, basisChips, shown, nbList, nbSelect, lonlat, get FULL() { return FULL; }, get GEO() { return GEO; }, map, mapButtons, panelInset, seqVar, seqLegend, classes, stepLegend, short, frame, yGrid, chips, months, monthsLong,
+  return { css, S, fmt, pct, tip, row, setGeo, views, hashState, legendHTML, stage, fsec, flist, seg, ftabs, nbPick, kv, mapChecks, phoneToggle, popOf, perK, fmtRate, POP_NOTE, basisChips, shown, nbList, nbSelect, lonlat, get FULL() { return FULL; }, get GEO() { return GEO; }, map, mapButtons, panelInset, seqVar, seqLegend, classes, stepLegend, short, frame, yGrid, chips, months, monthsLong,
     setYear, get YEAR() { return YEAR; }, monthTicks, doyTime, doyDate, doyISO, doyMonth, monthStarts, isoDate, share, numWord, cap, setText, setHTML, title };
 })();
