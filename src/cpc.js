@@ -237,7 +237,7 @@
   const csvTopics = () => Object.keys(P.themeY).sort().map(y => Object.assign({ year: y }, ...P.TH.map((t, i) => ({ [t]: P.themeY[y][i] }))));
 
   const V = NOLA.views([
-    { id: 'map', label: mapTitle(), keep: true, draw: drawMap, csv: () => st.tab === 'up' ? csvUp() : csvFiled() },
+    { id: 'map', label: mapTitle(), tab: 'Map of cases', keep: true, draw: drawMap, csv: () => st.tab === 'up' ? csvUp() : csvFiled() },
     { id: 'years', label: 'Cases filed per year, by type', draw: drawYears, csv: csvYears },
     { id: 'topics', label: 'Cases per year mentioning each topic', draw: drawTopics, csv: csvTopics },
   ], { ds: ['xxb5-5azv', 'CPC Projects'],

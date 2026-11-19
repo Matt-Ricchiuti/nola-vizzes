@@ -307,84 +307,108 @@ const NOLA = (() => {
   const setText = (id, s) => { const el = document.getElementById(id); if (el) el.textContent = s; };
   const setHTML = (id, s) => { const el = document.getElementById(id); if (el) el.innerHTML = s; };
 
-  // ---------- one subject per page: every chart stacked down the page ----------
-  // The URL hash holds the chart last used and the page's filters: #chartId&key=value&... so a link opens
-  // the page scrolled to that chart with exactly those filters.
+  // ---------- one subject per page: a row of tabs, one per chart ----------
+  // The URL hash holds the open chart and the page's filters: #chartId&key=value&... so a link opens
+  // that chart with exactly those filters.
   function hashState() {
     const [view, ...kv] = location.hash.slice(1).split('&'), o = { view };
     kv.forEach(p => { const [k, v] = p.split('='); if (k) o[k] = decodeURIComponent(v || ''); });
     return o;
   }
-  // views(list, { state, ds }) -- list: [{ id, label, cls, keep, draw(el, first), csv() -> rows, ds: [id, name] }]
-  // Each chart gets its own full-width section in #chart: a heading (label), its Copy link / Download CSV, then the chart.
-  // Filters are shared page state, so refresh() redraws every chart. state() returns the filters that differ from
-  // their defaults; they're written into the link. A page can jump to a chart with location.hash = 'chartId'.
+  // views(list, { state, ds }) -- list: [{ id, label, tab, cls, keep, draw(el, first), csv() -> rows, ds: [id, name] }]
+  // A bar at the top of #chart holds a tab per chart (`tab`, or `label`) and Copy link / Download CSV for the open one.
+  // Below it, each chart is its own section (heading `label`, then the chart); only the open one shows.
+  // Filters are shared page state: refresh() redraws the open chart, and the others redraw when next opened.
+  // state() returns the filters that differ from their defaults; they're written into the link.
+  // A page can open a chart with location.hash = 'chartId'.
   function views(list, opts = {}) {
     const host = document.getElementById('chart');
-    const panes = {}, secs = {}, drawn = new Set(); let cur = null;
+    const panes = {}, secs = {}, tabs = {}, drawn = new Set(), stale = new Set();
     const stateKV = () => {
       const st = opts.state ? opts.state() : {};
       return Object.entries(st).filter(([, v]) => v != null && v !== '').map(([k, v]) => `&${k}=${encodeURIComponent(v)}`).join('');
     };
-    const linkFor = id => location.href.split('#')[0] + '#' + id + stateKV();
-    const writeHash = () => { const kv = stateKV(); if (cur || kv) history.replaceState(null, '', '#' + (cur ? cur.id : '') + kv); };
+    const h0 = hashState().view;
+    let cur = list.find(v => v.id === h0) || list[0];
+    const linkFor = () => location.href.split('#')[0] + '#' + cur.id + stateKV();
+    const writeHash = () => history.replaceState(null, '', '#' + cur.id + stateKV());
     const btn = t => { const b = document.createElement('button'); b.className = 'btn'; b.type = 'button'; b.textContent = t; return b; };
+    // the bar: tabs, then the open chart's Copy link / Download CSV
+    const bar = document.createElement('div'); bar.className = 'vbar';
+    const tabRow = document.createElement('div'); tabRow.className = 'vtabs'; tabRow.setAttribute('role', 'tablist'); tabRow.setAttribute('aria-label', 'Charts');
+    const tools = document.createElement('div'); tools.className = 'tools';
+    const linkB = btn('Copy link'), csvB = btn('Download CSV');
+    linkB.onclick = async () => {
+      writeHash(); const url = linkFor();
+      try { await navigator.clipboard.writeText(url); linkB.textContent = 'Link copied'; }
+      catch (e) { prompt('Copy this link:', url); }
+      setTimeout(() => linkB.textContent = 'Copy link', 1600);
+    };
+    csvB.onclick = () => downloadCSV(cur);
+    tools.append(linkB, csvB); bar.append(tabRow, tools); host.appendChild(bar);
     list.forEach(v => {
+      const t = document.createElement('button'); t.type = 'button'; t.textContent = v.tab || v.label;
+      t.id = 'vt-' + v.id; t.setAttribute('role', 'tab'); t.setAttribute('aria-controls', 'v-' + v.id);
+      t.onclick = () => open(v.id); tabRow.appendChild(t); tabs[v.id] = t;
       const sec = document.createElement('section'); sec.className = 'vsec'; sec.id = 'v-' + v.id;
+      sec.setAttribute('role', 'tabpanel'); sec.setAttribute('aria-labelledby', 'vt-' + v.id);
       const head = document.createElement('div'); head.className = 'vsec-h';
-      const h = document.createElement('h2'); h.textContent = v.label;
-      const tools = document.createElement('div'); tools.className = 'tools';
-      const linkB = btn('Copy link');
-      linkB.onclick = async () => {
-        cur = v; writeHash(); const url = linkFor(v.id);
-        try { await navigator.clipboard.writeText(url); linkB.textContent = 'Link copied'; }
-        catch (e) { prompt('Copy this link:', url); }
-        setTimeout(() => linkB.textContent = 'Copy link', 1600);
-      };
-      tools.appendChild(linkB);
-      if (v.csv) { const csvB = btn('Download CSV'); csvB.onclick = () => downloadCSV(v); tools.appendChild(csvB); }
-      head.append(h, tools);
+      const h = document.createElement('h2'); h.textContent = v.label; head.appendChild(h);
       const p = document.createElement('div'); p.className = 'pane ' + (v.cls || 'card');
       sec.append(head, p); host.appendChild(sec); panes[v.id] = p; secs[v.id] = sec;
-      // the chart last touched is the one a copied link (and the address bar) points to
-      sec.addEventListener('pointerdown', () => { if (cur !== v) { cur = v; writeHash(); } });
     });
     // footer "Data:" link goes to the page's City dataset
     const dataLink = document.getElementById('dataLink'), ds = opts.ds || (list.find(v => v.ds) || {}).ds;
     if (dataLink && ds) { dataLink.href = 'https://data.nola.gov/d/' + ds[0]; dataLink.textContent = ds[1] + ' on data.nola.gov'; }
-    const drawOne = v => { v.draw(panes[v.id], !drawn.has(v.id)); drawn.add(v.id); };
-    const draw = () => { tip.hide(); list.forEach(drawOne); writeHash(); };
-    const go = (id, smooth) => {
+    // charts are drawn only while shown (hidden ones have no size); a hidden chart whose filters changed redraws when opened
+    const drawOne = v => { v.draw(panes[v.id], !drawn.has(v.id)); drawn.add(v.id); stale.delete(v.id); };
+    const draw = () => { tip.hide(); list.forEach(v => { if (v !== cur && drawn.has(v.id)) stale.add(v.id); }); drawOne(cur); writeHash(); };
+    function show(v) {
+      cur = v;
+      list.forEach(x => { secs[x.id].hidden = x !== v; tabs[x.id].setAttribute('aria-selected', x === v); tabs[x.id].tabIndex = x === v ? 0 : -1; });
+      csvB.hidden = !v.csv;
+      if (!drawn.has(v.id) || stale.has(v.id)) drawOne(v);
+      // on phones the tab row scrolls sideways: bring the open tab into view
+      const r = tabRow.getBoundingClientRect(), t = tabs[v.id].getBoundingClientRect();
+      if (t.left < r.left || t.right > r.right) tabRow.scrollLeft += t.left - r.left - 16;
+    }
+    function open(id, focusTab) {
       const v = list.find(x => x.id === id); if (!v) return;
-      cur = v; secs[id].scrollIntoView({ behavior: smooth ? 'smooth' : 'auto', block: 'start' });
-    };
+      tip.hide(); if (v !== cur || !drawn.has(v.id)) show(v); writeHash();
+      if (focusTab) tabs[id].focus();
+      if (bar.getBoundingClientRect().top < 0) bar.scrollIntoView({ block: 'start' }); // jumped here from further down the page
+    }
+    // arrow keys move between tabs
+    tabRow.addEventListener('keydown', ev => {
+      const i = list.indexOf(cur), n = list.length;
+      const j = ev.key === 'ArrowRight' ? (i + 1) % n : ev.key === 'ArrowLeft' ? (i - 1 + n) % n : ev.key === 'Home' ? 0 : ev.key === 'End' ? n - 1 : -1;
+      if (j >= 0) { ev.preventDefault(); open(list[j].id, true); }
+    });
     // a link with filters opened on this same page (only the hash changes) reloads, so its filters apply;
     // the pages' own jumps to a chart set a bare chart id and keep the current filters
     addEventListener('hashchange', () => {
       const h = hashState(), st = opts.state ? opts.state() : {};
       const want = Object.entries(h).filter(([k]) => k !== 'view'), have = Object.entries(st).filter(([, v]) => v != null && v !== '');
       if (want.length && (want.length !== have.length || want.some(([k, v]) => String(st[k]) !== v))) return location.reload();
-      draw(); go(h.view, true);
+      if (list.some(v => v.id === h.view) && h.view !== cur.id) { list.forEach(x => { if (drawn.has(x.id)) stale.add(x.id); }); open(h.view); } else draw();
     });
     let rt, lastW = innerWidth;
     addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => {
       if (innerWidth === lastW) return; lastW = innerWidth; // phones fire resize on scroll (address bar); only width matters
-      list.forEach(v => { if (!v.keep) drawOne(v); });
+      list.forEach(v => { if (!v.keep && drawn.has(v.id)) { if (v === cur) drawOne(v); else stale.add(v.id); } });
     }, 150); });
     function downloadCSV(v) {
-      const rows = v.csv(); if (!rows || !rows.length) return;
+      const rows = v.csv && v.csv(); if (!rows || !rows.length) return;
       const keys = Object.keys(rows[0]);
       const cell = x => { x = x == null ? '' : String(x); return /[",\n]/.test(x) ? '"' + x.replace(/"/g, '""') + '"' : x; };
       const text = [keys.map(cell).join(','), ...rows.map(r => keys.map(k => cell(r[k])).join(','))].join('\n');
       const a = document.createElement('a');
-      a.href = URL.createObjectURL(new Blob(['\ufeff' + text], { type: 'text/csv;charset=utf-8' }));
+      a.href = URL.createObjectURL(new Blob(['﻿' + text], { type: 'text/csv;charset=utf-8' }));
       a.download = `${location.pathname.split('/').pop().replace('.html', '') || 'index'}-${v.id}.csv`;
       document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
     }
-    const h0 = hashState().view;
-    draw();
-    if (list.some(v => v.id === h0)) requestAnimationFrame(() => go(h0, false));
-    return { refresh: draw, get id() { return cur ? cur.id : list[0].id; } };
+    show(cur); writeHash();
+    return { refresh: draw, open, get id() { return cur.id; } };
   }
   const legendHTML = items => '<div class="legend">' + items.map(([c, l, round]) => `<span><i style="background:${c}${round ? ';border-radius:50%' : ''}"></i>${l}</span>`).join('') + '</div>';
 
