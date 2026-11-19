@@ -1,0 +1,1046 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Blight and code enforcement · Nola Vizzes</title>
+<style>@import url('https://fonts.googleapis.com/css2?family=Young+Serif&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
+:root{
+  color-scheme: light;
+  --page:#f9f9f7; --surface:#fcfcfb; --ink:#0b0b0b; --ink2:#52514e; --muted:#898781;
+  --grid:#e1e0d9; --axis:#c3c2b7; --ring:rgba(11,11,11,.10); --land:#efeee9; --landline:#d7d5cc;
+  --road:rgba(11,11,11,.13); --road-major:rgba(11,11,11,.26); --road-fwy:rgba(11,11,11,.42);
+  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100; --s5:#e87ba4; --s6:#008300; --s7:#6250d6; --s8:#e34948;
+  --q1:#cde2fb; --q2:#9ec5f4; --q3:#6da7ec; --q4:#3987e5; --q5:#256abf; --q6:#184f95; --q7:#0d366b;
+  --none:#d9d8d2; --accent:#2a78d6; --chip:#efeee9;
+  --sbw:0px; --gut:24px; /* scrollbar width (set by lib.js) and side gutter of full-width map sections */
+}
+@media (prefers-color-scheme: dark){
+  :root:where(:not([data-theme="light"])){
+    color-scheme: dark;
+    --page:#0d0d0d; --surface:#1a1a19; --ink:#f0efec; --ink2:#c3c2b7; --muted:#898781;
+    --grid:#2c2c2a; --axis:#383835; --ring:rgba(255,255,255,.10); --land:#232321; --landline:#3a3a37;
+    --road:rgba(255,255,255,.12); --road-major:rgba(255,255,255,.24); --road-fwy:rgba(255,255,255,.40);
+    --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --s5:#d55181; --s6:#0ca30c; --s7:#9085e9; --s8:#e66767;
+    --q1:#0d366b; --q2:#104281; --q3:#184f95; --q4:#1c5cab; --q5:#2a78d6; --q6:#5598e7; --q7:#9ec5f4;
+    --none:#2f2f2c; --accent:#3987e5; --chip:#262624;
+  }
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--page);color:var(--ink);font-family:"Public Sans",system-ui,-apple-system,"Segoe UI",sans-serif;font-size:15px;line-height:1.5}
+h1,.vsec-h h2,.cards h2{font-family:"Young Serif",Georgia,"Times New Roman",serif;font-weight:400}
+.eyebrow,.flist .ct,.scalebar,.src,.tip .r span:last-child{font-family:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace}
+a{color:var(--accent)}
+.wrap{max-width:1120px;margin:0 auto;padding:28px 24px 64px}
+.site{display:flex;align-items:center;gap:22px;border-bottom:1px solid var(--grid);padding-bottom:12px;margin-bottom:28px;position:relative;z-index:30}
+.site b{font-size:13px;letter-spacing:.08em;text-transform:uppercase}
+/* header menu: "Visualizations" opens down to the pages; each page opens right to its views */
+.topnav{display:flex;align-items:center;gap:18px;flex:1;font-size:13px}
+.topnav .xlink{margin-left:auto;color:var(--ink2);text-decoration:none}
+.topnav .xlink.on{color:var(--ink);font-weight:600}
+.dd{position:relative}
+.ddbtn{font:inherit;font-size:13px;color:var(--ink2);background:none;border:0;padding:4px 0;cursor:pointer;display:inline-flex;align-items:center;gap:5px}
+.ddbtn.on,.dd:hover .ddbtn,.dd.open .ddbtn{color:var(--ink)}
+.ddbtn span{font-size:10px;transition:transform .15s}
+.dd:hover .ddbtn span,.dd.open .ddbtn span{transform:rotate(180deg)}
+.dd1{list-style:none;margin:0;padding:6px;background:var(--surface);border:1px solid var(--ring);border-radius:10px;box-shadow:0 10px 30px rgb(0 0 0 / .14);display:none}
+.dd1{position:absolute;top:100%;left:-10px;min-width:230px;margin-top:6px}
+.dd1::before{content:"";position:absolute;left:0;right:0;top:-10px;height:10px} /* hover bridge */
+.dd:hover .dd1,.dd:focus-within .dd1,.dd.open .dd1{display:block}
+.dd1 li{position:relative}
+.dd1 a{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:7px 10px;border-radius:7px;color:var(--ink);text-decoration:none;white-space:nowrap}
+.dd1 a.on{font-weight:600}
+.dd1 a:hover,.dd1 a:focus-visible{background:var(--chip);outline:none}
+@media(max-width:640px){
+  .site{flex-wrap:wrap;gap:8px 18px}
+  .dd{position:static}
+  .dd1{left:0;right:0;top:100%;min-width:0;max-height:75vh;overflow:auto}
+}
+h1{font-size:30px;line-height:1.15;margin:0 0 6px;letter-spacing:0}
+h2{font-size:19px;margin:0 0 4px}
+.src{font-size:11.5px;color:var(--muted);margin:0 0 22px}
+.src a{color:var(--ink2)}
+.card{background:var(--surface);border:1px solid var(--ring);border-radius:12px;padding:18px}
+.nbfocus{fill:none;stroke:var(--ink);stroke-width:2.4;vector-effect:non-scaling-stroke}
+.nbsel{font-size:13px}
+[hidden]{display:none!important}
+.pane.mapp{padding:6px}
+.popnote{color:var(--muted);font-size:12px}
+.split{display:grid;grid-template-columns:1.35fr 1fr;gap:16px;align-items:start}
+@media(max-width:860px){.split{grid-template-columns:1fr} h1{font-size:23px}}
+@media(max-width:600px){.wrap{padding:20px 16px 48px} .card{padding:12px} :root{--gut:16px}}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px}
+.chip{border:1px solid var(--ring);background:var(--chip);color:var(--ink);border-radius:999px;padding:4px 11px;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;font-family:inherit}
+.chip.on{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.chip i{width:9px;height:9px;border-radius:50%;display:inline-block}
+select{font:inherit;font-size:13px;padding:4px 8px;border-radius:8px;border:1px solid var(--ring);background:var(--surface);color:var(--ink)}
+.legend{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:var(--ink2);margin:6px 0 8px}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.legend i{width:10px;height:10px;border-radius:3px;display:inline-block}
+svg{display:block;max-width:100%}
+svg text{fill:var(--muted);font-size:11px;font-family:inherit}
+.axis path,.axis line{stroke:var(--axis)}
+.gridl line{stroke:var(--grid)}
+.gridl path{display:none}
+.map>svg{background:var(--surface);border-radius:10px;cursor:grab}
+/* maps on touch screens: one finger scrolls the page, two fingers move the map (NOLA.map / trees.js handle those) */
+.map>svg,.stage.mapstage .plot canvas{touch-action:pan-x pan-y}
+.nbpath{fill:var(--land);stroke:var(--landline);stroke-width:.8;vector-effect:non-scaling-stroke}
+.nbpath.hot:hover{stroke:var(--ink);stroke-width:1.6}
+.streets{pointer-events:none}
+.st{fill:none;vector-effect:non-scaling-stroke;stroke-linecap:round;stroke-linejoin:round}
+.st3{stroke:var(--road);stroke-width:.5}
+.st2{stroke:var(--road-major);stroke-width:.9}
+.st1{stroke:var(--road-major);stroke-width:.8}
+.st0{stroke:var(--road-fwy);stroke-width:1.7}
+.tip{position:fixed;pointer-events:none;background:var(--surface);color:var(--ink);border:1px solid var(--ring);box-shadow:0 6px 24px rgba(0,0,0,.14);border-radius:10px;padding:9px 11px;font-size:12.5px;max-width:300px;z-index:20;opacity:0;transition:opacity .08s}
+.tip b{font-size:13px}
+.tip .r{display:flex;justify-content:space-between;gap:14px;color:var(--ink2)}
+.tip .r span:last-child{color:var(--ink);font-variant-numeric:tabular-nums}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th{font-weight:600;text-align:left;color:var(--ink2);border-bottom:1px solid var(--axis);padding:6px 8px;cursor:pointer;white-space:nowrap;user-select:none}
+td{border-bottom:1px solid var(--grid);padding:6px 8px;font-variant-numeric:tabular-nums}
+tr.sel td{background:var(--chip)}
+tbody tr{cursor:pointer}
+tbody tr:hover td{background:var(--chip)}
+.num{text-align:right}
+.bar{height:8px;border-radius:0 4px 4px 0;background:var(--s1);display:inline-block;vertical-align:middle}
+.zoomhint{font-size:12px;color:var(--muted);margin-top:6px}
+.btn{font:inherit;font-size:12px;border:1px solid var(--ring);background:var(--surface);color:var(--ink2);border-radius:8px;padding:3px 9px;cursor:pointer}
+.foot{margin-top:40px;border-top:1px solid var(--grid);padding-top:14px;font-size:12px;color:var(--muted)}
+.foot a{color:var(--muted)}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.sr{position:absolute;left:-9999px}
+.halo{paint-order:stroke;stroke:var(--surface);stroke-width:5px;stroke-linejoin:round}
+.maplab{font-weight:600;letter-spacing:.02em}
+/* ---------- filters live on the chart: a panel of legend-style rows (see NOLA.stage / fsec / flist) ---------- */
+/* one tab per chart (NOLA.views): tabs and the open chart's Copy link / Download CSV in one row, the chart below */
+.vbar{display:flex;align-items:flex-start;gap:10px 18px;padding:0 0 12px;border-bottom:1px solid var(--grid);scroll-margin-top:12px}
+.vtabs{display:flex;flex-wrap:wrap;gap:4px;flex:1 1 auto;min-width:0}
+.vtabs button{font:inherit;font-size:13px;line-height:1.3;border:1px solid transparent;border-radius:999px;background:none;color:var(--ink2);padding:5px 12px;cursor:pointer;white-space:nowrap}
+.vtabs button:hover{background:var(--chip);color:var(--ink)}
+.vtabs button[aria-selected="true"]{background:var(--ink);color:var(--surface);font-weight:600}
+.vtabs button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.vsec{margin:26px 0 0}
+/* a page with one chart: its heading sits in the bar where the tabs would be */
+.vbar.one{align-items:center}
+.vbar.one h2{flex:1 1 auto;min-width:0;margin:0;font-family:"Young Serif",Georgia,"Times New Roman",serif;font-weight:400;font-size:21px}
+.vbar.one+.vsec{margin-top:14px}
+.vsec-h{margin:0 0 12px}
+.vsec-h h2{font-size:21px;margin:0}
+.tools{display:flex;gap:6px;flex:0 0 auto;padding-top:3px}
+@media(max-width:640px){
+  .vbar{flex-direction:column;gap:10px}
+  .vbar.one{flex-direction:row;flex-wrap:wrap;align-items:center}
+  .vtabs{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin:0 -16px;padding:0 16px;width:calc(100% + 32px)}
+  .vtabs::-webkit-scrollbar{display:none}
+  .tools{padding-top:0}
+}
+.stage{position:relative}
+.stage.chartstage{display:grid;grid-template-columns:260px minmax(0,1fr);gap:18px;align-items:start}
+.stage.chartstage>.fpanel{position:sticky;top:12px}
+/* a section holding a map spans the window, less a small gutter; its heading stays in line with the page */
+.vsec.wide>.pane{--mw:min(calc(100vw - var(--sbw) - 2 * var(--gut)),2400px);width:var(--mw);max-width:none;margin-left:calc(50% - var(--mw) / 2)}
+.stage.mapstage{height:clamp(460px,78vh,900px);padding:0;overflow:hidden}
+.stage.mapstage .plot{position:absolute;inset:0}
+.stage.mapstage .plot .map,.stage.mapstage .plot>svg{width:100%;height:100%}
+.stage.mapstage .map>svg{border-radius:12px}
+.stage.mapstage>.fpanel{position:absolute;top:12px;left:12px;width:296px;max-height:calc(100% - 24px);overflow:auto;overscroll-behavior:contain;
+  background:var(--surface);border:1px solid var(--ring);border-radius:10px;box-shadow:0 6px 24px rgb(0 0 0 / .12);z-index:2}
+.fpanel{display:flex;flex-direction:column;gap:14px;padding:14px 14px 12px;font-size:13px}
+.stage.chartstage>.fpanel{padding:0}
+.fpanel:empty{display:none}
+.stage.chartstage>.fpanel:empty+*{grid-column:1/-1}
+.eyebrow{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.fsec{display:flex;flex-direction:column;gap:6px}
+.fsec-h{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.linkbtn{background:none;border:0;padding:2px 0;color:var(--accent);font:500 12px inherit;font-family:inherit;cursor:pointer}
+.flist{display:flex;flex-direction:column;gap:1px;margin:0;padding:0;list-style:none}
+.flist button{all:unset;box-sizing:border-box;width:100%;display:grid;grid-template-columns:12px minmax(0,1fr) auto;gap:9px;align-items:center;padding:5px 6px;border-radius:6px;cursor:pointer}
+.flist button:hover{background:var(--chip)}
+.flist button:focus-visible,.seg button:focus-visible,.mapctl button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.flist .sw{width:11px;height:11px;border-radius:50%}
+.flist .nm{min-width:0;display:flex;flex-direction:column;gap:3px}
+.flist .nm>span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.flist .nm em{font-style:normal;font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.flist .fb{height:3px;border-radius:2px;background:var(--grid);overflow:hidden}
+.flist .fb i{display:block;height:100%}
+.flist .ct{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.flist.filtering button[aria-pressed="false"]{opacity:.45}
+.flist button[aria-pressed="true"]{background:var(--chip);box-shadow:inset 0 0 0 1.5px var(--accent)}
+.flist.toggles button[aria-pressed="false"]{opacity:.45}
+.flist.toggles button[aria-pressed="false"] .sw{background:transparent!important;box-shadow:inset 0 0 0 1.5px var(--muted)}
+.flist.toggles button[aria-pressed="true"]{background:none;box-shadow:none}
+/* tabs at the top of a filter panel: switch one section between related charts */
+.ftabs{display:flex;gap:2px;padding:3px;background:var(--chip);border-radius:9px}
+.ftabs button{flex:1 1 0;font:inherit;font-size:12.5px;line-height:1.25;border:0;border-radius:7px;background:none;color:var(--ink2);padding:6px 8px;cursor:pointer}
+.ftabs button[aria-selected="true"]{background:var(--surface);color:var(--ink);font-weight:600;box-shadow:0 1px 3px rgb(0 0 0 / .12)}
+.ftabs button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.seg{display:flex;border:1px solid var(--ring);border-radius:8px;overflow:hidden;width:max-content;max-width:100%}
+.seg button{font:inherit;font-size:12px;border:0;background:var(--surface);color:var(--ink2);padding:5px 10px;cursor:pointer}
+.seg button+button{border-left:1px solid var(--ring)}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--surface)}
+.fsel{width:100%}
+.find{display:flex;gap:6px}
+.find input{flex:1;min-width:0;font:inherit;font-size:13px;color:var(--ink);background:var(--chip);border:1px solid var(--ring);border-radius:7px;padding:6px 9px}
+.mapctl{position:absolute;top:12px;right:12px;display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--ring);border-radius:8px;overflow:hidden;z-index:2}
+.mapctl button{width:34px;height:34px;border:0;background:none;color:var(--ink);padding:0;display:grid;place-items:center;cursor:pointer}
+.mapctl svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
+.mapctl button+button{border-top:1px solid var(--ring)}
+.mapctl button:hover{background:var(--chip)}
+.scalebar{position:absolute;right:14px;bottom:12px;font-size:11px;color:var(--ink2);display:flex;flex-direction:column;align-items:flex-end;gap:3px;pointer-events:none;z-index:2}
+.scalebar i{display:block;height:5px;border:1.5px solid var(--ink2);border-top:0}
+.ftoggle{display:none}
+.maphint{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:3;pointer-events:none;opacity:0;transition:opacity .2s;
+  background:rgb(11 11 11 / .78);color:#fff;font-size:13px;font-weight:500;padding:8px 14px;border-radius:999px;white-space:nowrap}
+.maphint.on{opacity:1}
+.stlab{font-weight:500;pointer-events:none;paint-order:stroke;stroke:var(--surface);stroke-linejoin:round}
+.stlab.major{font-weight:650}
+/* stepped legend for equal-count classes (NOLA.stepLegend): the value under each boundary is where that color starts */
+.legend .steps{flex:1 1 100%;display:flex;max-width:290px;padding:0 14px 0 0}
+.legend .steps span,.steps span{flex:1;display:flex;flex-direction:column;align-items:stretch;gap:3px;min-width:0}
+.steps i{width:auto!important;height:10px;border-radius:0!important}
+.steps span:first-child i{border-radius:3px 0 0 3px!important}
+.steps span:nth-child(7) i{border-radius:0 3px 3px 0!important}
+.steps em{align-self:flex-start;font-style:normal;font-size:10.5px;color:var(--ink2);white-space:nowrap;font-variant-numeric:tabular-nums;transform:translateX(-50%)}
+.steps span:first-child em{transform:none}
+.steps .end{flex:0 0 0;padding-top:13px}
+.nonekey{font-size:11.5px}
+.maplegend{display:none}
+@media(max-width:760px){
+  .stage.chartstage{grid-template-columns:1fr}
+  .stage.chartstage>.fpanel{position:static}
+  .stage.mapstage{height:auto;overflow:visible;border:0;background:none}
+  .stage.mapstage>.fpanel{position:static;width:auto;max-height:none;box-shadow:none;margin-bottom:10px}
+  .stage.mapstage .plot{position:relative;height:min(560px,70vh);border:1px solid var(--ring);border-radius:12px;overflow:hidden;background:var(--surface)}
+  .ftoggle{display:block;margin-bottom:8px}
+  .maplegend{display:block;position:absolute;left:10px;bottom:10px;width:min(250px,calc(100% - 100px));background:var(--surface);border:1px solid var(--ring);border-radius:8px;padding:6px 8px 4px;z-index:2;font-size:11px;color:var(--ink2)}
+  .maplegend .steps{display:flex;padding-right:12px}
+  .maplegend .nonekey{display:flex;align-items:center;gap:5px;margin-top:3px}
+  .maplegend .nonekey i{width:10px;height:10px;border-radius:3px;display:inline-block}
+  .mlh{margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .fpanel.collapsed{display:none}
+}
+
+/* ---------- full-screen maps (NOLA.mapButtons): the map's whole stage fills the screen, filters, legend, scale bar and
+   controls included. .mapfs is on while full screen; .mapfs-css is the fallback layer where the Fullscreen API isn't
+   offered (iPhone), which also locks the page's scroll (html.mapfs-lock). `html` lifts these over page-specific sizes. */
+html .stage.mapstage.mapfs{position:fixed;top:0;right:0;bottom:0;left:0;z-index:1000;width:auto;height:auto;max-width:none;margin:0;
+  border:0;border-radius:0;background:var(--surface);overflow:hidden}
+html .stage.mapstage.mapfs .plot{position:absolute;inset:0;height:auto;border:0;border-radius:0;overflow:hidden}
+html .stage.mapstage.mapfs .map>svg,html .stage.mapstage.mapfs .plot canvas{border-radius:0;touch-action:none} /* one finger moves the map */
+html.mapfs-lock,html.mapfs-lock body{overflow:hidden;overscroll-behavior:none}
+@media(max-width:760px){ /* phones: the Filters button and the panel float over the map */
+  html .stage.mapstage.mapfs>.ftoggle{position:absolute;top:10px;left:10px;z-index:4;margin:0;padding:6px 12px;font-size:13px;color:var(--ink);box-shadow:0 2px 10px rgb(0 0 0 / .16)}
+  html .stage.mapstage.mapfs>.fpanel{position:absolute;top:52px;left:10px;width:min(320px,calc(100% - 66px));max-height:calc(100% - 62px);overflow:auto;
+    overscroll-behavior:contain;margin:0;z-index:3;box-shadow:0 6px 24px rgb(0 0 0 / .18)}
+  html .stage.mapstage.mapfs>.fpanel.collapsed{display:none}
+}
+
+/* ---------- one page per dataset: data pages (drone, calls, trees) ---------- */
+/* tables whose rows don't do anything on click */
+table.static tbody tr{cursor:auto}
+/* on phones a wide table scrolls inside its card instead of widening the page */
+@media(max-width:760px){.stage.chartstage{grid-template-columns:minmax(0,1fr)}}
+
+/* ---------- CPC page (cpc.js): filing-date range in the map panel, and the case-type key under the map ---------- */
+.cpc-range{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.cpc-range label{display:flex;flex-direction:column;gap:3px;min-width:0}
+.cpc-range span{font-size:11px;color:var(--muted)}
+.cpc-range input{width:100%;min-width:0;font:inherit;font-size:12.5px;color:var(--ink);background:var(--chip);border:1px solid var(--ring);border-radius:7px;padding:5px 7px}
+.cpc-range input:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.cpc-key{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px 22px;margin-top:16px}
+.cpc-kt{display:flex;gap:9px;align-items:flex-start;font-size:13px;line-height:1.45}
+.cpc-kt i{flex:0 0 11px;height:11px;border-radius:50%;margin-top:4px}
+.cpc-kt b{font-weight:600}
+.cpc-kt p{margin:1px 0 0;color:var(--ink2)}
+@media(max-width:600px){.cpc-key{grid-template-columns:1fr;gap:10px}}
+
+/* ===================== 311 service requests page (src/311.js) ===================== */
+.srmini svg text{fill:var(--ink2)}
+.srages{display:flex;flex-direction:column;gap:5px;font-size:12.5px;color:var(--ink2)}
+.srages span{display:grid;grid-template-columns:12px 1fr auto;gap:8px;align-items:center}
+.srages i{width:11px;height:11px;border-radius:3px}
+.srages b{font:400 12px "IBM Plex Mono",ui-monospace,monospace;color:var(--muted)}
+/* ===================== short-term rentals page (src/str.js): uses the 311 page's .srages lists ===================== */
+/* ===================== blight and code enforcement page (src/blight.js); also uses .srages ===================== */
+.srages i.tickkey{width:2px;height:14px;border-radius:0;background:var(--ink);margin-left:4px}
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script><script src="streets.js"></script>
+</head><body><div class="wrap">
+<div class="site"><b><a href="index.html" style="color:inherit;text-decoration:none">Nola Vizzes</a></b><nav class="topnav" aria-label="Site"><div class="dd"><button type="button" class="ddbtn on" aria-haspopup="true" aria-expanded="false">Visualizations<span aria-hidden="true">▾</span></button><ul class="dd1"><li><a href="cpc.html">Planning cases</a></li><li><a href="311.html">311 service requests</a></li><li><a href="str.html">Short-term rentals</a></li><li><a href="blight.html" class="on" aria-current="page">Blight and code enforcement</a></li><li><a href="permits.html">Building permits</a></li><li><a href="biz.html">New businesses</a></li><li><a href="trees.html">Street trees</a></li></ul></div><a class="xlink" href="about.html">About</a></nav><script>(()=>{const dd=document.currentScript.closest(".site").querySelector(".dd"),b=dd.querySelector(".ddbtn");const set=o=>{dd.classList.toggle("open",o);b.setAttribute("aria-expanded",o)};b.onclick=e=>{e.stopPropagation();set(!dd.classList.contains("open"))};document.addEventListener("click",e=>{if(!dd.contains(e.target))set(false)});dd.addEventListener("keydown",e=>{if(e.key==="Escape"){set(false);b.focus()}})})()</script></div>
+<h1>Blight and code enforcement</h1>
+<div class="src">Code Enforcement <a href="https://data.nola.gov/d/u6yx-v2tw">All Cases</a>, <a href="https://data.nola.gov/d/44ct-56tr">Hearings</a>, <a href="https://data.nola.gov/d/3ehi-je3s">Violations</a> and <a href="https://data.nola.gov/d/uh5a-f7uw">Inspections</a>, <a href="https://data.nola.gov/d/xhih-vxs6">Grass Cutting</a>, <a href="https://data.nola.gov/d/xv8z-gn8b">Abatements</a> · data.nola.gov · Cases through Nov 18, 2026 · Updated Nov 19, 2026</div>
+<div id="chart"></div>
+<div class="foot">Data: <a id="dataLink" href="https://data.nola.gov">data.nola.gov</a> · Not affiliated with the City of New Orleans · <a href="about.html">About</a></div>
+</div>
+<script>const DATA={"geo":{"nb":[{"n":"U.S. NAVAL BASE","r":[[547,1370,62,34,-5,22,3,4,-1,30,-75,-37,-16,-7,-26,-1,3,-65,55,20]]},{"n":"ALGIERS POINT","r":[[457,1343,-4,52,-31,1,-6,-3,-23,14,0,-41,8,-15,12,-8,10,-2,34,2]]},{"n":"WHITNEY","r":[[492,1350,-6,100,10,0,0,4,-1,2,-19,0,-8,2,-4,36,-21,-22,9,-1,2,-35,2,0,2,-41,-5,0,4,-52,35,7]]},{"n":"AUDUBON","r":[[147,1436,-26,113,-41,-10,-9,25,-18,-9,-3,3,0,7,-14,28,-14,-9,-10,-12,-4,-10,-3,-16,35,-54,-7,-5,79,-115,18,51,17,13]]},{"n":"LOWER NINTH WARD","r":[[682,1256,-36,86,-33,-13,-69,-18,27,-94,7,5,61,16,43,18]]},{"n":"OLD AURORA","r":[[618,1410,130,87,1,30,-11,100,-13,-11,-13,-1,-4,2,-11,-2,-62,-41,-30,-25,4,-78,-4,-3,2,-38,-3,-4,5,-22,9,6]]},{"n":"B. W. COOPER","r":[[265,1385,-16,24,-47,-31,1,-5,19,-29,37,31,6,10]]},{"n":"BAYOU ST. JOHN","r":[[299,1243,-31,42,-33,-23,-1,-3,7,-19,12,-18,-14,-15,6,-7,54,43]]},{"n":"DIXON","r":[[135,1236,9,31,13,21,-12,13,-25,-23,-23,-22,5,-5,3,3,4,-3,4,3,14,-16,-3,-3,11,1]]},{"n":"BEHRMAN","r":[[606,1460,-1,8,4,3,-4,78,-9,-7,-6,-1,-14,-12,-62,-30,-23,-4,0,-25,-5,-8,-9,-6,18,0,1,-2,0,-4,-10,0,3,-35,27,1,90,44]]},{"n":"BLACK PEARL","r":[[57,1452,-24,35,7,5,-35,54,-1,-49,1,-45,24,-26,28,26]]},{"n":"BROADMOOR","r":[[186,1372,26,63,-13,6,-37,3,-8,-3,-7,-5,9,-31,-12,-3,6,-20,4,1,3,-12,8,-12,21,13]]},{"n":"BYWATER","r":[[571,1217,-33,116,9,37,-72,-24,-52,-5,0,-19,11,-41,29,8,-4,13,13,3,44,12,18,-70,-9,-2,9,-35,-2,-3,39,10]]},{"n":"CENTRAL BUSINESS DISTRICT","r":[[325,1348,31,24,-3,5,15,12,25,-1,0,29,3,37,-22,1,0,-4,3,0,-1,-7,-3,-3,-1,-20,-3,-1,-27,-6,-7,25,-2,-1,-57,-38,-7,-6,-4,-9,40,-52,20,15]]},{"n":"CENTRAL CITY","r":[[202,1378,47,31,16,-24,4,9,7,6,59,39,-3,14,-11,-5,-14,22,-5,-6,-3,3,-58,39,-18,-40,-5,2,-2,-5,-5,-14,1,-16,-29,-67,19,12]]},{"n":"EAST CARROLLTON","r":[[99,1390,-42,62,-24,-23,-4,-3,50,-54,20,18]]},{"n":"EAST RIVERSIDE","r":[[189,1570,-2,-20,33,-4,32,-11,5,10,7,17,-75,8]]},{"n":"LITTLE WOODS","r":[[968,777,-169,122,-100,48,-19,6,-52,10,-16,-1,-25,-8,-29,10,-12,-36,-29,8,-11,-2,5,1,0,-10,13,-4,0,-44,4,-10,-1,-51,13,0,0,10,9,1,4,10,7,1,-4,6,2,3,3,0,1,17,16,17,18,-8,4,-5,-1,-4,2,-3,5,5,-12,14,-11,6,16,12,14,-14,-1,-6,2,-1,4,15,-3,4,1,3,102,-47,51,-29,15,-9,-1,-3,5,0,0,-4,8,0,41,-28,51,-41,7,-9,-2,-6,13,-9,0,-3,4,0,4,4,-1,-2,4,0,26,-24,-1,1,15,12,6,8,5,67]]},{"n":"MARIGNY","r":[[434,1281,-11,41,0,19,-19,-11,-2,-6,-33,-25,13,-13,52,-5]]},{"n":"CITY PARK","r":[[264,1113,2,16,-14,46,1,6,-6,8,-2,10,-6,8,14,15,-13,21,-25,-19,-6,8,-32,-26,-8,-6,11,-2,20,-193,36,1,26,-10,13,-2,-5,12,-6,67,1,39,-3,1,2,0]]},{"n":"DESIRE AREA","r":[[571,1217,-113,-31,2,-6,-5,-85,11,-1,57,-24,23,-6,32,124,-7,29]]},{"n":"DILLARD","r":[[393,1161,-52,3,0,-3,-19,-5,-3,-47,-1,-11,23,-18,-1,-12,46,-4,7,97]]},{"n":"GARDEN DISTRICT","r":[[294,1509,-42,26,-8,-22,-3,-7,36,-23,17,26]]},{"n":"FAIRGROUNDS","r":[[305,1154,14,7,1,10,16,-1,0,6,10,0,2,4,-49,63,-25,-20,-29,-23,2,-11,6,-8,-1,-6,7,-24,46,3]]},{"n":"FILLMORE","r":[[334,991,7,89,-23,18,1,11,-57,4,3,-1,-1,-17,6,-89,5,-12,59,-3]]},{"n":"FISCHER DEV","r":[[477,1456,10,6,4,10,-1,31,-5,13,-21,-22,2,-34,4,-4,7,0]]},{"n":"FLORIDA AREA","r":[[505,1200,4,2,-2,8,4,1,-1,5,21,6,-6,23,-51,-13,-5,-2,8,-28,-21,-6,2,-10,47,14]]},{"n":"FLORIDA DEV","r":[[532,1207,2,3,-3,12,-18,-5,-3,-1,1,-5,-4,-1,2,-8,-4,-2,27,7]]},{"n":"FRERET","r":[[177,1442,3,33,-22,2,-20,-2,3,-16,6,-23,12,7,18,-1]]},{"n":"GENTILLY TERRACE","r":[[451,1038,7,97,-20,24,-45,2,-2,-23,-7,-98,28,-3,38,-1,1,2]]},{"n":"GENTILLY WOODS","r":[[546,1064,-23,6,-51,22,-14,3,-3,0,-2,-25,-1,-34,81,-18,13,46]]},{"n":"GERT TOWN","r":[[222,1344,-20,34,-19,-12,3,6,-21,-13,2,-5,-23,-14,-4,5,-16,-14,-4,-3,-3,3,-13,-12,11,-12,-4,-4,7,-8,4,4,10,-10,13,12,12,-13,12,13,53,43]]},{"n":"HOLLYGROVE","r":[[97,1256,35,33,-10,10,-4,-4,-7,8,4,4,-11,12,-8,-8,-23,25,-28,-26,27,-54,1,-12,13,1,11,11]]},{"n":"HOLY CROSS","r":[[646,1342,-28,68,-71,-40,-9,-37,6,-22,16,4,53,14,33,13]]},{"n":"IBERVILLE","r":[[335,1335,-10,13,-20,-15,4,-5,6,-8,20,15]]},{"n":"IRISH CHANNEL","r":[[309,1533,17,28,-80,31,-57,19,1,-24,-2,-10,1,-7,75,-8,-12,-27,42,-26,15,24]]},{"n":"LAKE CATHERINE","r":[[1920,145,5,5,0,3,2,1,10,22,12,7,-1,1,2,3,1,6,-7,0,-2,5,21,13,5,15,-2,3,4,1,1,5,52,13,9,6,16,-2,10,-5,13,-2,59,-31,35,-28,2,-5,1,-9,3,-3,-2,-12,11,-10,4,0,16,6,10,8,28,12,46,27,19,16,13,19,1,7,15,0,11,6,11,2,11,6,2,-4,10,3,12,-4,26,2,27,8,-2,4,2,4,8,1,24,9,-8,33,-8,0,-13,8,-33,10,-7,22,-29,31,-7,2,-3,7,1,6,-6,12,-23,37,-9,9,-36,21,-8,11,-10,7,-13,3,-11,-2,-9,4,0,3,-2,-2,-6,2,-4,5,0,3,-7,9,-2,30,-5,15,-2,23,-5,18,-2,39,-4,13,3,4,1,10,-4,17,-32,16,-40,14,-13,-2,-29,5,-8,-2,-21,6,-6,6,-2,-1,-4,3,-19,3,-9,5,-1,6,-10,9,-2,-1,-10,3,0,4,-5,1,1,3,-4,1,-3,7,-4,2,0,6,-3,0,-2,5,2,1,-3,2,1,3,2,0,-5,19,3,4,0,5,-2,1,3,3,-3,8,2,7,3,4,5,16,35,50,7,14,1,9,12,7,3,11,5,1,-2,7,2,1,-4,7,-37,18,-18,2,-28,-1,-6,-11,-12,-11,-9,-3,-4,-6,-21,-12,-9,-13,-1,-7,-13,-13,-7,-12,-17,-5,-4,-5,-12,-2,-12,-6,-10,-12,-16,-10,-34,5,-7,-4,-30,-7,-39,-1,-9,-3,-16,3,-60,0,-25,5,-26,0,-11,4,-8,8,0,-13,-7,-2,-39,18,-22,-120,-49,-55,-7,-4,-47,2,-3,-5,-33,-214,-12,-54,-11,-1,-60,-131,2,-4,-1,4,3,6,9,0,57,-32,11,-1,3,-4,6,2,13,-2,9,-5,2,-4,3,1,2,-4,0,4,7,4,-4,4,2,10,-1,8,-3,6,-6,3,1,1,-2,6,2,0,1,3,-2,10,-1,3,-20,18,3,4,0,8,-3,4,3,9,0,10,9,24,21,38,-1,5,4,0,1,5,3,1,-2,5,2,3,2,-1,-2,6,4,5,3,0,0,6,9,9,5,10,-2,2,7,17,17,16,8,16,15,10,-1,7,5,0,1,4,-5,7,3,6,8,-1,10,4,2,6,20,2,4,-2,23,-1,5,-4,4,-14,11,3,7,11,31,-2,5,-3,24,-2,23,-8,5,0,3,-3,29,-15,18,-4,0,-4,4,-4,-1,-2,5,-5,1,2,4,-6,6,-1,-8,-14,8,-15,19,-18,6,-2,1,-4,12,-10,3,-5,4,1,2,-7,28,-27,3,-2,4,3,1,-4,4,0,-2,-4,4,-5,7,-4,4,1,17,-16,1,-4,3,-2,-2,-3,4,-1,-2,-4,5,-4,2,-6,6,-2,3,-6,3,1,5,-6,4,0,-1,-4,3,0,1,-3,1,1,-1,-3,4,2,2,-4,2,0,-2,-3,3,0,2,-4,5,1,1,-4,9,-5,2,-3,-1,-3,4,-4,-4,-5,3,1,2,-7,8,-8,0,-6,4,-7,3,-1,4,-15,6,1,-1,-6,-2,-1,2,-14,-2,-4,4,-3,-3,-4,-3,-12,-6,-2,1,-4,-3,-2,2,-2,-4,-1,1,-5,-4,-5,5,-1,0,-6,5,0,-5,-7,5,-32,8,-2,2,-5,3,5]]},{"n":"LAKESHORE - LAKE VISTA","r":[[278,964,-3,30,-13,2,-22,10,-16,1,-96,-9,-6,4,6,-45,3,-2,-1,6,9,-2,14,-4,23,2,9,-6,18,0,3,3,2,0,3,-5,12,-1,11,-5,8,2,8,11,22,2,6,6]]},{"n":"LAKEVIEW","r":[[200,1005,-15,143,-38,-4,1,-8,-32,-2,0,-13,-1,-9,7,-110,6,-4,72,7]]},{"n":"LAKE TERRACE & OAKS","r":[[506,934,-46,12,-16,13,-33,7,-35,4,-15,7,-28,3,1,11,-56,3,-3,0,4,-35,10,-11,8,-13,11,-3,10,4,5,-6,15,-1,12,-4,9,3,4,-7,0,4,5,0,1,-5,2,4,7,0,5,-1,0,-4,1,4,6,0,2,-4,4,5,7,-3,59,-8,10,2,11,7,11,14,12,-2]]},{"n":"LAKEWOOD","r":[[115,1112,2,13,-4,27,3,25,19,59,-11,-1,3,3,-7,8,-7,8,-4,-3,-4,3,-3,-3,-5,5,-11,-11,-13,-1,10,-134,32,2]]},{"n":"WEST END","r":[[131,955,-2,0,-2,7,-5,41,-7,109,-32,-2,13,-165,6,1,28,3,2,2,-1,4]]},{"n":"LEONIDAS","r":[[104,1319,13,12,-98,106,-14,15,-5,-51,45,-91,28,26,23,-25,8,8]]},{"n":"LOWER GARDEN DISTRICT","r":[[396,1454,-3,34,-5,12,-14,20,-23,-5,-28,-29,-1,6,1,2,-14,11,10,13,-9,7,3,5,-4,3,-32,-50,3,-2,22,-17,5,6,14,-22,11,5,10,-39,30,7,1,20,3,3,1,7,-3,0,0,4,22,-1]]},{"n":"MARLYVILLE - FONTAINBLEAU","r":[[165,1359,-8,12,-3,12,-4,-1,-6,20,12,3,-9,31,-17,-13,-15,-43,-3,-8,-13,18,-20,-18,41,-44,20,17,4,-5,23,14,-2,5]]},{"n":"McDONOGH","r":[[453,1395,5,0,-6,76,-9,1,-49,-54,-1,-11,23,-14,3,2,34,0]]},{"n":"MID-CITY","r":[[240,1244,-6,15,1,3,33,23,-46,59,-53,-43,-10,-11,-7,-8,-8,-15,-17,-52,42,-15,40,32,6,-8,25,20]]},{"n":"MILAN","r":[[241,1506,-22,9,-35,3,-7,-76,29,-4,6,-3,-1,16,7,17,5,-2,18,40]]},{"n":"MILNEBURG","r":[[450,1036,-44,1,-22,3,-4,-58,-1,-12,32,-4,34,-7,5,77]]},{"n":"NAVARRE","r":[[185,1148,-5,50,-23,5,-30,12,-9,-29,-2,-22,-3,-12,3,-18,32,2,-1,8,38,4]]},{"n":"PINES VILLAGE","r":[[628,963,-14,7,-6,13,5,67,-33,4,-34,10,-36,-127,3,-2,33,-7,12,36,29,-10,25,8,16,1]]},{"n":"PLUM ORCHARD","r":[[730,1031,-51,11,-66,8,-4,-51,0,-2,11,-3,57,-5,22,-7,28,-5,-2,1,5,53]]},{"n":"ST. BERNARD AREA","r":[[322,1149,-20,-1,3,6,-46,-3,1,-4,6,-18,-2,-16,55,-4,3,40]]},{"n":"PONTCHARTRAIN PARK","r":[[510,936,23,82,-72,15,-10,5,-3,-32,-3,-47,16,-13,45,-12,4,2]]},{"n":"READ BLVD EAST","r":[[968,960,-66,26,-72,21,-4,-47,-31,-49,-4,-7,177,-127,4,68,-3,32,-1,83]]},{"n":"READ BLVD WEST","r":[[830,1007,-51,14,-49,10,-5,-53,13,-2,42,-4,46,-10,4,45]]},{"n":"ST. CLAUDE","r":[[525,1245,9,2,-18,70,-57,-15,4,-13,-30,-8,9,-33,14,-52,21,6,-8,28,56,15]]},{"n":"NEW AURORA - ENGLISH TURN","r":[[747,1641,0,-3,-9,-12,11,-99,-1,-30,85,38,27,3,34,2,55,-2,50,7,30,7,14,7,24,20,25,32,18,36,17,41,14,46,3,27,-1,26,-6,23,-11,19,-14,12,-31,15,-92,-151,-115,-53,-67,-10,-19,10,-11,0,-30,-11]]},{"n":"SEVENTH WARD","r":[[401,1284,-22,3,-10,12,-70,-56,24,-31,25,-32,12,0,1,6,11,-1,0,5,17,-1,0,6,7,0,-1,22,6,67]]},{"n":"TREME - LAFITTE","r":[[369,1299,-31,39,-70,-54,8,-11,23,-30,70,56]]},{"n":"ST.  ANTHONY","r":[[384,1040,2,24,-46,4,-7,-88,26,-3,20,-7,5,70]]},{"n":"TOURO","r":[[252,1535,-32,11,-33,4,-3,-28,0,-4,35,-3,22,-9,11,29]]},{"n":"ST. ROCH","r":[[458,1186,-25,95,-32,3,-6,-67,1,-22,-7,0,0,-6,-17,1,0,-5,-11,1,-1,-6,-12,1,-2,-5,-10,0,0,-6,-14,1,-2,0,-1,-10,-13,-5,-4,-8,20,1,0,7,19,5,0,3,94,-6,3,1,20,-24,2,45,-2,6]]},{"n":"ST. THOMAS DEV","r":[[374,1520,-17,20,-31,21,-17,-28,4,-3,-3,-5,9,-7,-7,-8,-3,-5,14,-11,-1,-2,1,-6,28,29,23,5]]},{"n":"TALL TIMBERS - BRECHTEL","r":[[605,1549,29,24,60,40,14,4,10,-2,11,3,18,20,0,3,-11,-2,-9,85,-61,-46,-1,31,-27,-18,0,-7,-50,-55,-103,-112,6,-22,17,2,68,32,14,12,6,1,9,7]]},{"n":"TULANE - GRAVIER","r":[[315,1320,-50,65,-6,-10,-37,-31,46,-60,47,36]]},{"n":"UPTOWN","r":[[184,1518,3,32,-32,2,-34,-3,7,-32,10,-42,20,2,22,-2,4,43]]},{"n":"VIAVANT - VENETIAN ISLES","r":[[1543,869,-6,15,-6,4,0,3,-19,18,-23,13,-42,42,-6,10,-10,10,-6,17,-32,44,-3,8,-8,10,-7,-2,-12,8,-6,13,3,12,-6,12,-26,15,-1,6,5,7,21,14,3,6,-1,9,-14,13,-9,3,-8,-3,-6,-6,-8,-18,-8,-3,-9,6,-6,15,-9,10,-18,8,-6,0,-5,-4,-16,-25,4,-13,-4,-16,-18,-9,-5,-13,-24,-13,-6,0,-6,7,-6,1,-33,-9,-34,13,-11,28,-12,8,-17,0,-11,9,-8,-1,-20,22,-24,6,-10,5,-5,7,-12,4,-3,6,2,12,-3,4,-29,-7,-18,6,-6,-2,-15,1,-7,-9,-2,-18,-4,-4,-5,-1,-7,6,-6,1,-22,-21,-9,-1,-20,-13,-2,-10,-3,-3,-5,-2,-8,2,-24,25,-6,12,-6,3,-2,10,-5,3,-7,9,-11,22,0,4,-5,3,-27,33,-67,-28,-61,-16,-7,-5,7,-29,-32,-124,34,-10,101,-13,91,-18,120,-34,272,-104,125,-88,26,-23,9,-12,6,-13,4,-34,3,-10,11,-13,16,-7,4,0,4,10,47,-2,7,4,50,58,21,117,39,-18,7,2,0,13]]},{"n":"FRENCH QUARTER","r":[[423,1341,-10,2,-12,8,-8,15,0,22,-25,1,-15,-12,3,-5,-31,-24,7,-9,3,-4,3,3,31,-39,33,25,2,6,19,11]]},{"n":"WEST LAKE FOREST","r":[[826,962,-46,10,-34,2,-41,7,-27,8,-58,5,-11,3,-1,-17,6,-10,11,-6,70,-16,96,-44,35,58]]},{"n":"VILLAGE DE LEST","r":[[1255,286,-2,4,52,116,8,15,11,1,12,54,32,209,-17,6,-12,12,-5,12,-4,34,-6,13,-9,12,-26,23,-80,54,-33,28,-21,10,-187,71,1,-83,3,-32,-2,-27,0,-19,-7,-88,-6,-9,-15,-12,56,-55,54,-62,203,-287]]},{"n":"WEST RIVERSIDE","r":[[121,1549,34,3,32,-2,1,29,2,2,-1,30,-30,7,-33,0,-57,-11,-33,-14,14,-28,0,-7,3,-3,18,9,9,-25,41,10]]}],"pd":[{"n":"7","r":[[2040,217,9,0,20,-6,55,-26,13,-9,17,-27,7,-6,10,-5,18,-2,24,7,82,41,16,12,13,18,17,12,24,6,48,0,55,12,19,6,0,28,-12,26,-9,8,-8,0,-13,8,-33,10,-7,22,-29,31,-7,2,-3,7,1,6,-6,12,-23,37,-9,9,-36,21,-8,11,-10,7,-13,3,-11,-2,-9,4,0,3,-2,-2,-6,2,-4,5,0,3,-7,9,-2,30,-5,15,-2,23,-5,18,-2,39,-4,13,3,4,1,10,-4,17,-32,16,-40,14,-13,-2,-29,5,-8,-2,-21,6,-6,6,-2,-1,-4,3,-19,3,-9,5,-1,6,-10,9,-2,-1,-10,3,0,4,-5,1,1,3,-4,1,-3,7,-4,2,0,6,-3,0,-2,5,2,1,-3,2,1,3,2,0,-5,19,3,4,0,5,-2,1,3,3,-3,8,2,7,3,4,5,16,35,50,7,14,1,9,12,7,3,11,5,1,-2,7,2,0,0,4,-7,6,-34,16,-44,2,-20,-23,-9,-3,-4,-6,-21,-12,-9,-13,-1,-7,-13,-13,-7,-12,-17,-5,-4,-5,-12,-2,-12,-6,-10,-12,-12,-9,-12,-1,-26,5,-7,-4,-30,-7,-39,-1,-9,-3,-16,3,-60,0,-25,5,-28,0,-14,9,-9,18,-25,25,-23,13,-42,42,-6,10,-10,10,-6,17,-41,60,-15,2,-6,6,-6,13,3,12,-6,12,-26,15,-1,6,5,7,21,14,3,6,0,6,-3,6,-15,12,-9,1,-7,-4,-12,-23,-6,-4,-11,7,-6,15,-9,10,-18,8,-6,0,-5,-4,-16,-25,4,-13,-4,-16,-18,-9,-5,-13,-24,-13,-6,0,-6,7,-6,1,-33,-9,-34,13,-11,28,-12,8,-17,0,-11,9,-8,-1,-20,22,-24,6,-10,5,-5,7,-12,4,-3,6,2,12,-3,4,-29,-7,-18,6,-6,-2,-15,1,-7,-9,-2,-18,-3,-4,-6,-1,-7,6,-8,0,-20,-20,-9,-1,-20,-13,-3,-11,-7,-4,-11,4,-9,12,-12,11,-6,12,-6,3,-2,10,-8,6,-10,18,-144,-75,-15,16,-14,-9,-19,-64,10,-4,1,-7,15,-3,-3,-10,2,-1,-5,-52,-26,-84,-21,-2,0,-44,4,-10,-1,-51,13,0,0,10,9,1,6,8,6,3,1,26,17,17,32,-28,20,20,69,-26,48,-22,80,-53,106,-93,86,-80,229,-322,156,-54,-13,29,-9,48,-20,44,4,34,64,125,35,36,47,11,94,-1,52,-15,31,-30,17,-34,86,-81,103,-117,7,-44,-12,-30,7,-43,10,-18,20,-6,12,7,24,21,40,42,21,13,15,3]]},{"n":"4","r":[[618,1410,116,79,36,19,63,27,41,4,75,-1,33,4,47,10,25,14,13,13,25,32,27,55,14,44,8,24,3,27,-4,39,-7,20,-21,21,-31,15,-92,-151,-115,-53,-67,-10,-19,10,-11,0,-19,-9,-22,-4,-9,85,-61,-46,-1,31,-27,-18,0,-7,-244,-266,-1,-52,8,-15,12,-8,10,-2,52,5,72,24,71,40]]},{"n":"2","r":[[191,1610,-18,6,-47,2,-57,-11,-16,-5,-31,-18,-10,-12,-6,-20,-2,-25,2,-60,-6,-66,67,-135,51,4,26,10,8,12,-8,9,8,8,11,10,27,64,-3,1,29,79,-16,5,-21,1,7,75,6,-1,0,6,-6,1,5,60]]},{"n":"1","r":[[375,1291,-50,65,-25,-19,-36,47,-6,-11,-91,-74,-11,-11,6,-6,73,-79,7,-4,19,15,2,-2,40,1,5,-27,7,-12,60,117]]},{"n":"6","r":[[265,1383,4,8,3,2,33,16,21,15,-3,6,22,13,21,5,0,23,30,-4,-3,21,-14,26,-22,26,-27,19,-84,33,-55,18,-5,-60,6,-1,0,-6,-6,1,-7,-75,31,-4,6,-2,-2,-5,-27,-74,3,-1,-27,-63,-19,-19,12,-13,16,16,86,69,7,10]]},{"n":"8","r":[[396,1467,-30,4,0,-23,-16,-3,-22,-12,-5,-3,3,-6,-21,-15,-36,-18,-4,-8,35,-46,25,19,4,-5,50,-63,55,-6,-11,43,-1,16,-9,2,-12,8,-8,15,0,51,4,30,-1,20]]},{"n":"3","r":[[524,912,0,9,21,2,26,84,5,52,-2,1,3,10,-15,3,0,5,-3,4,-62,18,-24,15,-15,19,2,45,-2,10,-61,5,-45,-20,-22,29,-15,-29,-2,3,-5,9,-5,27,-40,-1,-2,2,-19,-15,-7,4,-83,89,-5,-10,-24,-11,-56,-5,5,-10,27,-342,219,1,183,-13,23,-25,0,35]]},{"n":"5","r":[[743,1216,-5,14,-5,3,-27,33,-24,-10,-64,154,-71,-40,-55,-20,-35,-7,-35,-2,1,-16,11,-43,-51,4,-8,5,-19,-37,-26,-51,22,-29,45,20,61,-5,2,-10,-2,-45,11,-14,11,-11,17,-9,54,-16,19,64,14,9,15,-16,144,75]]}],"pop":[2070,2289,2060,17054,4982,15480,1399,3583,1397,7928,1866,6039,3563,4351,14077,4041,2601,32656,2469,2719,2989,5413,1877,5343,5961,1045,1689,160,1643,8727,3206,4247,5188,3493,1122,3104,887,3730,9751,3609,1894,4635,6925,6202,6133,2312,14358,5551,4233,2846,4258,5390,2732,2103,7683,4694,7491,5295,10909,5748,4642,2859,7485,2295,12121,3606,5861,1052,3523,5010,9808,4742],"hu":[936,1414,1051,5862,2199,6611,513,2145,737,3381,1076,3056,2512,4491,8507,2313,1536,13976,2290,1606,1114,2483,1192,3163,2607,450,796,52,931,4330,1309,1687,2581,1852,647,1922,546,1606,4018,1180,734,2367,3927,4919,2990,1287,7257,3221,1992,1453,1691,2147,1252,796,2944,1892,4200,2092,6706,3546,2239,1783,4125,1269,5907,1910,3339,493,4694,2233,3432,2740]},"meta":{"pulled":"2026-11-19"},"ce":{"ds":["u6yx-v2tw","3ehi-je3s","uh5a-f7uw","44ct-56tr","xhih-vxs6","xv8z-gn8b"],"last":"2026-11-18","winStart":"2025-11-19","stages":["1 - Inspection","2 - Title Research","3 - Hearing","4 - Judgment","5 - In Compliance","X - Processing"],"ages":[90,365,730,1826],"openAge":[[[5,0,0,0,0],[4,1,4,11,0],[5,21,7,0,0],[0,1,11,7,47],[0,0,0,0,1],[0,0,1,3,1]],[[2,0,0,0,0],[0,1,2,2,0],[0,9,0,0,0],[0,0,3,2,6],[0,0,0,0,0],[0,0,0,1,1]],[[2,0,0,0,0],[3,5,5,12,0],[9,18,20,3,0],[0,2,25,17,40],[0,0,0,0,0],[0,0,1,1,0]],[[7,8,0,0,0],[1,3,0,2,0],[4,4,6,0,0],[0,0,5,9,8],[0,0,0,0,0],[0,0,1,1,0]],[[43,22,1,0,0],[38,80,42,37,1],[16,303,96,2,9],[0,15,156,49,609],[0,0,0,0,3],[0,7,4,4,6]],[[11,1,0,0,0],[2,1,3,19,1],[4,33,12,2,1],[0,2,32,34,54],[0,0,0,0,0],[0,0,0,7,0]],[[2,2,0,0,0],[1,0,3,10,1],[0,5,4,1,1],[0,1,3,1,12],[0,0,0,0,0],[0,1,0,0,0]],[[2,0,0,0,0],[1,3,1,2,0],[0,11,2,0,0],[1,0,7,5,14],[0,0,0,0,1],[0,0,0,2,0]],[[0,2,0,0,0],[5,6,1,1,0],[1,6,6,2,0],[0,0,7,12,43],[0,0,0,0,0],[0,0,1,0,0]],[[14,1,0,0,0],[19,1,27,24,0],[14,41,27,3,0],[1,3,79,27,113],[0,0,0,0,2],[0,1,1,4,1]],[[0,3,0,0,0],[0,0,1,1,0],[0,2,0,0,0],[0,0,0,1,7],[0,0,0,0,0],[0,0,0,0,0]],[[16,18,0,0,0],[3,1,1,25,0],[2,42,10,1,1],[0,0,12,13,76],[0,0,0,0,2],[0,0,1,4,0]],[[17,4,0,0,0],[0,4,1,7,0],[1,9,4,2,0],[0,3,7,22,49],[0,0,0,0,0],[0,2,0,2,0]],[[2,2,3,1,0],[13,1,2,12,0],[15,5,8,5,0],[2,2,6,34,10],[0,0,0,0,0],[0,0,1,2,0]],[[46,14,2,1,0],[35,20,25,82,2],[28,105,33,9,5],[0,6,103,95,332],[0,0,0,0,3],[0,4,5,15,1]],[[6,17,0,0,0],[0,0,0,1,0],[0,3,2,0,1],[0,3,9,10,6],[0,0,0,0,0],[0,1,2,0,0]],[[4,1,0,0,0],[1,1,0,3,0],[3,5,1,0,0],[0,0,5,7,8],[0,0,0,0,2],[0,0,0,0,0]],[[112,112,1,2,0],[22,18,11,32,1],[15,77,36,7,7],[0,7,61,98,378],[0,0,0,0,6],[1,3,8,21,1]],[[5,3,0,0,0],[0,1,0,1,0],[0,4,0,0,0],[0,0,3,10,8],[0,0,0,0,0],[0,0,0,1,0]],[[1,0,0,0,0],[1,0,0,1,0],[0,2,0,0,1],[0,0,2,3,2],[0,0,0,0,0],[0,0,1,1,0]],[[16,9,0,0,0],[18,6,4,48,0],[10,78,6,3,2],[0,2,32,38,168],[0,0,0,0,2],[0,2,0,3,0]],[[8,0,0,0,0],[3,5,5,13,1],[3,19,1,1,0],[0,2,24,23,63],[0,0,0,0,3],[0,0,0,2,0]],[[3,0,0,0,0],[1,0,0,0,0],[0,0,0,0,0],[0,1,0,0,3],[0,0,0,0,0],[0,0,0,0,0]],[[1,1,0,0,0],[1,3,0,2,0],[3,7,1,0,0],[0,1,11,14,18],[0,0,0,0,1],[0,1,1,3,0]],[[4,0,0,0,0],[2,3,1,11,0],[7,13,3,1,1],[0,2,9,17,50],[0,0,0,0,3],[0,0,0,4,0]],[[1,0,0,0,0],[0,0,3,4,0],[0,14,4,1,0],[0,1,8,1,23],[0,0,0,0,0],[0,0,0,0,0]],[[15,8,0,0,0],[4,10,5,23,0],[3,39,12,0,2],[0,1,13,23,202],[0,0,0,0,2],[0,0,0,6,0]],[[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,1],[0,0,0,0,0],[0,0,0,0,0]],[[2,1,0,0,0],[2,2,1,8,0],[1,4,1,0,0],[0,0,6,5,18],[0,0,0,0,1],[0,0,0,0,1]],[[8,3,0,0,0],[6,7,5,15,0],[3,18,5,1,1],[0,1,28,39,90],[0,0,0,0,2],[0,0,1,1,0]],[[2,0,0,0,0],[2,1,0,10,0],[1,16,1,0,1],[0,0,7,7,65],[0,0,0,0,1],[1,0,1,0,1]],[[17,4,0,0,0],[13,16,5,18,1],[7,20,3,7,0],[0,3,10,12,88],[0,0,0,0,5],[0,0,1,4,1]],[[25,10,0,0,0],[24,25,7,8,1],[10,36,17,5,1],[0,1,33,45,181],[0,0,0,0,2],[2,0,1,17,0]],[[9,6,0,0,0],[2,5,2,24,0],[2,17,4,5,5],[0,4,19,26,122],[0,0,0,0,2],[1,2,1,6,2]],[[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,1,0],[0,0,0,0,0],[0,0,0,0,0]],[[5,0,1,0,0],[2,0,1,5,0],[5,8,2,0,0],[0,0,3,5,21],[0,0,0,0,2],[0,0,1,1,0]],[[6,9,0,1,0],[0,0,1,0,0],[0,0,2,0,0],[0,0,2,3,6],[0,0,0,0,0],[0,0,0,2,0]],[[3,1,0,0,0],[0,0,0,1,0],[0,2,0,0,0],[0,1,0,5,3],[0,0,0,0,0],[0,0,1,0,0]],[[6,0,0,0,0],[1,4,1,3,0],[1,2,2,0,1],[0,0,4,9,17],[0,0,0,0,1],[1,0,0,1,0]],[[2,0,0,0,0],[0,0,0,1,0],[1,0,0,0,0],[0,0,1,0,4],[0,0,0,0,0],[0,0,0,0,0]],[[1,0,0,0,0],[0,1,0,2,0],[1,0,0,0,0],[0,0,0,1,3],[0,0,0,0,0],[0,0,2,1,0]],[[2,0,0,0,0],[1,1,1,0,0],[1,0,1,1,1],[0,0,2,2,13],[0,0,0,0,0],[1,0,0,0,0]],[[22,26,0,0,0],[11,3,4,6,0],[6,29,5,3,0],[0,2,17,29,58],[0,0,0,0,2],[1,2,2,9,0]],[[0,1,0,0,0],[1,1,1,3,0],[2,10,6,3,0],[0,1,4,12,10],[0,0,0,0,1],[0,0,0,4,0]],[[7,15,0,0,0],[1,2,0,2,1],[1,6,3,0,0],[0,1,5,13,14],[0,0,0,0,0],[0,0,2,1,0]],[[3,0,0,0,0],[0,2,5,9,0],[1,31,15,1,0],[0,3,29,12,69],[0,0,0,0,2],[0,1,1,4,0]],[[19,22,0,0,0],[0,4,3,37,0],[6,25,5,5,2],[0,5,16,34,57],[0,0,0,0,0],[2,0,1,2,1]],[[4,1,0,0,0],[7,5,5,17,1],[9,48,14,0,1],[0,3,23,20,79],[0,0,0,0,0],[0,1,1,1,1]],[[21,1,0,0,0],[1,4,3,17,0],[1,16,1,0,0],[0,7,22,15,90],[0,0,0,0,1],[0,0,0,1,0]],[[0,1,0,0,0],[0,5,1,0,0],[0,1,2,0,0],[0,0,4,1,4],[0,0,0,0,0],[0,0,0,0,0]],[[12,3,0,0,0],[10,5,2,12,1],[14,32,18,3,0],[0,2,32,27,133],[0,0,0,0,0],[0,0,2,4,0]],[[18,9,0,0,0],[18,24,9,6,0],[15,60,27,3,4],[0,6,44,29,228],[0,0,0,0,1],[0,1,2,4,4]],[[3,2,0,0,0],[3,3,1,10,0],[3,5,1,1,2],[0,1,13,12,39],[0,0,0,0,0],[0,0,0,1,0]],[[6,6,0,0,0],[2,2,3,3,0],[0,13,2,0,0],[0,1,25,9,53],[0,0,0,0,1],[0,1,1,0,0]],[[15,35,0,1,0],[10,7,1,12,0],[2,12,18,1,1],[0,2,33,18,79],[0,0,0,0,0],[0,1,0,2,1]],[[23,19,0,0,0],[5,5,4,6,0],[10,27,9,0,1],[0,2,17,25,106],[0,0,0,0,1],[0,0,1,5,0]],[[32,21,0,0,0],[20,10,5,66,1],[14,34,19,5,1],[0,2,39,80,249],[0,0,0,0,1],[2,3,1,11,0]],[[2,0,0,0,0],[6,6,21,18,0],[3,17,6,1,1],[0,4,32,17,52],[0,0,0,0,0],[0,0,0,6,0]],[[62,21,0,1,0],[12,10,11,94,2],[7,45,19,8,3],[0,5,72,135,340],[0,0,0,0,5],[1,2,2,6,0]],[[23,12,1,0,0],[2,7,7,25,0],[2,10,9,1,2],[0,1,27,41,72],[0,0,0,0,1],[1,3,1,4,1]],[[6,1,0,0,0],[0,3,3,16,0],[6,24,0,0,1],[0,2,23,15,40],[0,0,0,0,3],[2,0,0,0,1]],[[2,1,0,0,0],[1,1,0,3,0],[0,0,0,0,0],[0,0,2,1,5],[0,0,0,0,1],[0,0,0,1,0]],[[23,10,0,2,0],[21,15,8,46,1],[11,32,21,4,1],[0,5,63,90,286],[0,0,0,0,1],[3,1,5,11,1]],[[0,0,0,0,0],[0,1,1,0,0],[0,3,5,0,0],[0,0,1,2,2],[0,0,0,0,0],[0,0,0,1,0]],[[10,0,0,0,0],[11,3,18,28,0],[6,28,13,0,0],[0,2,25,11,23],[0,0,0,0,1],[1,0,1,3,1]],[[18,10,0,0,0],[6,1,1,58,2],[2,18,7,3,0],[0,0,10,14,42],[0,0,0,0,1],[0,0,1,4,0]],[[1,3,0,0,0],[4,4,0,6,1],[2,2,3,0,0],[0,1,10,4,13],[0,0,0,0,0],[0,0,1,3,1]],[[2,3,0,2,0],[1,0,7,1,0],[3,2,1,2,0],[0,0,2,9,11],[0,0,0,0,0],[0,0,1,3,1]],[[6,1,0,0,0],[2,0,0,54,0],[1,2,0,0,0],[0,0,3,14,2],[0,0,0,0,0],[0,0,0,3,0]],[[12,77,0,0,0],[2,8,0,19,0],[2,29,10,2,1],[0,2,11,17,128],[0,0,0,0,0],[0,2,1,5,3]],[[9,34,0,0,0],[6,4,2,4,0],[2,32,10,0,0],[0,1,17,11,70],[0,0,0,0,1],[0,0,1,3,1]],[[3,3,0,0,0],[0,1,1,1,0],[3,8,4,0,0],[0,1,3,1,4],[0,0,0,0,1],[0,0,0,3,0]],[[867,607,10,11,0],[419,386,312,1071,19],[317,1606,595,108,62],[4,128,1377,1455,5339],[0,0,0,0,72],[21,42,65,225,33]]],"new12":[[36,2,13],[17,4,9],[51,5,15],[13,17,17],[575,61,101],[55,9,40],[7,1,6],[20,11,5],[26,10,4],[95,10,47],[4,1,3],[62,0,40],[17,12,27],[67,4,25],[246,46,80],[10,4,24],[13,6,6],[175,28,274],[7,8,11],[6,5,1],[129,19,41],[38,21,9],[4,3,4],[21,10,9],[41,27,8],[17,2,6],[61,15,27],[0,0,0],[12,8,5],[43,25,16],[41,25,9],[70,16,25],[111,15,42],[46,23,21],[0,0,0],[23,10,5],[0,0,15],[4,4,9],[12,24,10],[2,5,2],[3,6,2],[3,14,2],[61,9,55],[20,9,6],[12,4,22],[57,5,15],[55,17,50],[93,17,17],[49,19,25],[7,6,6],[69,17,22],[137,23,32],[18,7,8],[18,13,17],[42,6,57],[64,22,47],[100,44,71],[64,4,25],[101,45,110],[27,27,44],[45,13,14],[3,1,5],[103,49,49],[6,2,2],[72,10,37],[33,6,30],[14,11,7],[6,0,7],[8,1,12],[55,16,97],[52,1,49],[14,9,7]],"years":[2016,2017,2018,2019,2020,2021,2022,2023,2024,2025,2026],"yr":[[[3,14],[7,30],[6,42],[2,25],[2,7],[4,18],[4,6],[10,10],[8,7],[23,21],[36,14]],[[1,16],[0,17],[0,19],[0,10],[1,9],[0,4],[3,5],[0,8],[2,3],[8,18],[9,11]],[[4,28],[3,40],[4,46],[4,34],[2,15],[0,14],[6,10],[18,15],[9,14],[60,47],[30,23]],[[0,30],[0,33],[1,28],[4,21],[0,10],[3,20],[3,36],[1,17],[7,20],[12,11],[27,19]],[[47,275],[35,272],[40,332],[147,1126],[9,120],[9,85],[44,54],[25,36],[28,38],[303,204],[515,191]],[[3,85],[2,91],[11,109],[3,53],[6,35],[5,37],[6,29],[22,33],[35,44],[50,81],[49,42]],[[2,10],[1,7],[3,17],[1,13],[0,8],[1,3],[4,7],[1,4],[7,11],[10,10],[12,2]],[[1,33],[2,25],[2,22],[3,18],[2,9],[1,9],[1,10],[2,8],[6,8],[10,18],[18,18]],[[7,23],[4,35],[4,24],[1,6],[2,10],[3,7],[6,19],[4,1],[10,13],[10,21],[20,18]],[[9,88],[13,129],[12,108],[8,113],[1,34],[8,35],[8,31],[35,69],[17,24],[135,127],[91,43]],[[0,7],[0,8],[0,18],[1,4],[0,2],[0,3],[1,3],[0,4],[1,3],[1,3],[5,3]],[[14,100],[3,50],[2,51],[5,27],[6,24],[3,33],[8,17],[9,23],[25,26],[29,29],[77,15]],[[4,51],[2,52],[5,39],[5,37],[3,8],[1,15],[6,14],[14,23],[14,20],[13,18],[38,11]],[[1,33],[0,26],[4,15],[2,15],[0,7],[2,30],[1,15],[51,362],[4,29],[20,47],[40,39]],[[50,262],[30,233],[19,299],[33,214],[13,153],[14,115],[39,79],[55,81],[114,114],[165,178],[254,97]],[[0,25],[2,32],[0,20],[0,10],[2,13],[2,11],[4,9],[4,10],[5,12],[12,18],[29,3]],[[0,23],[1,13],[0,12],[1,10],[0,4],[0,5],[4,10],[2,4],[5,5],[6,11],[14,7]],[[58,358],[35,310],[39,337],[31,227],[12,131],[24,107],[48,98],[33,65],[85,116],[131,208],[345,85]],[[0,23],[1,26],[0,17],[2,11],[3,5],[0,12],[2,10],[6,12],[4,11],[3,10],[13,12]],[[1,13],[0,17],[0,19],[0,10],[0,6],[0,6],[1,3],[1,4],[3,9],[3,8],[4,6]],[[18,145],[13,35],[3,151],[6,46],[0,19],[2,19],[21,24],[6,8],[83,51],[25,27],[140,42]],[[8,93],[4,80],[5,65],[7,42],[6,12],[4,22],[9,11],[14,14],[17,13],[29,47],[40,25]],[[1,1],[0,4],[0,5],[1,2],[0,3],[0,6],[0,4],[0,2],[0,0],[0,5],[5,5]],[[3,56],[4,38],[2,38],[2,27],[1,13],[1,24],[4,11],[5,10],[10,21],[13,30],[17,17]],[[9,87],[5,90],[7,81],[0,36],[0,18],[1,28],[7,14],[19,16],[7,14],[13,51],[31,39]],[[0,1],[5,12],[2,6],[2,21],[0,1],[2,1],[1,1],[4,2],[1,2],[15,11],[16,9]],[[16,74],[10,81],[6,83],[23,171],[3,20],[5,11],[21,29],[15,14],[17,20],[34,21],[75,20]],[[0,0],[0,1],[0,0],[0,2],[0,0],[0,0],[0,0],[0,0],[0,0],[0,0],[0,0]],[[3,28],[1,28],[2,14],[3,11],[0,5],[1,6],[1,12],[0,3],[12,12],[8,13],[12,13]],[[15,118],[10,101],[11,104],[9,54],[0,27],[6,29],[13,16],[21,19],[24,25],[38,60],[44,33]],[[16,68],[9,55],[5,64],[1,28],[1,14],[0,11],[4,15],[5,10],[10,10],[8,32],[22,49]],[[12,89],[8,61],[9,63],[5,42],[2,19],[6,39],[11,16],[12,23],[18,19],[22,33],[77,26]],[[20,159],[15,106],[8,114],[14,118],[2,34],[15,94],[28,38],[21,34],[29,49],[58,56],[130,34]],[[19,103],[20,92],[12,94],[13,39],[2,14],[6,22],[7,13],[9,16],[50,37],[22,44],[47,33]],[[0,0],[0,0],[0,0],[0,0],[0,1],[0,0],[0,1],[0,0],[1,2],[0,1],[0,0]],[[0,24],[2,33],[0,25],[4,22],[0,9],[1,13],[4,10],[3,9],[4,9],[8,25],[20,12]],[[0,5],[0,12],[2,15],[2,10],[0,2],[0,3],[0,4],[4,5],[2,5],[5,7],[15,0]],[[0,10],[0,9],[0,13],[0,4],[1,3],[0,3],[2,2],[1,4],[3,5],[1,17],[7,7]],[[3,47],[1,34],[1,47],[1,18],[0,16],[4,27],[10,21],[1,17],[3,20],[7,25],[14,28]],[[0,9],[0,4],[1,8],[0,7],[2,4],[0,3],[1,4],[0,3],[0,2],[1,4],[3,3]],[[0,24],[1,5],[0,5],[0,6],[0,2],[1,1],[1,14],[2,8],[1,2],[2,3],[3,8]],[[0,29],[1,40],[0,33],[3,8],[1,13],[1,8],[1,8],[1,7],[1,5],[4,20],[6,13]],[[7,97],[4,82],[3,82],[2,37],[1,17],[5,59],[17,26],[12,24],[22,35],[23,37],[102,19]],[[0,47],[1,22],[1,27],[2,15],[1,12],[1,13],[2,9],[19,44],[1,13],[12,15],[15,16]],[[1,26],[4,21],[2,25],[1,12],[2,12],[0,17],[1,11],[5,9],[12,23],[8,27],[33,4]],[[7,42],[8,73],[2,49],[3,41],[2,11],[6,27],[4,9],[9,12],[12,12],[59,48],[32,27]],[[2,113],[4,113],[2,101],[4,54],[3,35],[7,47],[9,38],[21,45],[51,52],[24,60],[81,33]],[[7,86],[12,90],[4,94],[9,60],[2,24],[6,46],[7,22],[19,32],[13,42],[43,50],[77,42]],[[17,155],[7,76],[6,119],[4,51],[2,10],[3,18],[5,23],[14,12],[12,15],[28,40],[49,40]],[[1,23],[0,19],[0,17],[0,7],[0,7],[0,11],[1,4],[0,5],[0,6],[8,17],[6,9]],[[23,65],[12,80],[10,85],[13,87],[2,23],[5,29],[9,17],[16,15],[22,14],[55,46],[75,25]],[[36,93],[21,110],[27,125],[24,173],[4,24],[6,24],[15,24],[18,20],[14,34],[85,79],[143,34]],[[6,64],[5,39],[2,39],[2,40],[3,6],[2,5],[7,11],[11,7],[4,5],[15,19],[20,12]],[[8,72],[3,65],[3,38],[2,33],[1,19],[2,17],[3,9],[6,9],[2,7],[32,47],[30,17]],[[11,72],[4,70],[10,106],[8,56],[1,32],[0,28],[18,45],[7,18],[12,17],[49,76],[84,18]],[[14,72],[9,110],[12,141],[19,93],[3,32],[6,17],[10,11],[12,17],[15,18],[34,67],[87,33]],[[29,187],[17,168],[15,176],[15,213],[9,71],[7,70],[52,55],[44,43],[66,65],[65,72],[136,68]],[[9,43],[2,67],[5,76],[2,25],[2,27],[2,17],[11,24],[16,11],[15,12],[64,78],[33,33]],[[30,257],[29,278],[23,277],[34,207],[13,60],[19,112],[63,71],[89,94],[97,117],[98,116],[165,79]],[[8,106],[8,116],[11,101],[6,42],[5,33],[8,35],[11,30],[23,35],[38,52],[42,63],[61,32]],[[6,140],[5,80],[2,59],[4,51],[2,10],[3,17],[7,12],[15,14],[9,10],[29,30],[40,24]],[[0,12],[0,12],[1,12],[0,10],[0,2],[0,7],[3,4],[2,4],[0,7],[2,6],[5,4]],[[29,212],[18,178],[30,216],[39,223],[8,67],[15,73],[41,53],[38,36],[76,89],[96,114],[120,73]],[[1,11],[0,6],[0,6],[0,1],[1,5],[0,2],[0,3],[1,4],[2,1],[7,9],[4,4]],[[2,63],[1,90],[2,56],[0,20],[0,31],[4,35],[16,52],[18,22],[9,21],[58,93],[59,38]],[[5,133],[7,48],[6,43],[2,13],[2,31],[3,23],[12,14],[16,22],[51,23],[19,26],[55,10]],[[2,26],[3,29],[0,26],[2,11],[0,8],[2,20],[5,12],[6,14],[4,8],[12,15],[17,15]],[[0,4],[1,15],[3,27],[2,17],[1,3],[1,11],[1,3],[10,5],[6,9],[11,16],[11,0]],[[0,6],[1,18],[1,6],[0,12],[0,7],[0,4],[3,7],[37,15],[32,52],[2,9],[12,6]],[[15,74],[11,86],[15,74],[2,44],[4,30],[11,44],[15,36],[19,14],[7,18],[22,57],[134,30]],[[15,35],[4,50],[4,66],[2,25],[1,28],[3,18],[7,24],[4,10],[8,14],[32,33],[85,11]],[[0,26],[1,23],[0,27],[0,13],[1,5],[0,8],[2,15],[2,7],[1,8],[8,17],[19,11]],[[639,5069],[452,4617],[430,4902],[552,4392],[161,1544],[263,1816],[702,1418],[949,1643],[1308,1657],[2381,3051],[4262,1867]]],"gyears":[2021,2022,2023,2024,2025,2026],"gyr":[[[0,28],[0,25],[0,21],[15,29],[1,5],[1,0]],[[0,2],[0,4],[0,4],[0,3],[0,0],[0,0]],[[0,27],[0,19],[0,24],[20,38],[16,14],[6,1]],[[0,12],[0,11],[0,8],[2,9],[2,1],[0,0]],[[0,872],[1,207],[7,1736],[1011,1679],[321,232],[286,96]],[[0,48],[0,11],[0,39],[17,47],[16,33],[1,0]],[[0,35],[0,26],[0,9],[7,29],[15,6],[1,2]],[[0,8],[0,3],[0,9],[1,2],[3,2],[0,0]],[[0,23],[0,35],[0,8],[8,44],[4,4],[0,0]],[[0,77],[0,23],[0,39],[79,186],[21,14],[10,3]],[[0,2],[0,2],[1,5],[1,0],[0,0],[0,0]],[[0,35],[0,28],[1,23],[5,45],[9,11],[3,2]],[[0,26],[0,11],[2,15],[36,31],[7,8],[3,0]],[[0,3],[0,2],[6,15],[19,23],[3,6],[0,4]],[[0,343],[0,106],[12,172],[97,377],[109,132],[42,18]],[[0,11],[0,0],[0,3],[1,7],[3,1],[0,0]],[[0,15],[0,4],[0,5],[0,0],[1,0],[0,0]],[[0,263],[0,101],[3,133],[137,299],[202,243],[25,10]],[[0,5],[0,6],[8,6],[6,11],[2,9],[2,0]],[[0,7],[0,2],[0,9],[0,2],[0,2],[1,0]],[[0,73],[1,220],[1,45],[191,197],[39,40],[44,22]],[[0,35],[0,13],[0,25],[13,37],[41,59],[3,3]],[[0,0],[0,2],[0,0],[0,0],[0,0],[0,0]],[[0,11],[0,13],[1,8],[4,22],[3,3],[1,3]],[[0,35],[0,8],[0,34],[6,28],[23,31],[4,2]],[[0,5],[0,2],[0,4],[9,11],[11,6],[3,0]],[[0,62],[0,59],[0,106],[93,173],[47,28],[18,7]],[[0,1],[0,0],[0,1],[1,3],[0,0],[1,0]],[[0,3],[0,3],[0,9],[2,6],[2,2],[4,0]],[[0,52],[0,35],[0,20],[32,67],[8,17],[1,5]],[[0,44],[0,21],[0,18],[14,47],[18,27],[2,1]],[[0,52],[0,69],[9,39],[24,86],[31,36],[8,1]],[[0,87],[0,67],[0,88],[53,279],[29,21],[6,3]],[[0,74],[0,14],[0,16],[89,294],[17,30],[3,5]],[[0,1],[0,0],[3,0],[2,2],[0,0],[0,0]],[[0,15],[0,8],[1,6],[2,6],[3,4],[2,0]],[[0,4],[0,1],[0,5],[1,7],[8,2],[3,0]],[[0,5],[0,0],[0,1],[0,1],[0,1],[0,0]],[[0,21],[0,14],[0,10],[2,14],[2,0],[0,0]],[[0,3],[0,1],[0,2],[0,4],[0,0],[1,0]],[[0,4],[0,0],[0,0],[1,2],[0,1],[0,0]],[[0,13],[0,6],[0,9],[3,12],[0,0],[1,1]],[[0,39],[0,11],[1,21],[10,34],[6,1],[3,4]],[[0,18],[0,3],[4,13],[8,7],[0,2],[0,0]],[[0,12],[0,9],[0,9],[1,13],[3,2],[1,0]],[[0,60],[0,8],[0,21],[5,23],[9,4],[2,1]],[[0,47],[0,13],[12,39],[11,37],[11,16],[2,1]],[[0,50],[0,22],[1,40],[12,43],[9,7],[0,1]],[[0,40],[0,29],[0,47],[56,103],[17,24],[8,2]],[[0,6],[0,1],[0,3],[1,5],[2,1],[0,0]],[[0,91],[0,89],[0,48],[52,131],[42,57],[15,7]],[[0,82],[4,125],[0,59],[116,257],[83,71],[55,15]],[[0,16],[0,8],[0,11],[3,25],[30,23],[6,0]],[[0,42],[0,87],[0,30],[16,72],[26,42],[1,1]],[[0,61],[0,25],[0,31],[33,55],[58,32],[8,0]],[[0,57],[0,34],[2,69],[39,82],[34,74],[7,0]],[[0,109],[0,79],[4,78],[133,183],[44,34],[9,6]],[[0,32],[0,26],[0,45],[17,41],[23,57],[0,0]],[[0,192],[0,71],[7,112],[82,327],[66,46],[56,18]],[[0,37],[0,23],[0,19],[32,55],[24,18],[7,0]],[[0,35],[0,12],[0,22],[4,35],[28,94],[3,0]],[[0,5],[0,2],[0,2],[0,4],[1,1],[0,0]],[[0,140],[0,53],[10,151],[74,175],[71,50],[20,5]],[[0,3],[0,1],[1,3],[2,3],[2,1],[0,0]],[[0,41],[0,38],[0,34],[12,37],[17,8],[0,0]],[[0,46],[0,24],[5,17],[28,74],[13,5],[5,2]],[[0,17],[0,4],[0,11],[1,3],[0,7],[0,0]],[[0,10],[0,2],[1,8],[6,4],[2,6],[0,0]],[[0,0],[0,1],[3,0],[24,23],[2,2],[0,1]],[[0,61],[0,40],[4,32],[33,64],[45,20],[35,4]],[[0,30],[0,18],[0,23],[38,46],[19,5],[1,1]],[[0,9],[0,9],[0,10],[1,5],[0,1],[0,0]],[[0,3832],[6,2051],[111,3805],[2859,6163],[1716,1757],[769,267]]],"g12":[1,0,8,0,403,1,9,1,0,15,0,11,4,5,68,0,0,45,2,1,66,6,0,4,6,3,25,1,4,6,5,9,12,8,0,2,3,0,0,1,0,2,7,0,1,3,3,2,10,0,22,75,6,4,8,7,16,0,75,9,4,0,29,0,0,8,0,0,1,39,2,0],"abOpen":[30,5,25,1,301,28,5,5,23,71,1,46,32,1,222,2,3,217,2,3,113,37,2,10,36,15,123,1,8,57,51,53,106,63,0,10,2,2,8,1,0,2,22,2,8,39,20,46,59,3,84,145,30,34,52,58,149,37,181,34,26,4,144,1,18,26,10,4,1,89,51,1],"abEnd":[["Payment Received",2823],["Not stated",346],["Procedural/Legal Deficiency",300],["Sold at Sheriff's Auction",138],["Change of Ownership",116],["Duplicate Case",110],["Other - See journal notes",82],["Opened New Case",39],["All Owners/Parties Not Listed",35],["Violations Abated",28],["No Violation Found",25],["Case Dismissed",18],["Property in Compliance",17],["No Payment Due",14],["Occupied, No Further Abatement",12],["Tax Adjudication Sale",11],["Unclear Violations",6],["Work in Progress - See Permits",5],["Wrong Address",5],["Unclear Property Description",3],["Case Expired",2],["Appealed to CDC",1],["Inactive",1],["New Owner",1],["Not a Violation - Imported License Application",1]],"hearGroups":["Guilty","Dismissed","Reset","Pending","Other"],"hear":[[1941,201,533,10,2],[1500,142,416,9,4],[961,90,304,4,3],[1151,107,439,10,2],[168,15,159,9,0],[626,103,356,21,1],[822,150,380,25,2],[741,148,355,16,0],[1208,252,594,39,7],[2123,385,824,88,0],[1201,209,336,62,0]],"upcoming":147,"viol":[["160 Weeds and Plant Growth",3112,3109],["157 Sanitation",1747,2170],["159 Sidewalks",1313,1093],["161 Rodent Harborage",1280,1961],["167 Exterior Surfaces",946,1455],["167 Paint or Protective Treatment",773,1277],["164 Motor Vehicles",531,620],["172 Roofs",487,752],["179 Windows",470,634],["163 Fences and Walls",467,657],["167 Siding and Masonry",422,677],["172 Gutters and Downspouts",396,447],["171 Exterior Walls",331,422],["171 Weatherboards",326,568],["168 Premises Identification",317,575],["158 Grading",294,224],["159 Driveways",278,380],["178 Handrails and Guardrails",254,400],["176 Decks Porches and Balconies",239,331],["163 Accessory Structures",220,357],["181 Doors",206,319],["176 Stairways",147,224],["165 Defacement of Property",133,170],["169 Structure",131,256],["182 Gates",120,254]],"violTotal":[15834,20787],"inspGroups":["Inspection","Reinspection","Posting a notice","Other"],"insp":[[203,70,427,3],[263,73,204,1],[386,71,303,3],[360,58,228,1],[431,52,255,4],[472,53,191,3],[472,57,214,3],[703,45,262,1],[692,62,235,0],[693,51,312,0],[387,37,281,0],[265,30,240,0],[254,49,258,0],[267,29,213,0],[353,46,242,2],[305,39,187,1],[431,28,205,1],[448,109,185,2],[503,152,203,1],[626,48,215,3],[552,36,212,0],[532,38,226,1],[454,30,177,0],[204,23,93,0],[244,39,188,0],[245,29,155,1],[268,20,82,1],[325,35,108,1],[262,15,80,0],[402,8,60,2],[357,33,138,1],[729,32,69,0],[483,35,90,6],[666,35,106,10],[412,20,84,4],[267,26,101,13],[536,25,77,7],[270,18,86,4],[272,24,165,7],[911,68,165,9],[931,79,110,6],[704,47,177,3],[246,45,186,7],[211,27,208,6],[242,84,207,2],[300,50,179,1],[206,23,170,7],[100,30,69,4],[0,6,1,12],[0,5,1,3],[1,0,0,0],[9,0,0,0],[3,0,0,0],[7,1,1,0],[31,26,5,0],[206,23,22,1],[91,27,31,1],[257,13,49,18],[217,21,50,10],[273,9,35,17],[177,19,52,15],[648,32,32,70],[737,18,60,34],[862,27,67,45],[837,20,76,102],[460,18,92,169],[377,38,107,121],[419,21,151,124],[179,10,22,120],[368,91,56,303],[315,48,58,105],[207,15,63,22],[224,15,109,45],[234,17,89,51],[178,18,175,91],[189,46,67,185],[249,50,93,190],[417,44,72,30],[457,74,100,25],[635,188,121,3],[407,187,98,23],[344,159,41,22],[227,63,126,17],[129,34,127,6],[236,67,130,28],[255,56,136,16],[283,92,105,14],[440,50,76,7],[560,154,107,10],[557,44,75,17],[427,239,107,34],[634,153,86,41],[537,152,108,12],[678,130,85,5],[1099,178,179,4],[582,150,69,3],[744,263,124,2],[596,246,95,0],[726,333,95,0],[1136,264,121,0],[641,301,124,1],[1071,314,167,11],[1303,872,204,15],[1035,706,265,40],[868,596,322,14],[1479,710,321,24],[1614,563,176,10],[1452,540,195,14],[1199,383,126,13],[1343,318,176,16],[796,393,230,18],[943,199,333,17],[467,88,387,20],[609,98,350,20],[627,99,155,28],[816,85,190,20],[1048,122,409,21],[1099,130,451,19],[924,75,322,15],[404,112,228,12],[677,73,150,20],[422,87,164,26],[608,194,239,34],[525,187,343,27],[441,145,154,95],[603,109,162,49],[738,113,214,72],[678,179,248,119],[741,90,275,92],[629,84,332,102],[218,71,246,78]],"open":15151,"total":47127,"noLoc":359}};</script>
+<script>// Shared helpers for the NOLA open data pages
+const NOLA = (() => {
+  const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const S = i => `var(--s${i + 1})`;
+  const fmt = d3.format(',');
+  const pct = (a, b) => b ? Math.round(100 * a / b) + '%' : '—';
+
+  // ---------- tooltip ----------
+  const tipEl = document.createElement('div');
+  tipEl.className = 'tip'; document.body.appendChild(tipEl);
+  const tip = {
+    show(html, ev) {
+      tipEl.innerHTML = html; tipEl.style.opacity = 1;
+      const w = tipEl.offsetWidth, h = tipEl.offsetHeight;
+      let x = ev.clientX + 14, y = ev.clientY + 14;
+      if (x + w > innerWidth - 8) x = ev.clientX - w - 14;
+      if (y + h > innerHeight - 8) y = ev.clientY - h - 14;
+      tipEl.style.left = x + 'px'; tipEl.style.top = y + 'px';
+    },
+    hide() { tipEl.style.opacity = 0; }
+  };
+  const row = (k, v) => `<div class="r"><span>${k}</span><span>${v}</span></div>`;
+
+  // ---------- geography ----------
+  const decode = r => { const o = []; let x = 0, y = 0; for (let i = 0; i < r.length; i += 2) { x += r[i]; y += r[i + 1]; o.push([x, y]); } return o; };
+  const pathOf = rings => rings.map(r => 'M' + decode(r).map(p => p.join(',')).join('L') + 'Z').join('');
+  const title = s => s.toLowerCase().replace(/(^|[\s\-\/.(&])([a-z])/g, (m, a, b) => a + b.toUpperCase()).replace(/\bMcdonogh\b/, 'McDonogh').replace(/\bB\. W\./, 'B.W.').replace(/\bSt\.\s+/g, 'St. ').replace(/\bDev\b/, 'Development');
+  let GEO = null;
+  // ---------- per-resident rates (2020 Census population per neighborhood, GEO.pop) ----------
+  // Use only for things residents generate (e.g. calls for service), not for land- or street-based counts.
+  const MIN_POP = 1000; // rates for neighborhoods smaller than this swing wildly, so they're left out
+  const popOf = i => GEO.pop ? GEO.pop[i] : null;
+  const perK = (n, pop) => n != null && pop >= MIN_POP ? 1000 * n / pop : null;
+  const fmtRate = v => v == null ? '—' : v >= 100 ? d3.format(',')(Math.round(v)) : v >= 10 ? v.toFixed(0) : v.toFixed(1);
+  const POP_NOTE = '<div class="legend popnote">Per 1,000 residents (2020 Census). Visitors, workers and highway traffic also generate calls, so rates run high where few people live, like the CBD and French Quarter. Neighborhoods under 1,000 residents are left out.</div>';
+  // Total / Per 1,000 residents switch
+  const basisChips = (el, onSel, sel = 'n') => chips(el, [{ label: 'Total', value: 'n' }, { label: 'Per 1,000 residents', value: 'pc' }], onSel, { sel });
+  // ---------- the opening view ----------
+  // Every neighborhood is mapped and counted. Maps open on the populated city, leaving out the mostly
+  // uninhabited marsh to the east (under 100 residents per square mile: Lake Catherine, Viavant–Venetian Isles),
+  // which would otherwise shrink everything else. Zoom out or pick one from the menu to see it.
+  const MIN_DENSITY = 100;
+  const SQMI = 400 / 2589988; // one map unit is about 20 m
+  let FULL = [-70, 130, 2110, 1730];
+  const bboxOf = rings => { let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9; rings.forEach(r => decode(r).forEach(([x, y]) => { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); })); return [x0, y0, x1, y1]; };
+  const pad = ([x0, y0, x1, y1], f) => { const dx = (x1 - x0) * f, dy = (y1 - y0) * f; return [x0 - dx, y0 - dy, x1 + dx, y1 + dy]; };
+  function setGeo(g) {
+    GEO = g;
+    GEO.nb.forEach((f, i) => {
+      f.idx = i; f.d = pathOf(f.r); f.name = title(f.n); f.bbox = bboxOf(f.r);
+      f.sqmi = f.r.reduce((a, r) => a + Math.abs(d3.polygonArea(decode(r))), 0) * SQMI;
+      f.skip = !!(g.pop && g.pop[i] / f.sqmi < MIN_DENSITY);
+    });
+    GEO.pd.forEach(f => { f.d = pathOf(f.r); });
+    const kept = GEO.nb.filter(f => !f.skip).map(f => f.bbox);
+    FULL = pad([d3.min(kept, b => b[0]), d3.min(kept, b => b[1]), d3.max(kept, b => b[2]), d3.max(kept, b => b[3])], 0.03);
+  }
+  const shown = i => i >= 0; // a record in neighborhood i appears on maps
+  const nbList = () => GEO.nb.slice().sort((a, b) => a.name.localeCompare(b.name));
+  // neighborhood picker: <select> with "All neighborhoods" (-1) and every mapped neighborhood
+  function nbSelect(el, onSel, sel = -1, label = 'All neighborhoods') {
+    el.innerHTML = `<option value="-1">${label}</option>` + nbList().map(f => `<option value="${f.idx}">${f.name}</option>`).join('');
+    el.value = sel; el.onchange = () => onSel(+el.value);
+  }
+  // projected map units -> [lon, lat] (for CSV downloads)
+  const lonlat = (x, y) => [+(x / 4830 - 90.14).toFixed(5), +(30.20 - y / 5550).toFixed(5)];
+
+  // map(el, opts) -> {svg, layer, zoomTo, setFill, focus, k()}
+  // The map fills el. It keeps clear of an on-map filter panel (o.panel) when fitting, and carries its own
+  // zoom controls, scale bar and street-name labels.
+  // Input: the mouse wheel (or trackpad pinch) zooms and dragging pans; the page never scrolls under the map.
+  // On touch screens one finger scrolls the page and two fingers move and zoom the map (see stage()).
+  // The map follows its box when the page is resized: one unit is one CSS pixel once the map is over 1000px wide
+  // (narrower maps scale down, as before), so text and dots keep their size on wide screens.
+  let mapN = 0;
+  function map(el, o) {
+    el.classList.add('map');
+    const dims = () => { const cw = el.clientWidth, ch = el.clientHeight, w = Math.max(1000, Math.round(cw));
+      return [w, Math.round(w * (ch > 50 && cw > 0 ? ch / cw : (o.height || 640) / 1000))]; };
+    let [W, H] = dims();
+    const svg = d3.select(el).append('svg').attr('viewBox', `0 0 ${W} ${H}`).attr('role', 'img').attr('aria-label', o.label || 'Map of New Orleans');
+    const root = svg.append('g');
+    const base = root.append('g');
+    const nbs = GEO.nb;
+    const nbSel = base.selectAll('path').data(nbs).join('path').attr('class', 'nbpath' + (o.tip ? ' hot' : '')).attr('d', f => f.d);
+    // street base map (City centerlines, in streets.js), clipped to the mapped neighborhoods; local streets fade in as you zoom
+    const ST = window.STREETS;
+    let localSt = null;
+    if (ST) {
+      const cid = 'nbclip' + (++mapN);
+      root.append('clipPath').attr('id', cid).selectAll('path').data(nbs).join('path').attr('d', f => f.d);
+      const sg = root.append('g').attr('clip-path', `url(#${cid})`).append('g').attr('class', 'streets').attr('transform', `scale(${1 / ST.q})`).attr('aria-hidden', 'true');
+      localSt = sg.append('path').attr('class', 'st st3').attr('d', ST.d[3]);
+      sg.append('path').attr('class', 'st st2').attr('d', ST.d[2]);
+      sg.append('path').attr('class', 'st st1').attr('d', ST.d[1]);
+      sg.append('path').attr('class', 'st st0').attr('d', ST.d[0]);
+    }
+    const streetZoom = k => { if (localSt) localSt.style('opacity', Math.max(0.35, Math.min(1, (k - 0.6) / 2.4))); };
+    const focusG = root.append('g').style('pointer-events', 'none');
+    if (o.districts) root.append('g').selectAll('path').data(GEO.pd).join('path').attr('d', f => f.d)
+      .attr('fill', 'none').attr('stroke', 'var(--ink2)').attr('stroke-width', 1.4).attr('vector-effect', 'non-scaling-stroke').attr('opacity', .55).style('pointer-events', 'none');
+    const stLabG = root.append('g').attr('aria-hidden', 'true');
+    const layer = root.append('g');
+    if (o.tip) nbSel.on('mousemove', (ev, f) => tip.show(o.tip(f.idx), ev)).on('mouseleave', tip.hide);
+
+    // ---- street names, placed after each zoom so they never overlap; longer streets first ----
+    const SL = ST && ST.lab, q = ST ? ST.q : 1;
+    const AN = SL ? SL.a.length / 6 : 0;
+    const order = SL ? d3.range(AN).sort((a, b) => SL.a[a * 6 + 5] - SL.a[b * 6 + 5] || SL.a[b * 6 + 3] - SL.a[a * 6 + 3]) : [];
+    function layoutLabels() {
+      if (!SL) return;
+      const t = d3.zoomTransform(svg.node()), k = t.k, placed = [], seen = new Map(), cell = 60, grid = new Map();
+      const hit = b => { for (let gx = Math.floor(b[0] / cell); gx <= Math.floor(b[2] / cell); gx++) for (let gy = Math.floor(b[1] / cell); gy <= Math.floor(b[3] / cell); gy++) { const L = grid.get(gx * 9973 + gy); if (L) for (const r of L) if (b[0] < r[2] && b[2] > r[0] && b[1] < r[3] && b[3] > r[1]) return true; } return false; };
+      const add = b => { for (let gx = Math.floor(b[0] / cell); gx <= Math.floor(b[2] / cell); gx++) for (let gy = Math.floor(b[1] / cell); gy <= Math.floor(b[3] / cell); gy++) { const key = gx * 9973 + gy; (grid.get(key) || grid.set(key, []).get(key)).push(b); } };
+      if (k >= 2) for (const i of order) {
+        const b = i * 6, tier = SL.a[b + 5];
+        if (tier === 2 && k < 5) continue;
+        const [sx, sy] = t.apply([SL.a[b] / q, SL.a[b + 1] / q]);
+        if (sx < -40 || sx > W + 40 || sy < -20 || sy > H + 20) continue;
+        const name = SL.names[SL.a[b + 4]], fs = tier < 2 ? 11.5 : 10.5, w = name.length * fs * 0.56 + 8;
+        if (w > 2 * SL.a[b + 3] / q * k) continue; // the street is too short at this zoom
+        const a = SL.a[b + 2] * Math.PI / 180, c = Math.abs(Math.cos(a)), sn = Math.abs(Math.sin(a)), hw = w / 2, hh = fs / 2 + 2;
+        const sh = c > .3 && sn > .3 ? .8 : 1, ex = (hw * c + hh * sn) * sh, ey = (hw * sn + hh * c) * sh, box = [sx - ex, sy - ey, sx + ex, sy + ey];
+        if (hit(box)) continue;
+        const prev = seen.get(name); if (prev && prev.some(([px, py]) => (px - sx) ** 2 + (py - sy) ** 2 < 260 * 260)) continue;
+        add(box); if (prev) prev.push([sx, sy]); else seen.set(name, [[sx, sy]]);
+        placed.push({ x: SL.a[b] / q, y: SL.a[b + 1] / q, a: SL.a[b + 2], name, fs, major: tier < 2 });
+        if (placed.length > 260) break;
+      }
+      stLabG.selectAll('text').data(placed).join('text').attr('class', d => 'stlab' + (d.major ? ' major' : ''))
+        .attr('transform', d => `translate(${d.x},${d.y}) rotate(${d.a})`).attr('text-anchor', 'middle').attr('dy', '0.35em')
+        .style('font-size', d => (d.fs / k) + 'px').style('stroke-width', (3 / k) + 'px').style('fill', 'var(--ink2)').text(d => d.name);
+    }
+
+    // ---- zoom, controls, scale bar ----
+    let k = 1, lt = 0, moved = false, target = null; const listeners = [];
+    const scaleEl = document.createElement('div'); scaleEl.className = 'scalebar'; scaleEl.innerHTML = '<span></span><i></i>'; el.appendChild(scaleEl);
+    function drawScale() {
+      const pxPerMile = 80.47 * k * (el.clientWidth || W) / W, opts = [0.05, 0.1, 0.25, 0.5, 1, 2, 5]; let m = opts[0];
+      for (const v of opts) if (v * pxPerMile <= 110) m = v;
+      scaleEl.lastChild.style.width = (m * pxPerMile).toFixed(0) + 'px';
+      scaleEl.firstChild.textContent = m < 1 ? (m * 5280 >= 1000 ? m + ' mi' : Math.round(m * 5280) + ' ft') : m + ' mi';
+    }
+    // the opening view is about k = 0.45; allow zooming out far enough to see the whole parish, east marsh included
+    const zoom = d3.zoom().scaleExtent([0.25, 40])
+      // touch: only two-finger gestures move the map, so one finger still scrolls the page (touch-action in lib.css);
+      // in full screen there's no page to scroll, so one finger moves the map too
+      .filter(ev => ev.type.startsWith('touch') ? ev.touches.length >= 2 || !!el.closest('.mapfs') : (!ev.ctrlKey || ev.type === 'wheel') && !ev.button)
+      .on('zoom', ev => {
+        if (ev.sourceEvent) moved = true; // the reader moved the map, so a resize keeps their view instead of refitting
+        root.attr('transform', ev.transform); k = ev.transform.k; streetZoom(k); drawScale();
+        stLabG.selectAll('text').style('font-size', d => (d.fs / k) + 'px').style('stroke-width', (3 / k) + 'px');
+        listeners.forEach(f => f(k)); clearTimeout(lt); lt = setTimeout(layoutLabels, 90);
+      });
+    svg.call(zoom).on('dblclick.zoom', null);
+    // Safari's trackpad pinch arrives as gesture events rather than ctrl+wheel; zoom the map instead of the page
+    // (on iPhone/iPad the same events come with two-finger touches, which d3 already handles)
+    let gk = 1, touching = false;
+    el.addEventListener('touchstart', e => { touching = true; }, { passive: true });
+    const untouch = e => { touching = e.touches.length > 0; };
+    el.addEventListener('touchend', untouch, { passive: true }); el.addEventListener('touchcancel', untouch, { passive: true });
+    el.addEventListener('gesturestart', e => { e.preventDefault(); gk = k; });
+    el.addEventListener('gesturechange', e => { e.preventDefault(); if (touching) return; moved = true;
+      const r = svg.node().getBoundingClientRect(); svg.call(zoom.scaleTo, gk * e.scale, [(e.clientX - r.left) * W / r.width, (e.clientY - r.top) * H / r.height]); });
+    // fit an extent into the part of the map the filter panel doesn't cover
+    const inset = () => panelInset(o.panel, el.clientWidth) * W / Math.max(1, el.clientWidth);
+    function zoomTo(ext, dur = 0) {
+      const [x0, y0, x1, y1] = ext; target = ext; moved = false;
+      const L = inset(), s = Math.min((W - L) / (x1 - x0), H / (y1 - y0)) * 0.96;
+      const tr = d3.zoomIdentity.translate(L + (W - L) / 2, H / 2).scale(s).translate(-(x0 + x1) / 2, -(y0 + y1) / 2);
+      (dur ? svg.transition().duration(dur) : svg).call(zoom.transform, tr);
+    }
+    const home = o.extent || FULL;
+    let focused = -1;
+    const by = f => () => { moved = true; svg.transition().duration(250).call(zoom.scaleBy, f); };
+    // entering or leaving full screen resizes the map: fit() refits it (or keeps the reader's view) and places labels again
+    mapButtons(el, { zoomIn: by(1.7), zoomOut: by(1 / 1.7), reset: () => api.focus(focused), onFull: () => { fit(); drawScale(); layoutLabels(); } });
+    zoomTo(home); drawScale(); layoutLabels();
+    // follow the map's box (window resizes, the page's scrollbar appearing, rotating a phone): an untouched map is
+    // refitted to what it was showing; one the reader has moved keeps its center and scale
+    const fit = () => {
+      if (!el.clientWidth || !el.clientHeight) return;
+      const [nw, nh] = dims(); if (nw === W && nh === H) return;
+      const t = d3.zoomTransform(svg.node()), c = t.invert([W / 2, H / 2]);
+      W = nw; H = nh; svg.interrupt().attr('viewBox', `0 0 ${W} ${H}`);
+      if (!moved && target) zoomTo(target);
+      else svg.call(zoom.transform, d3.zoomIdentity.translate(W / 2, H / 2).scale(t.k).translate(-c[0], -c[1]));
+      drawScale();
+    };
+    if (window.ResizeObserver) new ResizeObserver(fit).observe(el);
+    addEventListener('resize', fit);
+    const api = {
+      svg, layer, nbSel, zoomTo, k: () => k, onZoom: f => listeners.push(f), home,
+      setFill(fn) { nbSel.attr('fill', f => fn(f.idx) || null).style('fill', f => fn(f.idx) || null); },
+      // outline one neighborhood and zoom to it (-1: clear and go back to the whole mapped city)
+      focus(i, dur = 450) {
+        focused = i;
+        focusG.selectAll('path').data(i >= 0 ? [GEO.nb[i]] : []).join('path').attr('d', f => f.d).attr('class', 'nbfocus');
+        zoomTo(i >= 0 ? pad(GEO.nb[i].bbox, 0.25) : home, dur);
+      }
+    };
+    return api;
+  }
+  // how far (CSS px) the floating filter panel reaches into a map `mapW` px wide, so fits keep clear of it.
+  // 0 when the panel isn't floating, is folded away, or covers most of a narrow map (phones in full screen).
+  function panelInset(panel, mapW) {
+    if (!panel || !panel.childElementCount || getComputedStyle(panel).position !== 'absolute') return 0;
+    const w = panel.offsetWidth; return w && w < mapW / 2 ? w + 24 : 0;
+  }
+
+  // ---------- map controls: full screen, zoom in, zoom out, reset ----------
+  const ico = d => `<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><path d="${d}"/></svg>`;
+  const ICON = {
+    full: ico('M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5'),
+    exit: ico('M9 4v5H4M15 4v5h5M20 15h-5v5M4 15h5v5'),
+    plus: ico('M12 5v14M5 12h14'),
+    minus: ico('M5 12h14'),
+    reset: ico('M4.6 13.5A7.6 7.6 0 1 0 6.6 6.6M6.6 2.4v4.2h4.2') // circular arrow, back to the opening view
+  };
+  const D = document, fsElement = () => D.fullscreenElement || D.webkitFullscreenElement || null;
+  // mapButtons(host, { zoomIn, zoomOut, reset, onFull(on) }) adds the control stack to a map's box (host) and returns it.
+  // Full screen takes the map's whole stage (filter panel, legend, scale bar, controls) with the Fullscreen API, or,
+  // where that isn't offered (iPhone Safari) or is refused, a fixed layer over the page with the page's scroll locked.
+  // Esc and the browser's own exit keep the button in step. onFull runs once the new size has settled.
+  function mapButtons(host, { zoomIn, zoomOut, reset, onFull } = {}) {
+    if (!host) return null;
+    const box = host.closest('.stage') || host;
+    const ctl = D.createElement('div'); ctl.className = 'mapctl';
+    const add = (icon, label, fn) => { const b = D.createElement('button'); b.type = 'button'; b.innerHTML = icon; b.title = label; b.setAttribute('aria-label', label); b.onclick = fn; ctl.appendChild(b); return b; };
+    let mode = null, sy = 0; // mode: 'api' | 'css' | null
+    const fsb = add(ICON.full, 'Full screen', () => (mode ? exit() : enter()));
+    fsb.setAttribute('aria-pressed', 'false'); fsb.classList.add('fsbtn');
+    if (zoomIn) add(ICON.plus, 'Zoom in', zoomIn);
+    if (zoomOut) add(ICON.minus, 'Zoom out', zoomOut);
+    if (reset) add(ICON.reset, 'Reset view', reset);
+    host.appendChild(ctl);
+    const settle = on => { let n = 0; const go = () => { if (onFull) onFull(on); if (++n < 3) requestAnimationFrame(go); }; requestAnimationFrame(go); };
+    const onKey = e => { if (e.key === 'Escape' && mode === 'css' && !/^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) { e.preventDefault(); exit(); } };
+    function show(on) {
+      box.classList.toggle('mapfs', on); box.classList.toggle('mapfs-css', on && mode === 'css');
+      D.documentElement.classList.toggle('mapfs-lock', on && mode === 'css');
+      fsb.innerHTML = on ? ICON.exit : ICON.full; fsb.setAttribute('aria-pressed', on); fsb.title = on ? 'Exit full screen (Esc)' : 'Full screen';
+      // the tooltip has to live inside the full-screen layer to be seen there
+      tip.hide(); (on ? box : D.body).appendChild(tipEl);
+      if (on) D.addEventListener('keydown', onKey); else { D.removeEventListener('keydown', onKey); mode = null; if (Math.abs(scrollY - sy) > 1) scrollTo(scrollX, sy); }
+      settle(on);
+    }
+    function css() { mode = 'css'; show(true); }
+    function enter() {
+      sy = scrollY;
+      const req = box.requestFullscreen || box.webkitRequestFullscreen;
+      if (!(D.fullscreenEnabled || D.webkitFullscreenEnabled) || !req) return css();
+      mode = 'api';
+      let p; try { p = req.call(box, { navigationUI: 'hide' }); } catch (e) { return css(); }
+      if (p && p.catch) p.catch(failed);
+      // a browser that neither enters nor refuses (some embedded views leave the request hanging) gets the fallback
+      setTimeout(failed, 1200);
+    }
+    function exit() {
+      if (mode === 'api' && fsElement() === box) (D.exitFullscreen || D.webkitExitFullscreen).call(D);
+      else if (mode) show(false);
+    }
+    const changed = () => { const on = fsElement() === box;
+      if (on && (mode !== 'api' || !box.classList.contains('mapfs'))) { mode = 'api'; show(true); } // (also a late success after the fallback took over)
+      else if (!on && mode === 'api' && box.classList.contains('mapfs')) show(false); };
+    const failed = () => { if (mode === 'api' && fsElement() !== box) css(); }; // older Safari reports a refusal by event, not a promise
+    ['fullscreenchange', 'webkitfullscreenchange'].forEach(t => D.addEventListener(t, changed));
+    ['fullscreenerror', 'webkitfullscreenerror'].forEach(t => D.addEventListener(t, failed));
+    return ctl;
+  }
+
+  // ---------- filters on the chart ----------
+  // stage(el, { map }) turns a view's pane into a filter panel + plot area. On maps the panel floats over the map,
+  // and the section holding the map spans the window (see .vsec.wide in lib.css).
+  function stage(el, { map: isMap = false, open = false } = {}) {
+    el.classList.add('stage', isMap ? 'mapstage' : 'chartstage');
+    el.innerHTML = '<div class="fpanel"></div><div class="plot"></div>';
+    const panel = el.firstChild, plot = el.lastChild;
+    if (isMap) { // on phones the map's filters fold away behind a button, so the map shows first
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'btn ftoggle'; b.textContent = 'Filters';
+      if (open) b.textContent = 'Hide filters'; else panel.classList.add('collapsed');
+      b.onclick = () => { panel.classList.toggle('collapsed'); b.textContent = panel.classList.contains('collapsed') ? 'Filters' : 'Hide filters'; };
+      el.insertBefore(b, panel);
+      const sec = el.closest('.vsec'); if (sec) sec.classList.add('wide');
+      lockInput(panel, plot);
+    }
+    return { panel, plot };
+  }
+  // Keep input over a map in the map. The wheel over the map belongs to the map (each map zooms on it), even at the
+  // zoom limits, where it would otherwise fall through and scroll the page. The floating filter panel scrolls itself
+  // and stops at its ends instead of handing the scroll on to the page. On touch screens one finger scrolls the page
+  // and two fingers move the map (each map does the moving); a one-finger swipe over the map shows a short hint.
+  function lockInput(panel, plot) {
+    plot.addEventListener('wheel', e => e.preventDefault(), { passive: false });
+    panel.addEventListener('wheel', e => {
+      if (e.ctrlKey || getComputedStyle(panel).position !== 'absolute') return; // page zoom; phones: the panel is part of the page
+      for (let n = e.target; n && n !== panel.parentNode; n = n.parentNode) {
+        if (n.nodeType !== 1 || n.scrollHeight <= n.clientHeight + 1 || !/auto|scroll/.test(getComputedStyle(n).overflowY)) continue;
+        if (e.deltaY < 0 ? n.scrollTop > 0 : n.scrollTop + n.clientHeight < n.scrollHeight - 1) return; // this box can still scroll
+      }
+      e.preventDefault();
+    }, { passive: false });
+    let y0 = null, two = false, ht = 0;
+    plot.addEventListener('touchstart', e => { two = e.touches.length > 1; y0 = two ? null : [e.touches[0].clientX, e.touches[0].clientY]; }, { passive: true });
+    plot.addEventListener('touchmove', e => {
+      if (two || !y0 || e.touches.length !== 1 || plot.closest('.mapfs')) return; // in full screen one finger moves the map
+      const t = e.touches[0]; if (Math.hypot(t.clientX - y0[0], t.clientY - y0[1]) < 12) return; y0 = null;
+      let h = plot.querySelector(':scope>.maphint');
+      if (!h) { h = document.createElement('div'); h.className = 'maphint'; h.setAttribute('aria-hidden', 'true'); h.textContent = 'Use two fingers to move the map'; plot.appendChild(h); }
+      h.classList.add('on'); clearTimeout(ht); ht = setTimeout(() => h.classList.remove('on'), 1400);
+    }, { passive: true });
+  }
+  // the page's scrollbar width, so full-width sections (lib.css) span the window without a sideways scroll
+  const setSbw = () => document.documentElement.style.setProperty('--sbw', Math.max(0, innerWidth - document.documentElement.clientWidth) + 'px');
+  if (window.ResizeObserver) new ResizeObserver(setSbw).observe(document.documentElement);
+  addEventListener('resize', setSbw); setSbw();
+  // panel section with a small heading and an optional link-style action ("Show all")
+  function fsec(panel, title, action) {
+    const sec = document.createElement('div'); sec.className = 'fsec';
+    sec.innerHTML = `<div class="fsec-h"><span class="eyebrow">${title}</span></div>`;
+    if (action) { const b = document.createElement('button'); b.type = 'button'; b.className = 'linkbtn'; b.textContent = action[0]; b.onclick = action[1]; sec.firstChild.appendChild(b); }
+    panel.appendChild(sec); return sec;
+  }
+  // legend-style filter rows: swatch, name (+ sub), proportion bar, count. mode 'pick' (one at a time) or 'toggle' (each on/off)
+  function flist(sec, rows, { pressed, onClick, mode = 'pick' }) {
+    const ul = document.createElement('ul'); ul.className = 'flist' + (mode === 'toggle' ? ' toggles' : '');
+    const mx = Math.max(1, ...rows.map(r => r.count || 0)); let any = false;
+    rows.forEach(r => {
+      const li = document.createElement('li'), b = document.createElement('button'); b.type = 'button';
+      const on = !!pressed(r.key); if (on) any = true; b.setAttribute('aria-pressed', on);
+      const col = r.color || 'var(--muted)';
+      b.innerHTML = `<span class="sw" style="background:${col}${r.square ? ';border-radius:3px' : ''}"></span><span class="nm"><span>${r.name}</span>${r.sub ? `<em>${r.sub}</em>` : ''}${r.count != null ? `<span class="fb"><i style="width:${(100 * r.count / mx).toFixed(1)}%;background:${col}"></i></span>` : ''}</span><span class="ct">${r.count != null ? fmt(r.count) : ''}</span>`;
+      b.onclick = () => onClick(r.key); li.appendChild(b); ul.appendChild(li);
+    });
+    if (mode === 'pick' && any) ul.classList.add('filtering');
+    sec.appendChild(ul); return ul;
+  }
+  // segmented switch
+  function seg(sec, opts, value, onChange) {
+    const d = document.createElement('div'); d.className = 'seg';
+    opts.forEach(([v, l]) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = l; b.setAttribute('aria-pressed', v === value); b.onclick = () => onChange(v); d.appendChild(b); });
+    sec.appendChild(d); return d;
+  }
+  // ftabs(panel, [[value, label], ...], value, onChange): a tab row at the very top of a filter panel, for one chart
+  // section that switches between closely related charts of the same data (e.g. two maps). Returns the row.
+  function ftabs(panel, opts, value, onChange) {
+    const d = document.createElement('div'); d.className = 'ftabs'; d.setAttribute('role', 'tablist');
+    opts.forEach(([v, l]) => {
+      const b = document.createElement('button'); b.type = 'button'; b.textContent = l; b.setAttribute('role', 'tab');
+      b.setAttribute('aria-selected', v === value); b.onclick = () => { if (v !== value) onChange(v); }; d.appendChild(b);
+    });
+    panel.prepend(d); return d;
+  }
+  // neighborhood picker inside a panel section
+  function nbPick(sec, value, onSel, label = 'All neighborhoods') {
+    const s = document.createElement('select'); s.className = 'fsel'; s.setAttribute('aria-label', 'Neighborhood'); sec.appendChild(s);
+    nbSelect(s, onSel, value, label); return s;
+  }
+  // on phones the panel collapses behind a "Filters" button
+  function phoneToggle(panel) {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'btn ftoggle'; b.textContent = 'Filters';
+    b.onclick = () => panel.classList.toggle('collapsed'); panel.prepend(b);
+  }
+
+  // sequential color for a value in [0,1]
+  const SEQ = ['--q1', '--q2', '--q3', '--q4', '--q5', '--q6', '--q7'];
+  const seqVar = t => `var(${SEQ[Math.max(0, Math.min(6, Math.floor(t * 7)))]})`;
+  // breaks = [low, high]; the top swatch gets a "+" only when values run past `high` (open = true)
+  function seqLegend(el, breaks, fmtf, label, open = true) {
+    el.innerHTML = `<span>${label}</span>` + SEQ.map((s, i) => `<span><i style="background:var(${s})"></i>${i === 0 ? fmtf(breaks[0]) : i === 6 ? fmtf(breaks[1]) + (open ? '+' : '') : ''}</span>`).join('');
+  }
+  // Seven equal-count classes, so each color holds about the same number of areas and differences across most of
+  // the city stay visible even when a few places are far above the rest. classes(values) -> { color(v), edges }
+  function classes(vals) {
+    const v = vals.filter(x => x != null && isFinite(x)).sort(d3.ascending);
+    const q = d3.scaleQuantile().domain(v).range(d3.range(7));
+    return { color: x => x == null ? 'var(--none)' : `var(${SEQ[q(x)]})`, edges: [v[0], ...q.quantiles(), v[v.length - 1]] };
+  }
+  // legend for classes(): a stepped bar with the value where each color starts, and a swatch for areas with no value
+  function stepLegend(el, edges, fmtf, none) {
+    el.innerHTML = '<div class="steps">' + SEQ.map((s, i) => `<span><i style="background:var(${s})"></i><em>${fmtf(edges[i])}</em></span>`).join('')
+      + `<span class="end"><em>${fmtf(edges[7])}</em></span></div>` + (none ? `<span class="nonekey"><i style="background:var(--none)"></i>${none}</span>` : '');
+  }
+  // compact numbers for legends: 950, 1.3k, 12k
+  const short = v => v >= 1000 ? d3.format('.2~s')(v).replace('G', 'B') : fmtRate(v);
+
+  // ---------- small chart helpers ----------
+  function frame(el, { h = 260, m = { t: 12, r: 16, b: 28, l: 44 } } = {}) {
+    const W = Math.max(320, el.clientWidth || 600); // never narrower than a phone, even if drawn while hidden
+    const svg = d3.select(el).append('svg').attr('viewBox', `0 0 ${W} ${h}`);
+    return { svg, W, H: h, m, iw: W - m.l - m.r, ih: h - m.t - m.b, g: svg.append('g').attr('transform', `translate(${m.l},${m.t})`) };
+  }
+  function yGrid(f, y, ticks = 4, tf = d3.format('~s')) {
+    f.g.append('g').attr('class', 'gridl').call(d3.axisLeft(y).ticks(ticks).tickSize(-f.iw).tickFormat(tf)).call(g => g.select('.domain').remove()).call(g => g.selectAll('text').attr('x', -6));
+    f.g.selectAll('.gridl .tick line').attr('stroke', 'var(--grid)');
+  }
+  function chips(el, items, onSel, { multi = false, sel = null } = {}) {
+    el.innerHTML = '';
+    let cur = sel;
+    items.forEach((it, i) => {
+      const b = document.createElement('button'); b.className = 'chip'; b.type = 'button';
+      b.innerHTML = (it.color ? `<i style="background:${it.color}"></i>` : '') + it.label;
+      b.onclick = () => { cur = it.value; [...el.children].forEach(c => c.classList.remove('on')); b.classList.add('on'); onSel(it.value); };
+      if (it.value === sel) b.classList.add('on');
+      el.appendChild(b);
+    });
+  }
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const monthsLong = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  // the calendar year a page covers; day-of-year (doy) values count from Jan 1 of it
+  let YEAR = new Date().getFullYear();
+  const setYear = y => { YEAR = y; };
+  const doyTime = (d, y = YEAR) => new Date(Date.UTC(y, 0, 1) + d * 864e5);
+  const doyDate = (d, y = YEAR) => { const t = doyTime(d, y); return months[t.getUTCMonth()] + ' ' + t.getUTCDate(); };
+  const doyMonth = (d, y = YEAR) => doyTime(d, y).getUTCMonth();
+  const doyISO = (d, y = YEAR) => doyTime(d, y).toISOString().slice(0, 10);
+  // first doy of each month (only months that start on or before `last`, if given)
+  const monthStarts = (y = YEAR, last = 400) => d3.range(12).map(m => (Date.UTC(y, m, 1) - Date.UTC(y, 0, 1)) / 864e5).filter(d => d <= last);
+  // month labels for a time axis: every month when there's room, every other month on narrow charts,
+  // and never one that would run off the right edge. starts: first doy of each month; x: doy -> px
+  const monthTicks = (starts, x, iw) => {
+    const step = iw / Math.max(1, starts.length) < 34 ? 2 : 1;
+    return starts.map((d, i) => ({ x: x(d), label: months[i], i })).filter(t => t.i % step === 0 && t.x + 22 <= iw);
+  };
+  // 'YYYY-MM-DD' -> 'Nov 18, 2026'
+  const isoDate = s => { const [y, m, d] = s.slice(0, 10).split('-').map(Number); return `${months[m - 1]} ${d}, ${y}`; };
+  // plain-language share: .33 -> 'about a third'
+  function share(p) {
+    const named = [[1 / 4, 'about a quarter'], [1 / 3, 'about a third'], [1 / 2, 'about half'], [2 / 3, 'about two-thirds'], [3 / 4, 'about three-quarters']];
+    const hit = named.find(([v]) => Math.abs(p - v) < 0.025);
+    return hit ? hit[1] : `about ${Math.round(p * 100)}%`;
+  }
+  const numWord = n => ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'][n] || fmt(n);
+  const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
+  const setText = (id, s) => { const el = document.getElementById(id); if (el) el.textContent = s; };
+  const setHTML = (id, s) => { const el = document.getElementById(id); if (el) el.innerHTML = s; };
+
+  // ---------- one subject per page: a row of tabs, one per chart ----------
+  // The URL hash holds the open chart and the page's filters: #chartId&key=value&... so a link opens
+  // that chart with exactly those filters.
+  function hashState() {
+    const [view, ...kv] = location.hash.slice(1).split('&'), o = { view };
+    kv.forEach(p => { const [k, v] = p.split('='); if (k) o[k] = decodeURIComponent(v || ''); });
+    return o;
+  }
+  // views(list, { state, ds }) -- list: [{ id, label, tab, cls, keep, draw(el, first), csv() -> rows, file() -> CSV name (default id), ds: [id, name] }]
+  // A bar at the top of #chart holds a tab per chart (`tab`, or `label`) and Copy link / Download CSV for the open one.
+  // Below it, each chart is its own section (heading `label`, then the chart); only the open one shows.
+  // With a single chart there are no tabs: its heading takes their place in the bar.
+  // Filters are shared page state: refresh() redraws the open chart, and the others redraw when next opened.
+  // state() returns the filters that differ from their defaults; they're written into the link.
+  // A page can open a chart with location.hash = 'chartId'.
+  function views(list, opts = {}) {
+    const host = document.getElementById('chart');
+    const panes = {}, secs = {}, tabs = {}, drawn = new Set(), stale = new Set();
+    const stateKV = () => {
+      const st = opts.state ? opts.state() : {};
+      return Object.entries(st).filter(([, v]) => v != null && v !== '').map(([k, v]) => `&${k}=${encodeURIComponent(v)}`).join('');
+    };
+    const h0 = hashState().view;
+    let cur = list.find(v => v.id === h0) || list[0];
+    const linkFor = () => location.href.split('#')[0] + '#' + cur.id + stateKV();
+    const writeHash = () => history.replaceState(null, '', '#' + cur.id + stateKV());
+    const btn = t => { const b = document.createElement('button'); b.className = 'btn'; b.type = 'button'; b.textContent = t; return b; };
+    // the bar: tabs, then the open chart's Copy link / Download CSV
+    const bar = document.createElement('div'); bar.className = 'vbar';
+    const tabRow = document.createElement('div'); tabRow.className = 'vtabs'; tabRow.setAttribute('role', 'tablist'); tabRow.setAttribute('aria-label', 'Charts');
+    const tools = document.createElement('div'); tools.className = 'tools';
+    const linkB = btn('Copy link'), csvB = btn('Download CSV');
+    linkB.onclick = async () => {
+      writeHash(); const url = linkFor();
+      try { await navigator.clipboard.writeText(url); linkB.textContent = 'Link copied'; }
+      catch (e) { prompt('Copy this link:', url); }
+      setTimeout(() => linkB.textContent = 'Copy link', 1600);
+    };
+    csvB.onclick = () => downloadCSV(cur);
+    tools.append(linkB, csvB);
+    // a page with a single chart has no tabs: the bar holds that chart's heading instead
+    const one = list.length === 1;
+    if (one) bar.classList.add('one');
+    bar.append(one ? document.createElement('h2') : tabRow, tools); host.appendChild(bar);
+    list.forEach(v => {
+      const t = document.createElement('button'); t.type = 'button'; t.textContent = v.tab || v.label;
+      t.id = 'vt-' + v.id; t.setAttribute('role', 'tab'); t.setAttribute('aria-controls', 'v-' + v.id);
+      t.onclick = () => open(v.id); tabRow.appendChild(t); tabs[v.id] = t;
+      const sec = document.createElement('section'); sec.className = 'vsec'; sec.id = 'v-' + v.id;
+      const h = one ? bar.firstChild : document.createElement('h2'); h.textContent = v.label;
+      const p = document.createElement('div'); p.className = 'pane ' + (v.cls || 'card');
+      if (one) { h.id = 'vh-' + v.id; sec.setAttribute('aria-labelledby', h.id); sec.append(p); }
+      else {
+        sec.setAttribute('role', 'tabpanel'); sec.setAttribute('aria-labelledby', 'vt-' + v.id);
+        const head = document.createElement('div'); head.className = 'vsec-h'; head.appendChild(h); sec.append(head, p);
+      }
+      host.appendChild(sec); panes[v.id] = p; secs[v.id] = sec;
+    });
+    // footer "Data:" link goes to the page's City dataset
+    const dataLink = document.getElementById('dataLink'), ds = opts.ds || (list.find(v => v.ds) || {}).ds;
+    if (dataLink && ds) { dataLink.href = 'https://data.nola.gov/d/' + ds[0]; dataLink.textContent = ds[1] + ' on data.nola.gov'; }
+    // charts are drawn only while shown (hidden ones have no size); a hidden chart whose filters changed redraws when opened
+    const drawOne = v => { v.draw(panes[v.id], !drawn.has(v.id)); drawn.add(v.id); stale.delete(v.id); };
+    const draw = () => { tip.hide(); list.forEach(v => { if (v !== cur && drawn.has(v.id)) stale.add(v.id); }); drawOne(cur); writeHash(); setSbw(); };
+    function show(v) {
+      cur = v;
+      list.forEach(x => { secs[x.id].hidden = x !== v; tabs[x.id].setAttribute('aria-selected', x === v); tabs[x.id].tabIndex = x === v ? 0 : -1; });
+      csvB.hidden = !v.csv;
+      if (!drawn.has(v.id) || stale.has(v.id)) drawOne(v);
+      // on phones the tab row scrolls sideways: bring the open tab into view
+      const r = tabRow.getBoundingClientRect(), t = tabs[v.id].getBoundingClientRect();
+      if (t.left < r.left || t.right > r.right) tabRow.scrollLeft += t.left - r.left - 16;
+    }
+    function open(id, focusTab) {
+      const v = list.find(x => x.id === id); if (!v) return;
+      tip.hide(); if (v !== cur || !drawn.has(v.id)) show(v); writeHash();
+      if (focusTab) tabs[id].focus();
+      if (bar.getBoundingClientRect().top < 0) bar.scrollIntoView({ block: 'start' }); // jumped here from further down the page
+    }
+    // arrow keys move between tabs
+    tabRow.addEventListener('keydown', ev => {
+      const i = list.indexOf(cur), n = list.length;
+      const j = ev.key === 'ArrowRight' ? (i + 1) % n : ev.key === 'ArrowLeft' ? (i - 1 + n) % n : ev.key === 'Home' ? 0 : ev.key === 'End' ? n - 1 : -1;
+      if (j >= 0) { ev.preventDefault(); open(list[j].id, true); }
+    });
+    // a link with filters opened on this same page (only the hash changes) reloads, so its filters apply;
+    // the pages' own jumps to a chart set a bare chart id and keep the current filters
+    addEventListener('hashchange', () => {
+      const h = hashState(), st = opts.state ? opts.state() : {};
+      const want = Object.entries(h).filter(([k]) => k !== 'view'), have = Object.entries(st).filter(([, v]) => v != null && v !== '');
+      if (want.length && (want.length !== have.length || want.some(([k, v]) => String(st[k]) !== v))) return location.reload();
+      if (list.some(v => v.id === h.view) && h.view !== cur.id) { list.forEach(x => { if (drawn.has(x.id)) stale.add(x.id); }); open(h.view); } else draw();
+    });
+    let rt, lastW = innerWidth;
+    addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => {
+      if (innerWidth === lastW) return; lastW = innerWidth; // phones fire resize on scroll (address bar); only width matters
+      list.forEach(v => { if (!v.keep && drawn.has(v.id)) { if (v === cur) drawOne(v); else stale.add(v.id); } });
+    }, 150); });
+    function downloadCSV(v) {
+      const rows = v.csv && v.csv(); if (!rows || !rows.length) return;
+      const keys = Object.keys(rows[0]);
+      const cell = x => { x = x == null ? '' : String(x); return /[",\n]/.test(x) ? '"' + x.replace(/"/g, '""') + '"' : x; };
+      const text = [keys.map(cell).join(','), ...rows.map(r => keys.map(k => cell(r[k])).join(','))].join('\n');
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob(['\ufeff' + text], { type: 'text/csv;charset=utf-8' }));
+      a.download = `${location.pathname.split('/').pop().replace('.html', '') || 'index'}-${v.file ? v.file() : v.id}.csv`;
+      document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    }
+    show(cur); writeHash();
+    return { refresh: draw, open, get id() { return cur.id; } };
+  }
+  const legendHTML = items => '<div class="legend">' + items.map(([c, l, round]) => `<span><i style="background:${c}${round ? ';border-radius:50%' : ''}"></i>${l}</span>`).join('') + '</div>';
+
+  return { css, S, fmt, pct, tip, row, setGeo, views, hashState, legendHTML, stage, fsec, flist, seg, ftabs, nbPick, phoneToggle, popOf, perK, fmtRate, POP_NOTE, basisChips, shown, nbList, nbSelect, lonlat, get FULL() { return FULL; }, get GEO() { return GEO; }, map, mapButtons, panelInset, seqVar, seqLegend, classes, stepLegend, short, frame, yGrid, chips, months, monthsLong,
+    setYear, get YEAR() { return YEAR; }, monthTicks, doyTime, doyDate, doyISO, doyMonth, monthStarts, isoDate, share, numWord, cap, setText, setHTML, title };
+})();
+</script>
+<script>// Blight and code enforcement page
+(() => {
+  const D = DATA.ce; NOLA.setGeo(DATA.geo);
+  const { fmt, tip, row } = NOLA;
+  const GEO = NOLA.GEO, HU = DATA.geo.hu || [];
+  const nbName = i => i >= 0 ? GEO.nb[i].name : '—';
+  const sw = c => `<i style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${c}"></i> `;
+  const lastLabel = NOLA.isoDate(D.last).replace(/, \d+$/, ''), YEAR = +D.last.slice(0, 4), partialYear = y => y === YEAR && !D.last.endsWith('-12-31');
+  const STAGE = D.stages.map(s => ({ '1 - Inspection': 'Inspection', '2 - Title Research': 'Title research', '3 - Hearing': 'Hearing', '4 - Judgment': 'Judgment', '5 - In Compliance': 'In compliance', 'X - Processing': 'Processing' })[s] || s);
+  const STAGE_C = ['var(--s1)', 'var(--s7)', 'var(--s4)', 'var(--s2)', 'var(--s3)', 'var(--muted)'];
+  const AGE_L = ['Under 90 days', '90 days to 1 year', '1–2 years', '2–5 years', 'Over 5 years'];
+  const AGE_C = ['var(--q2)', 'var(--q3)', 'var(--q4)', 'var(--q5)', 'var(--q7)'];
+  const NEW_L = [['Violation found', 'var(--s2)'], ['No violation', 'var(--s3)'], ['Not inspected yet, or other', 'var(--muted)']];
+  const HEAR_C = ['var(--s2)', 'var(--s3)', 'var(--s4)', 'var(--s7)', 'var(--muted)'];
+  const HEAR_L = { Guilty: 'Guilty', Dismissed: 'Dismissed', Reset: 'Reset to a later date', Pending: 'Result pending', Other: 'Other' };
+  const INSP_C = ['var(--s1)', 'var(--s3)', 'var(--s4)', 'var(--muted)'];
+  const MIN_HU = 500, perHU = (n, i) => HU[i] >= MIN_HU ? 1000 * n / HU[i] : null;
+
+  const H = NOLA.hashState();
+  const TABS = ['open', 'new', 'grass', 'abate'];
+  const st = { nb: H.nb != null ? +H.nb : -1, measure: TABS.includes(H.measure) ? H.measure : 'open', stage: H.stage != null ? +H.stage : -1, res: H.res != null ? +H.res : -1,
+               basis: H.basis === 'hu' ? 'hu' : 'n', kind: H.kind === 'grass' ? 'grass' : 'ce', ig: H.ig != null ? +H.ig : -1 };
+  const staged = (el, first, isMap) => { if (first) el._s = NOLA.stage(el, { map: isMap }); return el._s; };
+  const set = (k, v) => { st[k] = v; V.refresh(); };
+  const toggle = k => v => set(k, st[k] === v ? -1 : v);
+  const kvList = (sec, items) => sec.insertAdjacentHTML('beforeend', '<div class="srages">' + items.map(([l, c, n]) => `<span>${c ? `<i style="background:${c}"></i>` : '<i></i>'}${l}<b>${n}</b></span>`).join('') + '</div>');
+
+  // ---------- per-neighborhood numbers ----------
+  const openOf = (nb, stage = st.stage) => { const a = D.openAge[nb]; return stage >= 0 ? d3.sum(a[stage]) : d3.sum(a, r => d3.sum(r)); };
+  const newOf = (nb, res = st.res) => res >= 0 ? D.new12[nb][res] : d3.sum(D.new12[nb]);
+  const raw = i => st.measure === 'open' ? openOf(i) : st.measure === 'new' ? newOf(i) : st.measure === 'grass' ? D.g12[i] : D.abOpen[i];
+  const val = i => st.basis === 'hu' ? perHU(raw(i), i) : raw(i);
+  const MEAS = { open: 'Open code enforcement cases', new: 'Cases filed in the past 12 months', grass: 'Overgrown-lot cases, past 12 months', abate: 'Properties in abatement' };
+
+  // ---------- map ----------
+  let m;
+  function drawMap(pane, first) {
+    const { panel, plot } = staged(pane, first, true);
+    panel.innerHTML = '';
+    NOLA.ftabs(panel, [['open', 'Open cases'], ['new', 'New cases'], ['grass', 'Overgrown lots'], ['abate', 'Abatement']], st.measure, v => set('measure', v));
+    NOLA.nbPick(NOLA.fsec(panel, 'Neighborhood'), st.nb, v => set('nb', v));
+    const nbs = d3.range(72).filter(nb => st.nb < 0 || nb === st.nb);
+    if (st.measure === 'open')
+      NOLA.flist(NOLA.fsec(panel, `Stage · ${fmt(d3.sum(nbs, nb => openOf(nb, -1)))} open`, st.stage >= 0 ? ['All stages', () => set('stage', -1)] : null),
+        STAGE.map((s, k) => ({ key: k, name: s, color: STAGE_C[k], count: d3.sum(nbs, nb => openOf(nb, k)) })), { pressed: k => st.stage === k, onClick: toggle('stage') });
+    else if (st.measure === 'new')
+      NOLA.flist(NOLA.fsec(panel, `First inspection · since ${NOLA.isoDate(D.winStart).replace(/, \d+$/, '')}`, st.res >= 0 ? ['Show all', () => set('res', -1)] : null),
+        NEW_L.map(([l, c], k) => ({ key: k, name: l, color: c, count: d3.sum(nbs, nb => D.new12[nb][k]) })), { pressed: k => st.res === k, onClick: toggle('res') });
+    else if (st.measure === 'grass')
+      kvList(NOLA.fsec(panel, 'Since ' + NOLA.isoDate(D.winStart)), [['Cases filed', null, fmt(d3.sum(nbs, nb => D.g12[nb]))]]);
+    else {
+      kvList(NOLA.fsec(panel, 'In abatement now'), [['Properties', null, fmt(d3.sum(nbs, nb => D.abOpen[nb]))]]);
+      kvList(NOLA.fsec(panel, 'How closed abatement cases ended'), D.abEnd.slice(0, 6).map(([k, n]) => [k === 'Not stated' ? 'Closed, no reason given' : k, null, fmt(n)]));
+    }
+    NOLA.seg(NOLA.fsec(panel, 'Count'), [['n', 'Total'], ['hu', 'Per 1,000 homes']], st.basis, v => set('basis', v));
+    const ls = NOLA.fsec(panel, 'Legend'), leg = document.createElement('div'); leg.className = 'legend'; ls.appendChild(leg);
+    if (st.basis === 'hu') ls.insertAdjacentHTML('beforeend', '<div class="legend popnote">Per 1,000 homes (2020 Census housing units)</div>');
+    if (first) {
+      m = NOLA.map(plot, { panel, label: 'Map of code enforcement by neighborhood', tip: mapTip });
+      m.lastNb = -1;
+      plot.insertAdjacentHTML('beforeend', '<div class="maplegend"></div>');
+    }
+    const cl = NOLA.classes(d3.range(72).map(val));
+    m.setFill(i => cl.color(val(i)));
+    const none = d3.range(72).some(i => val(i) == null) ? `Under ${MIN_HU} homes` : null, lf = v => st.basis === 'hu' ? NOLA.fmtRate(v) : NOLA.short(v);
+    NOLA.stepLegend(leg, cl.edges, lf, none);
+    const ml = plot.querySelector('.maplegend'); NOLA.stepLegend(ml, cl.edges, lf, none);
+    ml.insertAdjacentHTML('afterbegin', `<div class="mlh">${MEAS[st.measure]}${st.basis === 'hu' ? ' per 1,000 homes' : ''}</div>`);
+    if (m.lastNb !== st.nb) { m.focus(st.nb, first ? 0 : 450); m.lastNb = st.nb; }
+  }
+  function mapTip(i) {
+    const r = perHU(raw(i), i);
+    return `<b>${GEO.nb[i].name}</b>` + row('Open cases', fmt(openOf(i, -1))) + (st.stage >= 0 && st.measure === 'open' ? row('Open, ' + STAGE[st.stage].toLowerCase(), fmt(openOf(i))) : '')
+      + row('Cases filed, past 12 months', fmt(newOf(i, -1))) + row('Overgrown-lot cases, past 12 months', fmt(D.g12[i])) + row('Properties in abatement', fmt(D.abOpen[i]))
+      + row('Housing units (2020)', fmt(HU[i] || 0)) + (r != null ? row('Shown per 1,000 homes', NOLA.fmtRate(r)) : '');
+  }
+
+  // ---------- cases filed per year ----------
+  function drawYears(pane, first) {
+    const { panel, plot } = staged(pane, first);
+    panel.innerHTML = '';
+    NOLA.ftabs(panel, [['ce', 'Code enforcement'], ['grass', 'Overgrown lots']], st.kind, v => set('kind', v));
+    NOLA.nbPick(NOLA.fsec(panel, 'Neighborhood'), st.nb, v => set('nb', v));
+    const years = st.kind === 'grass' ? D.gyears : D.years, data = (st.kind === 'grass' ? D.gyr : D.yr)[st.nb >= 0 ? st.nb : 72];
+    const C = [['Still open', 'var(--s2)'], ['Closed', 'var(--s1)']];
+    kvList(NOLA.fsec(panel, `Cases filed since ${years[0]}`), C.map(([l, c], k) => [l, c, fmt(d3.sum(data, d => d[k]))]));
+    plot.innerHTML = '';
+    const f = NOLA.frame(plot, { h: 340, m: { t: 18, r: 10, b: 28, l: 44 } });
+    const x = d3.scaleBand().domain(years).range([0, f.iw]).paddingInner(.22);
+    const y = d3.scaleLinear().domain([0, (d3.max(data, d => d[0] + d[1]) || 1) * 1.05]).range([f.ih, 0]).nice();
+    NOLA.yGrid(f, y, 5, d3.format(','));
+    data.forEach((d, k) => { let y0 = 0; [1, 0].forEach(s => { const v = d[s]; if (!v) return;
+      f.g.append('rect').attr('x', x(years[k])).attr('width', x.bandwidth()).attr('y', y(y0 + v)).attr('height', Math.max(.5, y(y0) - y(y0 + v))).attr('fill', C[s][1]).attr('opacity', partialYear(years[k]) ? .55 : 1); y0 += v; }); });
+    data.forEach((d, k) => { if (partialYear(years[k])) f.g.append('text').attr('class', 'halo').attr('x', x(years[k]) + x.bandwidth()).attr('y', y(d[0] + d[1]) - 5).attr('text-anchor', 'end').style('fill', 'var(--ink2)').text('to ' + lastLabel); });
+    f.g.selectAll('rect.h').data(years).join('rect').attr('class', 'h').attr('x', yy => x(yy) - 2).attr('width', x.step()).attr('height', f.ih).attr('fill', 'transparent')
+      .on('mousemove', (ev, yy) => { const d = data[years.indexOf(yy)];
+        tip.show(`<b>Filed in ${yy}${partialYear(yy) ? ', through ' + lastLabel : ''}</b>` + (st.nb >= 0 ? `<div style="color:var(--ink2)">${nbName(st.nb)}</div>` : '') + row('Cases', fmt(d[0] + d[1])) + C.map(([l, c], s) => row(sw(c) + l, fmt(d[s]))).join(''), ev); }).on('mouseleave', tip.hide);
+    f.g.selectAll('text.x').data(years).join('text').attr('class', 'x').attr('x', yy => x(yy) + x.bandwidth() / 2).attr('y', f.ih + 18).attr('text-anchor', 'middle').text(yy => f.iw < 420 ? "'" + String(yy).slice(2) : yy);
+    f.g.append('line').attr('x1', 0).attr('x2', f.iw).attr('y1', f.ih).attr('y2', f.ih).attr('stroke', 'var(--axis)');
+  }
+
+  // ---------- horizontal rows: label + stacked bar ----------
+  function barRows(plot, rows, colors, { tipFor, onClick, labelW = 210, prev } = {}) {
+    plot.innerHTML = '';
+    const narrow = (plot.clientWidth || 600) < 600, rh = narrow ? 42 : 30;
+    const f = NOLA.frame(plot, { h: 30 + rows.length * rh, m: { t: 4, r: 46, b: 24, l: narrow ? 6 : labelW } });
+    const mx = d3.max(rows, r => Math.max(d3.sum(r.a), prev ? r.prev || 0 : 0)) || 1;
+    const x = d3.scaleLinear().domain([0, mx * 1.04]).range([0, f.iw]).nice();
+    f.g.append('g').attr('class', 'gridl').attr('transform', `translate(0,${f.ih})`).call(d3.axisBottom(x).ticks(5).tickSize(-f.ih).tickFormat(d3.format('~s'))).call(g => g.select('.domain').remove());
+    f.g.selectAll('.gridl .tick line').attr('stroke', 'var(--grid)');
+    rows.forEach((r, i) => {
+      const y0 = i * rh, cy = y0 + rh - (narrow ? 11 : 15);
+      f.g.append('text').attr('x', narrow ? 0 : -10).attr('y', narrow ? y0 + 13 : cy + 4).attr('text-anchor', narrow ? 'start' : 'end').style('fill', r.on ? 'var(--ink)' : 'var(--ink2)').style('font-weight', r.on ? 650 : null).text(r.name);
+      let x0 = 0; r.a.forEach((v, k) => { if (!v) return; f.g.append('rect').attr('x', x(x0)).attr('width', Math.max(.5, x(x0 + v) - x(x0) - .5)).attr('y', cy - 7).attr('height', 14).attr('fill', colors[k]); x0 += v; });
+      if (prev && r.prev != null) f.g.append('line').attr('x1', x(r.prev)).attr('x2', x(r.prev)).attr('y1', cy - 10).attr('y2', cy + 10).attr('stroke', 'var(--ink)').attr('stroke-width', 2);
+      f.g.append('text').attr('x', x(Math.max(x0, prev ? r.prev || 0 : 0)) + 6).attr('y', cy + 4).style('fill', 'var(--ink2)').text(fmt(x0));
+      f.g.append('rect').attr('x', narrow ? 0 : -f.m.l).attr('width', f.iw + (narrow ? 0 : f.m.l)).attr('y', y0).attr('height', rh).attr('fill', 'transparent').style('cursor', onClick ? 'pointer' : null)
+        .on('mousemove', ev => tip.show(tipFor(r), ev)).on('mouseleave', tip.hide).on('click', () => onClick && onClick(r));
+    });
+  }
+
+  // ---------- open cases by stage and age ----------
+  function drawOpen(pane, first) {
+    const { panel, plot } = staged(pane, first);
+    panel.innerHTML = '';
+    NOLA.nbPick(NOLA.fsec(panel, 'Neighborhood'), st.nb, v => set('nb', v));
+    const A = D.openAge[st.nb >= 0 ? st.nb : 72];
+    kvList(NOLA.fsec(panel, `Open for · ${fmt(d3.sum(A, r => d3.sum(r)))} cases`), AGE_L.map((l, a) => [l, AGE_C[a], fmt(d3.sum(A, r => r[a]))]));
+    const rows = STAGE.map((s, k) => ({ k, name: s, a: A[k], on: k === st.stage })).filter(r => d3.sum(r.a));
+    barRows(plot, rows, AGE_C, { labelW: 130,
+      tipFor: r => `<b>${r.name}</b><div style="color:var(--ink2)">Open cases${st.nb >= 0 ? ', ' + nbName(st.nb) : ''}</div>` + row('Total', fmt(d3.sum(r.a))) + AGE_L.map((l, a) => row(sw(AGE_C[a]) + l, fmt(r.a[a]))).join(''),
+      onClick: r => set('stage', st.stage === r.k ? -1 : r.k) });
+  }
+
+  // ---------- hearing results per year ----------
+  function drawHear(pane, first) {
+    const { panel, plot } = staged(pane, first);
+    panel.innerHTML = '';
+    kvList(NOLA.fsec(panel, `Hearings held since ${D.years[0]}`), D.hearGroups.map((g, k) => [HEAR_L[g] || g, HEAR_C[k], fmt(d3.sum(D.hear, d => d[k]))]));
+    kvList(NOLA.fsec(panel, 'Scheduled'), [['After ' + lastLabel, null, fmt(D.upcoming)]]);
+    plot.innerHTML = '';
+    const f = NOLA.frame(plot, { h: 340, m: { t: 18, r: 10, b: 28, l: 44 } });
+    const x = d3.scaleBand().domain(D.years).range([0, f.iw]).paddingInner(.22);
+    const y = d3.scaleLinear().domain([0, (d3.max(D.hear, d => d3.sum(d)) || 1) * 1.05]).range([f.ih, 0]).nice();
+    NOLA.yGrid(f, y, 5, d3.format(','));
+    D.hear.forEach((d, k) => { let y0 = 0; d.forEach((v, g) => { if (!v) return;
+      f.g.append('rect').attr('x', x(D.years[k])).attr('width', x.bandwidth()).attr('y', y(y0 + v)).attr('height', Math.max(.5, y(y0) - y(y0 + v))).attr('fill', HEAR_C[g]).attr('opacity', partialYear(D.years[k]) ? .55 : 1); y0 += v; }); });
+    D.hear.forEach((d, k) => { if (partialYear(D.years[k])) f.g.append('text').attr('class', 'halo').attr('x', x(D.years[k]) + x.bandwidth()).attr('y', y(d3.sum(d)) - 5).attr('text-anchor', 'end').style('fill', 'var(--ink2)').text('to ' + lastLabel); });
+    f.g.selectAll('rect.h').data(D.years).join('rect').attr('class', 'h').attr('x', yy => x(yy) - 2).attr('width', x.step()).attr('height', f.ih).attr('fill', 'transparent')
+      .on('mousemove', (ev, yy) => { const d = D.hear[D.years.indexOf(yy)];
+        tip.show(`<b>Hearings in ${yy}${partialYear(yy) ? ', through ' + lastLabel : ''}</b>` + row('Total', fmt(d3.sum(d))) + D.hearGroups.map((g, k) => d[k] ? row(sw(HEAR_C[k]) + (HEAR_L[g] || g), fmt(d[k])) : '').join(''), ev); }).on('mouseleave', tip.hide);
+    f.g.selectAll('text.x').data(D.years).join('text').attr('class', 'x').attr('x', yy => x(yy) + x.bandwidth() / 2).attr('y', f.ih + 18).attr('text-anchor', 'middle').text(yy => f.iw < 420 ? "'" + String(yy).slice(2) : yy);
+    f.g.append('line').attr('x1', 0).attr('x2', f.iw).attr('y1', f.ih).attr('y2', f.ih).attr('stroke', 'var(--axis)');
+  }
+
+  // ---------- most cited violations ----------
+  const vName = s => s.replace(/^\d+\s+/, ''), vCode = s => (s.match(/^\d+/) || [''])[0];
+  function drawViol(pane, first) {
+    const { panel, plot } = staged(pane, first);
+    panel.innerHTML = '';
+    const sec = NOLA.fsec(panel, 'Violations cited');
+    kvList(sec, [['Past 12 months', 'var(--s1)', fmt(D.violTotal[0])], ['12 months before', null, fmt(D.violTotal[1])]]);
+    sec.querySelector('.srages span:last-child i').className = 'tickkey';
+    const rows = D.viol.slice(0, 15).map(v => ({ name: vName(v[0]), code: vCode(v[0]), a: [v[1]], prev: v[2] }));
+    barRows(plot, rows, ['var(--s1)'], { prev: true, labelW: 220,
+      tipFor: r => `<b>${r.name}</b>${r.code ? `<div style="color:var(--ink2)">City Code section 26-${r.code}</div>` : ''}` + row('Cited, past 12 months', fmt(r.a[0])) + row('12 months before', fmt(r.prev)) });
+  }
+
+  // ---------- inspections per month ----------
+  const imon = D.insp.map((a, k) => ({ k, y: D.years[0] + Math.floor(k / 12), mo: k % 12, a }));
+  function drawInsp(pane, first) {
+    const { panel, plot } = staged(pane, first);
+    panel.innerHTML = '';
+    NOLA.flist(NOLA.fsec(panel, `Inspections since ${D.years[0]}`, st.ig >= 0 ? ['Show all', () => set('ig', -1)] : null),
+      D.inspGroups.map((g, k) => ({ key: k, name: g, color: INSP_C[k], count: d3.sum(imon, d => d.a[k]) })), { pressed: k => st.ig === k, onClick: toggle('ig') });
+    plot.innerHTML = '';
+    const f = NOLA.frame(plot, { h: 320, m: { t: 14, r: 10, b: 28, l: 44 } });
+    const x = d3.scaleBand().domain(imon.map(d => d.k)).range([0, f.iw]).paddingInner(.15);
+    const show = g => st.ig < 0 || g === st.ig, tot = d => d3.sum(d.a.filter((v, g) => show(g)));
+    const y = d3.scaleLinear().domain([0, (d3.max(imon, tot) || 1) * 1.05]).range([f.ih, 0]).nice();
+    NOLA.yGrid(f, y, 5, d3.format(','));
+    const lastMonthPartial = !isMonthEnd(D.last);
+    imon.forEach(d => { let y0 = 0; d.a.forEach((v, g) => { if (!v || !show(g)) return;
+      f.g.append('rect').attr('x', x(d.k)).attr('width', x.bandwidth()).attr('y', y(y0 + v)).attr('height', Math.max(.5, y(y0) - y(y0 + v))).attr('fill', INSP_C[g]).attr('opacity', d.k === imon.length - 1 && lastMonthPartial ? .45 : 1); y0 += v; }); });
+    f.g.selectAll('rect.h').data(imon).join('rect').attr('class', 'h').attr('x', d => x(d.k)).attr('width', x.step()).attr('height', f.ih).attr('fill', 'transparent')
+      .on('mousemove', (ev, d) => tip.show(`<b>${NOLA.monthsLong[d.mo]} ${d.y}${d.k === imon.length - 1 && lastMonthPartial ? ', through ' + lastLabel : ''}</b>` + row('Inspections', fmt(tot(d))) + D.inspGroups.map((g, k) => show(k) && d.a[k] ? row(sw(INSP_C[k]) + g, fmt(d.a[k])) : '').join(''), ev)).on('mouseleave', tip.hide);
+    const step = f.iw < 500 ? 2 : 1;
+    f.g.selectAll('text.x').data(imon.filter(d => d.mo === 0 && d.y % step === 0)).join('text').attr('class', 'x').attr('x', d => x(d.k)).attr('y', f.ih + 18).text(d => d.y);
+    f.g.append('line').attr('x1', 0).attr('x2', f.iw).attr('y1', f.ih).attr('y2', f.ih).attr('stroke', 'var(--axis)');
+  }
+  const isMonthEnd = iso => { const d = new Date(iso + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + 1); return d.getUTCDate() === 1; };
+
+  // ---------- CSV downloads ----------
+  const csvMap = () => NOLA.nbList().map(f => { const i = f.idx;
+    return Object.assign({ neighborhood: f.name, housing_units_2020: HU[i], open_cases: openOf(i, -1) }, ...STAGE.map((s, k) => ({ ['open, ' + s.toLowerCase()]: openOf(i, k) })),
+      { cases_filed_past_12_months: newOf(i, -1) }, ...NEW_L.map(([l], k) => ({ ['filed past 12 months, ' + l.toLowerCase()]: D.new12[i][k] })),
+      { overgrown_lot_cases_past_12_months: D.g12[i], properties_in_abatement: D.abOpen[i] }); });
+  const csvYears = () => { const years = st.kind === 'grass' ? D.gyears : D.years, data = (st.kind === 'grass' ? D.gyr : D.yr)[st.nb >= 0 ? st.nb : 72];
+    return data.map((d, k) => ({ year: years[k], area: st.nb >= 0 ? nbName(st.nb) : 'New Orleans', cases: st.kind === 'grass' ? 'overgrown lots' : 'code enforcement', still_open: d[0], closed: d[1] })); };
+  const csvOpen = () => { const A = D.openAge[st.nb >= 0 ? st.nb : 72];
+    return STAGE.map((s, k) => Object.assign({ area: st.nb >= 0 ? nbName(st.nb) : 'New Orleans', stage: s, open: d3.sum(A[k]) }, ...AGE_L.map((l, a) => ({ [l]: A[k][a] })))); };
+  const csvHear = () => D.hear.map((d, k) => Object.assign({ year: D.years[k] }, ...D.hearGroups.map((g, j) => ({ [HEAR_L[g] || g]: d[j] }))));
+  const csvViol = () => D.viol.map(v => ({ violation: vName(v[0]), code_section: vCode(v[0]) ? '26-' + vCode(v[0]) : '', past_12_months: v[1], previous_12_months: v[2] }));
+  const csvInsp = () => imon.map(d => Object.assign({ month: `${d.y}-${String(d.mo + 1).padStart(2, '0')}` }, ...D.inspGroups.map((g, k) => ({ [g]: d.a[k] }))));
+
+  const V = NOLA.views([
+    { id: 'map', label: 'Code enforcement by neighborhood', tab: 'Map of cases', keep: true, draw: drawMap, csv: csvMap },
+    { id: 'years', label: 'Cases filed per year', draw: drawYears, csv: csvYears },
+    { id: 'open', label: 'Open cases, by stage and how long they have been open', tab: 'Open cases', draw: drawOpen, csv: csvOpen },
+    { id: 'violations', label: 'Most cited violations, past 12 months', tab: 'Violations', draw: drawViol, csv: csvViol },
+    { id: 'hearings', label: 'Hearing results per year', tab: 'Hearings', draw: drawHear, csv: csvHear },
+    { id: 'inspections', label: 'Inspections per month', tab: 'Inspections', draw: drawInsp, csv: csvInsp },
+  ], { ds: [D.ds[0], 'Code Enforcement All Cases'],
+       state: () => ({ measure: st.measure !== 'open' ? st.measure : null, stage: st.stage >= 0 ? st.stage : null, res: st.res >= 0 ? st.res : null, basis: st.basis !== 'n' ? st.basis : null,
+                       kind: st.kind !== 'ce' ? st.kind : null, ig: st.ig >= 0 ? st.ig : null, nb: st.nb >= 0 ? st.nb : null }) });
+})();
+</script>
+</body></html>

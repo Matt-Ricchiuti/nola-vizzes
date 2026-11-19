@@ -79,9 +79,9 @@ svg text{fill:var(--muted);font-size:11px;font-family:inherit}
 .axis path,.axis line{stroke:var(--axis)}
 .gridl line{stroke:var(--grid)}
 .gridl path{display:none}
-.map svg{background:var(--surface);border-radius:10px;cursor:grab}
+.map>svg{background:var(--surface);border-radius:10px;cursor:grab}
 /* maps on touch screens: one finger scrolls the page, two fingers move the map (NOLA.map / trees.js handle those) */
-.map svg,.stage.mapstage .plot canvas{touch-action:pan-x pan-y}
+.map>svg,.stage.mapstage .plot canvas{touch-action:pan-x pan-y}
 .nbpath{fill:var(--land);stroke:var(--landline);stroke-width:.8;vector-effect:non-scaling-stroke}
 .nbpath.hot:hover{stroke:var(--ink);stroke-width:1.6}
 .streets{pointer-events:none}
@@ -140,8 +140,8 @@ tbody tr:hover td{background:var(--chip)}
 .vsec.wide>.pane{--mw:min(calc(100vw - var(--sbw) - 2 * var(--gut)),2400px);width:var(--mw);max-width:none;margin-left:calc(50% - var(--mw) / 2)}
 .stage.mapstage{height:clamp(460px,78vh,900px);padding:0;overflow:hidden}
 .stage.mapstage .plot{position:absolute;inset:0}
-.stage.mapstage .plot .map,.stage.mapstage .plot svg{width:100%;height:100%}
-.stage.mapstage .map svg{border-radius:12px}
+.stage.mapstage .plot .map,.stage.mapstage .plot>svg{width:100%;height:100%}
+.stage.mapstage .map>svg{border-radius:12px}
 .stage.mapstage>.fpanel{position:absolute;top:12px;left:12px;width:296px;max-height:calc(100% - 24px);overflow:auto;overscroll-behavior:contain;
   background:var(--surface);border:1px solid var(--ring);border-radius:10px;box-shadow:0 6px 24px rgb(0 0 0 / .12);z-index:2}
 .fpanel{display:flex;flex-direction:column;gap:14px;padding:14px 14px 12px;font-size:13px}
@@ -181,7 +181,8 @@ tbody tr:hover td{background:var(--chip)}
 .find{display:flex;gap:6px}
 .find input{flex:1;min-width:0;font:inherit;font-size:13px;color:var(--ink);background:var(--chip);border:1px solid var(--ring);border-radius:7px;padding:6px 9px}
 .mapctl{position:absolute;top:12px;right:12px;display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--ring);border-radius:8px;overflow:hidden;z-index:2}
-.mapctl button{width:34px;height:34px;border:0;background:none;color:var(--ink);font:500 17px inherit;font-family:inherit;cursor:pointer}
+.mapctl button{width:34px;height:34px;border:0;background:none;color:var(--ink);padding:0;display:grid;place-items:center;cursor:pointer}
+.mapctl svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
 .mapctl button+button{border-top:1px solid var(--ring)}
 .mapctl button:hover{background:var(--chip)}
 .scalebar{position:absolute;right:14px;bottom:12px;font-size:11px;color:var(--ink2);display:flex;flex-direction:column;align-items:flex-end;gap:3px;pointer-events:none;z-index:2}
@@ -218,6 +219,21 @@ tbody tr:hover td{background:var(--chip)}
   .fpanel.collapsed{display:none}
 }
 
+/* ---------- full-screen maps (NOLA.mapButtons): the map's whole stage fills the screen, filters, legend, scale bar and
+   controls included. .mapfs is on while full screen; .mapfs-css is the fallback layer where the Fullscreen API isn't
+   offered (iPhone), which also locks the page's scroll (html.mapfs-lock). `html` lifts these over page-specific sizes. */
+html .stage.mapstage.mapfs{position:fixed;top:0;right:0;bottom:0;left:0;z-index:1000;width:auto;height:auto;max-width:none;margin:0;
+  border:0;border-radius:0;background:var(--surface);overflow:hidden}
+html .stage.mapstage.mapfs .plot{position:absolute;inset:0;height:auto;border:0;border-radius:0;overflow:hidden}
+html .stage.mapstage.mapfs .map>svg,html .stage.mapstage.mapfs .plot canvas{border-radius:0;touch-action:none} /* one finger moves the map */
+html.mapfs-lock,html.mapfs-lock body{overflow:hidden;overscroll-behavior:none}
+@media(max-width:760px){ /* phones: the Filters button and the panel float over the map */
+  html .stage.mapstage.mapfs>.ftoggle{position:absolute;top:10px;left:10px;z-index:4;margin:0;padding:6px 12px;font-size:13px;color:var(--ink);box-shadow:0 2px 10px rgb(0 0 0 / .16)}
+  html .stage.mapstage.mapfs>.fpanel{position:absolute;top:52px;left:10px;width:min(320px,calc(100% - 66px));max-height:calc(100% - 62px);overflow:auto;
+    overscroll-behavior:contain;margin:0;z-index:3;box-shadow:0 6px 24px rgb(0 0 0 / .18)}
+  html .stage.mapstage.mapfs>.fpanel.collapsed{display:none}
+}
+
 /* ---------- one page per dataset: data pages (drone, calls, trees) ---------- */
 /* tables whose rows don't do anything on click */
 table.static tbody tr{cursor:auto}
@@ -237,27 +253,47 @@ table.static tbody tr{cursor:auto}
 .cpc-kt p{margin:1px 0 0;color:var(--ink2)}
 @media(max-width:600px){.cpc-key{grid-template-columns:1fr;gap:10px}}
 
+/* ===================== 311 service requests page (src/311.js) ===================== */
+.srmini svg text{fill:var(--ink2)}
+.srages{display:flex;flex-direction:column;gap:5px;font-size:12.5px;color:var(--ink2)}
+.srages span{display:grid;grid-template-columns:12px 1fr auto;gap:8px;align-items:center}
+.srages i{width:11px;height:11px;border-radius:3px}
+.srages b{font:400 12px "IBM Plex Mono",ui-monospace,monospace;color:var(--muted)}
+/* ===================== short-term rentals page (src/str.js): uses the 311 page's .srages lists ===================== */
+/* ===================== blight and code enforcement page (src/blight.js); also uses .srages ===================== */
+.srages i.tickkey{width:2px;height:14px;border-radius:0;background:var(--ink);margin-left:4px}
+
 .prose{max-width:720px;font-size:14px}
 .prose p,.prose li{color:var(--ink2)}
 .prose h2{font-size:16px;margin:26px 0 4px}
 .prose ul{margin:4px 0;padding-left:18px}
 </style></head><body><div class="wrap">
-<div class="site"><b><a href="index.html" style="color:inherit;text-decoration:none">Nola Vizzes</a></b><nav class="topnav" aria-label="Site"><div class="dd"><button type="button" class="ddbtn" aria-haspopup="true" aria-expanded="false">Visualizations<span aria-hidden="true">▾</span></button><ul class="dd1"><li><a href="drone.html">NOPD drone flights</a></li><li><a href="cfs.html">Calls for service</a></li><li><a href="cpc.html">Planning cases</a></li><li><a href="trees.html">Street trees</a></li></ul></div><a class="xlink on" href="about.html">About</a></nav><script>(()=>{const dd=document.currentScript.closest(".site").querySelector(".dd"),b=dd.querySelector(".ddbtn");const set=o=>{dd.classList.toggle("open",o);b.setAttribute("aria-expanded",o)};b.onclick=e=>{e.stopPropagation();set(!dd.classList.contains("open"))};document.addEventListener("click",e=>{if(!dd.contains(e.target))set(false)});dd.addEventListener("keydown",e=>{if(e.key==="Escape"){set(false);b.focus()}})})()</script></div>
+<div class="site"><b><a href="index.html" style="color:inherit;text-decoration:none">Nola Vizzes</a></b><nav class="topnav" aria-label="Site"><div class="dd"><button type="button" class="ddbtn" aria-haspopup="true" aria-expanded="false">Visualizations<span aria-hidden="true">▾</span></button><ul class="dd1"><li><a href="cpc.html">Planning cases</a></li><li><a href="311.html">311 service requests</a></li><li><a href="str.html">Short-term rentals</a></li><li><a href="blight.html">Blight and code enforcement</a></li><li><a href="permits.html">Building permits</a></li><li><a href="biz.html">New businesses</a></li><li><a href="trees.html">Street trees</a></li></ul></div><a class="xlink on" href="about.html">About</a></nav><script>(()=>{const dd=document.currentScript.closest(".site").querySelector(".dd"),b=dd.querySelector(".ddbtn");const set=o=>{dd.classList.toggle("open",o);b.setAttribute("aria-expanded",o)};b.onclick=e=>{e.stopPropagation();set(!dd.classList.contains("open"))};document.addEventListener("click",e=>{if(!dd.contains(e.target))set(false)});dd.addEventListener("keydown",e=>{if(e.key==="Escape"){set(false);b.focus()}})})()</script></div>
 <h1>About</h1>
-<div class="src">Updated daily from <a href="https://data.nola.gov">data.nola.gov</a> · Data last updated Nov 18, 2026</div>
+<div class="src">Updated daily from <a href="https://data.nola.gov">data.nola.gov</a> · Data last updated Nov 19, 2026</div>
 <div class="prose">
 <p>An independent project, not affiliated with the City of New Orleans. Every page links to the City dataset it uses. The street map under every map is the City's <a href="https://data.nola.gov/d/22q2-dqpb">Centerline</a> dataset. Source code: <a href="https://github.com/Matt-Ricchiuti/nola-vizzes">GitHub</a>.</p>
 
 <h2>Notes on the data</h2>
 <ul>
-<li><b>Calls for service.</b> "Started by officers" means self-initiated. Arrival time runs from call creation to the first officer's arrival, for calls from the public only. The current month is left off the monthly chart until it's complete. NOPD withholds locations for medical and mental-health calls. The neighborhood map can show calls per 1,000 residents, using 2020 Census population. Counts include calls the City closed as duplicate or void (about 6%). NOPD cautions against comparing its call data over time, since classifications and systems change.</li>
-<li><b>Drone flights.</b> Takeoff times appear to be UTC and are shown in Central time. Purposes are grouped from a free-text field; when it's blank, the activity summary is used. Locations are takeoff points, not flight paths.</li>
 <li><b>Planning cases.</b> Cases with several types are grouped under the most consequential one. Topics come from keywords in case descriptions. A neighborhood notice (NPP) and the case it leads to are separate records; NPP notices start in 2016, which raises yearly totals from then on. Rows the City's file repeats exactly are counted once. Hearing dates are the next meeting dates the City lists; a few fall on weekends or holidays and are flagged as listed.</li>
+<li><b>311 service requests.</b> The page starts with February 2019: the City's file dates about 313,000 older requests to January 1–2, 2019, when they were moved into its current system. Request types are the City's own; types it no longer uses are counted as Other. A request is "open" while its status is Pending, and "closed" when the City closed it in its system, which for some types means the work was assigned to a contractor or referred to another department, not that it was finished. Time to close counts requests closed in the past 12 months that have a close date; most closed abandoned-vehicle requests have none. Locations are where each request was reported; about 2% have none. Requests can be about any place, so rates per 1,000 residents run high where few people live, like the CBD; neighborhoods with fewer than 1,000 residents get no rate.</li>
+<li><b>Short-term rentals.</b> The map shows active licenses for commercial, non-commercial and exempt lodging rentals. Operator permits, which license the person running a rental rather than a place, are not mapped. "Per 100 homes" divides licenses by 2020 Census housing units; neighborhoods with fewer than 500 are left out. The City's license types changed with its rules in 2017, late 2019 and 2023, so the applications chart groups them into commercial, residential (accessory, residential owner and non-commercial), temporary and other. Outcomes are each application's current status; "since expired" means the license was issued and has expired. A few applications have no date and are left off the chart.</li>
+<li><b>Blight and code enforcement.</b> Yearly charts start in 2016: the City's records date about 76,000 cases and 59,000 hearings to 2009, when older records were moved into its system. Open cases are shown by the stage the City lists and by time since the case was filed. "New cases" are grouped by the result of the first inspection. Overgrown-lot cases are the City's grass-cutting (lot abatement) cases, which start in earnest in 2021. The abatement records show no property entering abatement since 2019, so the map shows only properties still in abatement. "Per 1,000 homes" divides by 2020 Census housing units; neighborhoods with fewer than 500 are left out.</li>
+<li><b>Building permits.</b> Counts are permits issued, by the date the City issued them. The City's permit codes are grouped into nine types; interior demolition counts as renovation, and City demolitions count as demolitions. New construction, demolition and solar permits are mapped one by one at their address. Days to permit run from the application date to the issue date. Construction values are left out because some are clearly entry errors. "Per 1,000 homes" divides by 2020 Census housing units; neighborhoods with fewer than 500 are left out.</li>
+<li><b>New businesses.</b> "New applications" are occupational license applications, counted by the date filed; that dataset starts in 2018. Sectors are the City's NAICS categories; many recent applications don't have one yet ("Not stated"). Outcomes are each application's current status: "approved or issued" includes licenses that have since expired, and some older applications are still listed as filed or in review. "Licensed now" counts businesses holding a license today, with sectors matched from their business type; event and street vendors are grouped separately. Licenses with no location in the city, like many vendors and taxis, are not mapped.</li>
 <li><b>Street trees.</b> The City's tree inventory as last updated on April 17, 2025, exported once and not refreshed daily.</li>
 <li>Every neighborhood is counted. Maps open on the populated city, so Lake Catherine and Viavant–Venetian Isles (under 100 residents per square mile) start out of view: zoom out or pick them from the menu.</li>
 <li>Shaded maps use seven shades with about the same number of neighborhoods in each; the legend shows where each shade starts.</li>
-<li>Other neighborhood figures are totals, not per resident.</li>
+<li>Neighborhood figures are totals unless the map says per 1,000 residents.</li>
 <li><b>Population.</b> Resident counts come from the 2020 Census, the most recent official count. The site will keep using them until the 2030 Census results are released, so population data is slightly out of date.</li>
+</ul>
+
+<h2>Pages not in the menu</h2>
+<p>The police calls for service and drone flights pages are off the menu for now. They are still updated daily, and links to them still work.</p>
+<ul>
+<li><b><a href="cfs.html">Calls for service</a>.</b> "Started by officers" means self-initiated. Arrival time runs from call creation to the first officer's arrival, for calls from the public only. The current month is left off the monthly chart until it's complete. NOPD withholds locations for medical and mental-health calls. The neighborhood map can show calls per 1,000 residents, using 2020 Census population. Counts include calls the City closed as duplicate or void (about 6%). NOPD cautions against comparing its call data over time, since classifications and systems change.</li>
+<li><b><a href="drone.html">Drone flights</a>.</b> Takeoff times appear to be UTC and are shown in Central time. Purposes are grouped from a free-text field; when it's blank, the activity summary is used. Locations are takeoff points, not flight paths.</li>
 </ul>
 </div>
 <div class="foot">Data: <a id="dataLink" href="https://data.nola.gov">data.nola.gov</a> · Not affiliated with the City of New Orleans · <a href="about.html">About</a></div>

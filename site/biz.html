@@ -1,0 +1,954 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>New businesses · Nola Vizzes</title>
+<style>@import url('https://fonts.googleapis.com/css2?family=Young+Serif&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
+:root{
+  color-scheme: light;
+  --page:#f9f9f7; --surface:#fcfcfb; --ink:#0b0b0b; --ink2:#52514e; --muted:#898781;
+  --grid:#e1e0d9; --axis:#c3c2b7; --ring:rgba(11,11,11,.10); --land:#efeee9; --landline:#d7d5cc;
+  --road:rgba(11,11,11,.13); --road-major:rgba(11,11,11,.26); --road-fwy:rgba(11,11,11,.42);
+  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100; --s5:#e87ba4; --s6:#008300; --s7:#6250d6; --s8:#e34948;
+  --q1:#cde2fb; --q2:#9ec5f4; --q3:#6da7ec; --q4:#3987e5; --q5:#256abf; --q6:#184f95; --q7:#0d366b;
+  --none:#d9d8d2; --accent:#2a78d6; --chip:#efeee9;
+  --sbw:0px; --gut:24px; /* scrollbar width (set by lib.js) and side gutter of full-width map sections */
+}
+@media (prefers-color-scheme: dark){
+  :root:where(:not([data-theme="light"])){
+    color-scheme: dark;
+    --page:#0d0d0d; --surface:#1a1a19; --ink:#f0efec; --ink2:#c3c2b7; --muted:#898781;
+    --grid:#2c2c2a; --axis:#383835; --ring:rgba(255,255,255,.10); --land:#232321; --landline:#3a3a37;
+    --road:rgba(255,255,255,.12); --road-major:rgba(255,255,255,.24); --road-fwy:rgba(255,255,255,.40);
+    --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --s5:#d55181; --s6:#0ca30c; --s7:#9085e9; --s8:#e66767;
+    --q1:#0d366b; --q2:#104281; --q3:#184f95; --q4:#1c5cab; --q5:#2a78d6; --q6:#5598e7; --q7:#9ec5f4;
+    --none:#2f2f2c; --accent:#3987e5; --chip:#262624;
+  }
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--page);color:var(--ink);font-family:"Public Sans",system-ui,-apple-system,"Segoe UI",sans-serif;font-size:15px;line-height:1.5}
+h1,.vsec-h h2,.cards h2{font-family:"Young Serif",Georgia,"Times New Roman",serif;font-weight:400}
+.eyebrow,.flist .ct,.scalebar,.src,.tip .r span:last-child{font-family:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace}
+a{color:var(--accent)}
+.wrap{max-width:1120px;margin:0 auto;padding:28px 24px 64px}
+.site{display:flex;align-items:center;gap:22px;border-bottom:1px solid var(--grid);padding-bottom:12px;margin-bottom:28px;position:relative;z-index:30}
+.site b{font-size:13px;letter-spacing:.08em;text-transform:uppercase}
+/* header menu: "Visualizations" opens down to the pages; each page opens right to its views */
+.topnav{display:flex;align-items:center;gap:18px;flex:1;font-size:13px}
+.topnav .xlink{margin-left:auto;color:var(--ink2);text-decoration:none}
+.topnav .xlink.on{color:var(--ink);font-weight:600}
+.dd{position:relative}
+.ddbtn{font:inherit;font-size:13px;color:var(--ink2);background:none;border:0;padding:4px 0;cursor:pointer;display:inline-flex;align-items:center;gap:5px}
+.ddbtn.on,.dd:hover .ddbtn,.dd.open .ddbtn{color:var(--ink)}
+.ddbtn span{font-size:10px;transition:transform .15s}
+.dd:hover .ddbtn span,.dd.open .ddbtn span{transform:rotate(180deg)}
+.dd1{list-style:none;margin:0;padding:6px;background:var(--surface);border:1px solid var(--ring);border-radius:10px;box-shadow:0 10px 30px rgb(0 0 0 / .14);display:none}
+.dd1{position:absolute;top:100%;left:-10px;min-width:230px;margin-top:6px}
+.dd1::before{content:"";position:absolute;left:0;right:0;top:-10px;height:10px} /* hover bridge */
+.dd:hover .dd1,.dd:focus-within .dd1,.dd.open .dd1{display:block}
+.dd1 li{position:relative}
+.dd1 a{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:7px 10px;border-radius:7px;color:var(--ink);text-decoration:none;white-space:nowrap}
+.dd1 a.on{font-weight:600}
+.dd1 a:hover,.dd1 a:focus-visible{background:var(--chip);outline:none}
+@media(max-width:640px){
+  .site{flex-wrap:wrap;gap:8px 18px}
+  .dd{position:static}
+  .dd1{left:0;right:0;top:100%;min-width:0;max-height:75vh;overflow:auto}
+}
+h1{font-size:30px;line-height:1.15;margin:0 0 6px;letter-spacing:0}
+h2{font-size:19px;margin:0 0 4px}
+.src{font-size:11.5px;color:var(--muted);margin:0 0 22px}
+.src a{color:var(--ink2)}
+.card{background:var(--surface);border:1px solid var(--ring);border-radius:12px;padding:18px}
+.nbfocus{fill:none;stroke:var(--ink);stroke-width:2.4;vector-effect:non-scaling-stroke}
+.nbsel{font-size:13px}
+[hidden]{display:none!important}
+.pane.mapp{padding:6px}
+.popnote{color:var(--muted);font-size:12px}
+.split{display:grid;grid-template-columns:1.35fr 1fr;gap:16px;align-items:start}
+@media(max-width:860px){.split{grid-template-columns:1fr} h1{font-size:23px}}
+@media(max-width:600px){.wrap{padding:20px 16px 48px} .card{padding:12px} :root{--gut:16px}}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px}
+.chip{border:1px solid var(--ring);background:var(--chip);color:var(--ink);border-radius:999px;padding:4px 11px;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;font-family:inherit}
+.chip.on{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.chip i{width:9px;height:9px;border-radius:50%;display:inline-block}
+select{font:inherit;font-size:13px;padding:4px 8px;border-radius:8px;border:1px solid var(--ring);background:var(--surface);color:var(--ink)}
+.legend{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:var(--ink2);margin:6px 0 8px}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.legend i{width:10px;height:10px;border-radius:3px;display:inline-block}
+svg{display:block;max-width:100%}
+svg text{fill:var(--muted);font-size:11px;font-family:inherit}
+.axis path,.axis line{stroke:var(--axis)}
+.gridl line{stroke:var(--grid)}
+.gridl path{display:none}
+.map>svg{background:var(--surface);border-radius:10px;cursor:grab}
+/* maps on touch screens: one finger scrolls the page, two fingers move the map (NOLA.map / trees.js handle those) */
+.map>svg,.stage.mapstage .plot canvas{touch-action:pan-x pan-y}
+.nbpath{fill:var(--land);stroke:var(--landline);stroke-width:.8;vector-effect:non-scaling-stroke}
+.nbpath.hot:hover{stroke:var(--ink);stroke-width:1.6}
+.streets{pointer-events:none}
+.st{fill:none;vector-effect:non-scaling-stroke;stroke-linecap:round;stroke-linejoin:round}
+.st3{stroke:var(--road);stroke-width:.5}
+.st2{stroke:var(--road-major);stroke-width:.9}
+.st1{stroke:var(--road-major);stroke-width:.8}
+.st0{stroke:var(--road-fwy);stroke-width:1.7}
+.tip{position:fixed;pointer-events:none;background:var(--surface);color:var(--ink);border:1px solid var(--ring);box-shadow:0 6px 24px rgba(0,0,0,.14);border-radius:10px;padding:9px 11px;font-size:12.5px;max-width:300px;z-index:20;opacity:0;transition:opacity .08s}
+.tip b{font-size:13px}
+.tip .r{display:flex;justify-content:space-between;gap:14px;color:var(--ink2)}
+.tip .r span:last-child{color:var(--ink);font-variant-numeric:tabular-nums}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th{font-weight:600;text-align:left;color:var(--ink2);border-bottom:1px solid var(--axis);padding:6px 8px;cursor:pointer;white-space:nowrap;user-select:none}
+td{border-bottom:1px solid var(--grid);padding:6px 8px;font-variant-numeric:tabular-nums}
+tr.sel td{background:var(--chip)}
+tbody tr{cursor:pointer}
+tbody tr:hover td{background:var(--chip)}
+.num{text-align:right}
+.bar{height:8px;border-radius:0 4px 4px 0;background:var(--s1);display:inline-block;vertical-align:middle}
+.zoomhint{font-size:12px;color:var(--muted);margin-top:6px}
+.btn{font:inherit;font-size:12px;border:1px solid var(--ring);background:var(--surface);color:var(--ink2);border-radius:8px;padding:3px 9px;cursor:pointer}
+.foot{margin-top:40px;border-top:1px solid var(--grid);padding-top:14px;font-size:12px;color:var(--muted)}
+.foot a{color:var(--muted)}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.sr{position:absolute;left:-9999px}
+.halo{paint-order:stroke;stroke:var(--surface);stroke-width:5px;stroke-linejoin:round}
+.maplab{font-weight:600;letter-spacing:.02em}
+/* ---------- filters live on the chart: a panel of legend-style rows (see NOLA.stage / fsec / flist) ---------- */
+/* one tab per chart (NOLA.views): tabs and the open chart's Copy link / Download CSV in one row, the chart below */
+.vbar{display:flex;align-items:flex-start;gap:10px 18px;padding:0 0 12px;border-bottom:1px solid var(--grid);scroll-margin-top:12px}
+.vtabs{display:flex;flex-wrap:wrap;gap:4px;flex:1 1 auto;min-width:0}
+.vtabs button{font:inherit;font-size:13px;line-height:1.3;border:1px solid transparent;border-radius:999px;background:none;color:var(--ink2);padding:5px 12px;cursor:pointer;white-space:nowrap}
+.vtabs button:hover{background:var(--chip);color:var(--ink)}
+.vtabs button[aria-selected="true"]{background:var(--ink);color:var(--surface);font-weight:600}
+.vtabs button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.vsec{margin:26px 0 0}
+/* a page with one chart: its heading sits in the bar where the tabs would be */
+.vbar.one{align-items:center}
+.vbar.one h2{flex:1 1 auto;min-width:0;margin:0;font-family:"Young Serif",Georgia,"Times New Roman",serif;font-weight:400;font-size:21px}
+.vbar.one+.vsec{margin-top:14px}
+.vsec-h{margin:0 0 12px}
+.vsec-h h2{font-size:21px;margin:0}
+.tools{display:flex;gap:6px;flex:0 0 auto;padding-top:3px}
+@media(max-width:640px){
+  .vbar{flex-direction:column;gap:10px}
+  .vbar.one{flex-direction:row;flex-wrap:wrap;align-items:center}
+  .vtabs{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin:0 -16px;padding:0 16px;width:calc(100% + 32px)}
+  .vtabs::-webkit-scrollbar{display:none}
+  .tools{padding-top:0}
+}
+.stage{position:relative}
+.stage.chartstage{display:grid;grid-template-columns:260px minmax(0,1fr);gap:18px;align-items:start}
+.stage.chartstage>.fpanel{position:sticky;top:12px}
+/* a section holding a map spans the window, less a small gutter; its heading stays in line with the page */
+.vsec.wide>.pane{--mw:min(calc(100vw - var(--sbw) - 2 * var(--gut)),2400px);width:var(--mw);max-width:none;margin-left:calc(50% - var(--mw) / 2)}
+.stage.mapstage{height:clamp(460px,78vh,900px);padding:0;overflow:hidden}
+.stage.mapstage .plot{position:absolute;inset:0}
+.stage.mapstage .plot .map,.stage.mapstage .plot>svg{width:100%;height:100%}
+.stage.mapstage .map>svg{border-radius:12px}
+.stage.mapstage>.fpanel{position:absolute;top:12px;left:12px;width:296px;max-height:calc(100% - 24px);overflow:auto;overscroll-behavior:contain;
+  background:var(--surface);border:1px solid var(--ring);border-radius:10px;box-shadow:0 6px 24px rgb(0 0 0 / .12);z-index:2}
+.fpanel{display:flex;flex-direction:column;gap:14px;padding:14px 14px 12px;font-size:13px}
+.stage.chartstage>.fpanel{padding:0}
+.fpanel:empty{display:none}
+.stage.chartstage>.fpanel:empty+*{grid-column:1/-1}
+.eyebrow{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.fsec{display:flex;flex-direction:column;gap:6px}
+.fsec-h{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.linkbtn{background:none;border:0;padding:2px 0;color:var(--accent);font:500 12px inherit;font-family:inherit;cursor:pointer}
+.flist{display:flex;flex-direction:column;gap:1px;margin:0;padding:0;list-style:none}
+.flist button{all:unset;box-sizing:border-box;width:100%;display:grid;grid-template-columns:12px minmax(0,1fr) auto;gap:9px;align-items:center;padding:5px 6px;border-radius:6px;cursor:pointer}
+.flist button:hover{background:var(--chip)}
+.flist button:focus-visible,.seg button:focus-visible,.mapctl button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.flist .sw{width:11px;height:11px;border-radius:50%}
+.flist .nm{min-width:0;display:flex;flex-direction:column;gap:3px}
+.flist .nm>span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.flist .nm em{font-style:normal;font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.flist .fb{height:3px;border-radius:2px;background:var(--grid);overflow:hidden}
+.flist .fb i{display:block;height:100%}
+.flist .ct{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.flist.filtering button[aria-pressed="false"]{opacity:.45}
+.flist button[aria-pressed="true"]{background:var(--chip);box-shadow:inset 0 0 0 1.5px var(--accent)}
+.flist.toggles button[aria-pressed="false"]{opacity:.45}
+.flist.toggles button[aria-pressed="false"] .sw{background:transparent!important;box-shadow:inset 0 0 0 1.5px var(--muted)}
+.flist.toggles button[aria-pressed="true"]{background:none;box-shadow:none}
+/* tabs at the top of a filter panel: switch one section between related charts */
+.ftabs{display:flex;gap:2px;padding:3px;background:var(--chip);border-radius:9px}
+.ftabs button{flex:1 1 0;font:inherit;font-size:12.5px;line-height:1.25;border:0;border-radius:7px;background:none;color:var(--ink2);padding:6px 8px;cursor:pointer}
+.ftabs button[aria-selected="true"]{background:var(--surface);color:var(--ink);font-weight:600;box-shadow:0 1px 3px rgb(0 0 0 / .12)}
+.ftabs button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.seg{display:flex;border:1px solid var(--ring);border-radius:8px;overflow:hidden;width:max-content;max-width:100%}
+.seg button{font:inherit;font-size:12px;border:0;background:var(--surface);color:var(--ink2);padding:5px 10px;cursor:pointer}
+.seg button+button{border-left:1px solid var(--ring)}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--surface)}
+.fsel{width:100%}
+.find{display:flex;gap:6px}
+.find input{flex:1;min-width:0;font:inherit;font-size:13px;color:var(--ink);background:var(--chip);border:1px solid var(--ring);border-radius:7px;padding:6px 9px}
+.mapctl{position:absolute;top:12px;right:12px;display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--ring);border-radius:8px;overflow:hidden;z-index:2}
+.mapctl button{width:34px;height:34px;border:0;background:none;color:var(--ink);padding:0;display:grid;place-items:center;cursor:pointer}
+.mapctl svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
+.mapctl button+button{border-top:1px solid var(--ring)}
+.mapctl button:hover{background:var(--chip)}
+.scalebar{position:absolute;right:14px;bottom:12px;font-size:11px;color:var(--ink2);display:flex;flex-direction:column;align-items:flex-end;gap:3px;pointer-events:none;z-index:2}
+.scalebar i{display:block;height:5px;border:1.5px solid var(--ink2);border-top:0}
+.ftoggle{display:none}
+.maphint{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:3;pointer-events:none;opacity:0;transition:opacity .2s;
+  background:rgb(11 11 11 / .78);color:#fff;font-size:13px;font-weight:500;padding:8px 14px;border-radius:999px;white-space:nowrap}
+.maphint.on{opacity:1}
+.stlab{font-weight:500;pointer-events:none;paint-order:stroke;stroke:var(--surface);stroke-linejoin:round}
+.stlab.major{font-weight:650}
+/* stepped legend for equal-count classes (NOLA.stepLegend): the value under each boundary is where that color starts */
+.legend .steps{flex:1 1 100%;display:flex;max-width:290px;padding:0 14px 0 0}
+.legend .steps span,.steps span{flex:1;display:flex;flex-direction:column;align-items:stretch;gap:3px;min-width:0}
+.steps i{width:auto!important;height:10px;border-radius:0!important}
+.steps span:first-child i{border-radius:3px 0 0 3px!important}
+.steps span:nth-child(7) i{border-radius:0 3px 3px 0!important}
+.steps em{align-self:flex-start;font-style:normal;font-size:10.5px;color:var(--ink2);white-space:nowrap;font-variant-numeric:tabular-nums;transform:translateX(-50%)}
+.steps span:first-child em{transform:none}
+.steps .end{flex:0 0 0;padding-top:13px}
+.nonekey{font-size:11.5px}
+.maplegend{display:none}
+@media(max-width:760px){
+  .stage.chartstage{grid-template-columns:1fr}
+  .stage.chartstage>.fpanel{position:static}
+  .stage.mapstage{height:auto;overflow:visible;border:0;background:none}
+  .stage.mapstage>.fpanel{position:static;width:auto;max-height:none;box-shadow:none;margin-bottom:10px}
+  .stage.mapstage .plot{position:relative;height:min(560px,70vh);border:1px solid var(--ring);border-radius:12px;overflow:hidden;background:var(--surface)}
+  .ftoggle{display:block;margin-bottom:8px}
+  .maplegend{display:block;position:absolute;left:10px;bottom:10px;width:min(250px,calc(100% - 100px));background:var(--surface);border:1px solid var(--ring);border-radius:8px;padding:6px 8px 4px;z-index:2;font-size:11px;color:var(--ink2)}
+  .maplegend .steps{display:flex;padding-right:12px}
+  .maplegend .nonekey{display:flex;align-items:center;gap:5px;margin-top:3px}
+  .maplegend .nonekey i{width:10px;height:10px;border-radius:3px;display:inline-block}
+  .mlh{margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .fpanel.collapsed{display:none}
+}
+
+/* ---------- full-screen maps (NOLA.mapButtons): the map's whole stage fills the screen, filters, legend, scale bar and
+   controls included. .mapfs is on while full screen; .mapfs-css is the fallback layer where the Fullscreen API isn't
+   offered (iPhone), which also locks the page's scroll (html.mapfs-lock). `html` lifts these over page-specific sizes. */
+html .stage.mapstage.mapfs{position:fixed;top:0;right:0;bottom:0;left:0;z-index:1000;width:auto;height:auto;max-width:none;margin:0;
+  border:0;border-radius:0;background:var(--surface);overflow:hidden}
+html .stage.mapstage.mapfs .plot{position:absolute;inset:0;height:auto;border:0;border-radius:0;overflow:hidden}
+html .stage.mapstage.mapfs .map>svg,html .stage.mapstage.mapfs .plot canvas{border-radius:0;touch-action:none} /* one finger moves the map */
+html.mapfs-lock,html.mapfs-lock body{overflow:hidden;overscroll-behavior:none}
+@media(max-width:760px){ /* phones: the Filters button and the panel float over the map */
+  html .stage.mapstage.mapfs>.ftoggle{position:absolute;top:10px;left:10px;z-index:4;margin:0;padding:6px 12px;font-size:13px;color:var(--ink);box-shadow:0 2px 10px rgb(0 0 0 / .16)}
+  html .stage.mapstage.mapfs>.fpanel{position:absolute;top:52px;left:10px;width:min(320px,calc(100% - 66px));max-height:calc(100% - 62px);overflow:auto;
+    overscroll-behavior:contain;margin:0;z-index:3;box-shadow:0 6px 24px rgb(0 0 0 / .18)}
+  html .stage.mapstage.mapfs>.fpanel.collapsed{display:none}
+}
+
+/* ---------- one page per dataset: data pages (drone, calls, trees) ---------- */
+/* tables whose rows don't do anything on click */
+table.static tbody tr{cursor:auto}
+/* on phones a wide table scrolls inside its card instead of widening the page */
+@media(max-width:760px){.stage.chartstage{grid-template-columns:minmax(0,1fr)}}
+
+/* ---------- CPC page (cpc.js): filing-date range in the map panel, and the case-type key under the map ---------- */
+.cpc-range{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.cpc-range label{display:flex;flex-direction:column;gap:3px;min-width:0}
+.cpc-range span{font-size:11px;color:var(--muted)}
+.cpc-range input{width:100%;min-width:0;font:inherit;font-size:12.5px;color:var(--ink);background:var(--chip);border:1px solid var(--ring);border-radius:7px;padding:5px 7px}
+.cpc-range input:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.cpc-key{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px 22px;margin-top:16px}
+.cpc-kt{display:flex;gap:9px;align-items:flex-start;font-size:13px;line-height:1.45}
+.cpc-kt i{flex:0 0 11px;height:11px;border-radius:50%;margin-top:4px}
+.cpc-kt b{font-weight:600}
+.cpc-kt p{margin:1px 0 0;color:var(--ink2)}
+@media(max-width:600px){.cpc-key{grid-template-columns:1fr;gap:10px}}
+
+/* ===================== 311 service requests page (src/311.js) ===================== */
+.srmini svg text{fill:var(--ink2)}
+.srages{display:flex;flex-direction:column;gap:5px;font-size:12.5px;color:var(--ink2)}
+.srages span{display:grid;grid-template-columns:12px 1fr auto;gap:8px;align-items:center}
+.srages i{width:11px;height:11px;border-radius:3px}
+.srages b{font:400 12px "IBM Plex Mono",ui-monospace,monospace;color:var(--muted)}
+/* ===================== short-term rentals page (src/str.js): uses the 311 page's .srages lists ===================== */
+/* ===================== blight and code enforcement page (src/blight.js); also uses .srages ===================== */
+.srages i.tickkey{width:2px;height:14px;border-radius:0;background:var(--ink);margin-left:4px}
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script><script src="streets.js"></script>
+</head><body><div class="wrap">
+<div class="site"><b><a href="index.html" style="color:inherit;text-decoration:none">Nola Vizzes</a></b><nav class="topnav" aria-label="Site"><div class="dd"><button type="button" class="ddbtn on" aria-haspopup="true" aria-expanded="false">Visualizations<span aria-hidden="true">▾</span></button><ul class="dd1"><li><a href="cpc.html">Planning cases</a></li><li><a href="311.html">311 service requests</a></li><li><a href="str.html">Short-term rentals</a></li><li><a href="blight.html">Blight and code enforcement</a></li><li><a href="permits.html">Building permits</a></li><li><a href="biz.html" class="on" aria-current="page">New businesses</a></li><li><a href="trees.html">Street trees</a></li></ul></div><a class="xlink" href="about.html">About</a></nav><script>(()=>{const dd=document.currentScript.closest(".site").querySelector(".dd"),b=dd.querySelector(".ddbtn");const set=o=>{dd.classList.toggle("open",o);b.setAttribute("aria-expanded",o)};b.onclick=e=>{e.stopPropagation();set(!dd.classList.contains("open"))};document.addEventListener("click",e=>{if(!dd.contains(e.target))set(false)});dd.addEventListener("keydown",e=>{if(e.key==="Escape"){set(false);b.focus()}})})()</script></div>
+<h1>New businesses</h1>
+<div class="src"><a href="https://data.nola.gov/d/abc4-h3u3">Occupational Business License Data (applications)</a> and <a href="https://data.nola.gov/d/hjcd-grvu">Occupational Business Licenses</a> · data.nola.gov · Applications through Nov 18, 2026 · Updated Nov 19, 2026</div>
+<div id="chart"></div>
+<div class="foot">Data: <a id="dataLink" href="https://data.nola.gov">data.nola.gov</a> · Not affiliated with the City of New Orleans · <a href="about.html">About</a></div>
+</div>
+<script>const DATA={"geo":{"nb":[{"n":"U.S. NAVAL BASE","r":[[547,1370,62,34,-5,22,3,4,-1,30,-75,-37,-16,-7,-26,-1,3,-65,55,20]]},{"n":"ALGIERS POINT","r":[[457,1343,-4,52,-31,1,-6,-3,-23,14,0,-41,8,-15,12,-8,10,-2,34,2]]},{"n":"WHITNEY","r":[[492,1350,-6,100,10,0,0,4,-1,2,-19,0,-8,2,-4,36,-21,-22,9,-1,2,-35,2,0,2,-41,-5,0,4,-52,35,7]]},{"n":"AUDUBON","r":[[147,1436,-26,113,-41,-10,-9,25,-18,-9,-3,3,0,7,-14,28,-14,-9,-10,-12,-4,-10,-3,-16,35,-54,-7,-5,79,-115,18,51,17,13]]},{"n":"LOWER NINTH WARD","r":[[682,1256,-36,86,-33,-13,-69,-18,27,-94,7,5,61,16,43,18]]},{"n":"OLD AURORA","r":[[618,1410,130,87,1,30,-11,100,-13,-11,-13,-1,-4,2,-11,-2,-62,-41,-30,-25,4,-78,-4,-3,2,-38,-3,-4,5,-22,9,6]]},{"n":"B. W. COOPER","r":[[265,1385,-16,24,-47,-31,1,-5,19,-29,37,31,6,10]]},{"n":"BAYOU ST. JOHN","r":[[299,1243,-31,42,-33,-23,-1,-3,7,-19,12,-18,-14,-15,6,-7,54,43]]},{"n":"DIXON","r":[[135,1236,9,31,13,21,-12,13,-25,-23,-23,-22,5,-5,3,3,4,-3,4,3,14,-16,-3,-3,11,1]]},{"n":"BEHRMAN","r":[[606,1460,-1,8,4,3,-4,78,-9,-7,-6,-1,-14,-12,-62,-30,-23,-4,0,-25,-5,-8,-9,-6,18,0,1,-2,0,-4,-10,0,3,-35,27,1,90,44]]},{"n":"BLACK PEARL","r":[[57,1452,-24,35,7,5,-35,54,-1,-49,1,-45,24,-26,28,26]]},{"n":"BROADMOOR","r":[[186,1372,26,63,-13,6,-37,3,-8,-3,-7,-5,9,-31,-12,-3,6,-20,4,1,3,-12,8,-12,21,13]]},{"n":"BYWATER","r":[[571,1217,-33,116,9,37,-72,-24,-52,-5,0,-19,11,-41,29,8,-4,13,13,3,44,12,18,-70,-9,-2,9,-35,-2,-3,39,10]]},{"n":"CENTRAL BUSINESS DISTRICT","r":[[325,1348,31,24,-3,5,15,12,25,-1,0,29,3,37,-22,1,0,-4,3,0,-1,-7,-3,-3,-1,-20,-3,-1,-27,-6,-7,25,-2,-1,-57,-38,-7,-6,-4,-9,40,-52,20,15]]},{"n":"CENTRAL CITY","r":[[202,1378,47,31,16,-24,4,9,7,6,59,39,-3,14,-11,-5,-14,22,-5,-6,-3,3,-58,39,-18,-40,-5,2,-2,-5,-5,-14,1,-16,-29,-67,19,12]]},{"n":"EAST CARROLLTON","r":[[99,1390,-42,62,-24,-23,-4,-3,50,-54,20,18]]},{"n":"EAST RIVERSIDE","r":[[189,1570,-2,-20,33,-4,32,-11,5,10,7,17,-75,8]]},{"n":"LITTLE WOODS","r":[[968,777,-169,122,-100,48,-19,6,-52,10,-16,-1,-25,-8,-29,10,-12,-36,-29,8,-11,-2,5,1,0,-10,13,-4,0,-44,4,-10,-1,-51,13,0,0,10,9,1,4,10,7,1,-4,6,2,3,3,0,1,17,16,17,18,-8,4,-5,-1,-4,2,-3,5,5,-12,14,-11,6,16,12,14,-14,-1,-6,2,-1,4,15,-3,4,1,3,102,-47,51,-29,15,-9,-1,-3,5,0,0,-4,8,0,41,-28,51,-41,7,-9,-2,-6,13,-9,0,-3,4,0,4,4,-1,-2,4,0,26,-24,-1,1,15,12,6,8,5,67]]},{"n":"MARIGNY","r":[[434,1281,-11,41,0,19,-19,-11,-2,-6,-33,-25,13,-13,52,-5]]},{"n":"CITY PARK","r":[[264,1113,2,16,-14,46,1,6,-6,8,-2,10,-6,8,14,15,-13,21,-25,-19,-6,8,-32,-26,-8,-6,11,-2,20,-193,36,1,26,-10,13,-2,-5,12,-6,67,1,39,-3,1,2,0]]},{"n":"DESIRE AREA","r":[[571,1217,-113,-31,2,-6,-5,-85,11,-1,57,-24,23,-6,32,124,-7,29]]},{"n":"DILLARD","r":[[393,1161,-52,3,0,-3,-19,-5,-3,-47,-1,-11,23,-18,-1,-12,46,-4,7,97]]},{"n":"GARDEN DISTRICT","r":[[294,1509,-42,26,-8,-22,-3,-7,36,-23,17,26]]},{"n":"FAIRGROUNDS","r":[[305,1154,14,7,1,10,16,-1,0,6,10,0,2,4,-49,63,-25,-20,-29,-23,2,-11,6,-8,-1,-6,7,-24,46,3]]},{"n":"FILLMORE","r":[[334,991,7,89,-23,18,1,11,-57,4,3,-1,-1,-17,6,-89,5,-12,59,-3]]},{"n":"FISCHER DEV","r":[[477,1456,10,6,4,10,-1,31,-5,13,-21,-22,2,-34,4,-4,7,0]]},{"n":"FLORIDA AREA","r":[[505,1200,4,2,-2,8,4,1,-1,5,21,6,-6,23,-51,-13,-5,-2,8,-28,-21,-6,2,-10,47,14]]},{"n":"FLORIDA DEV","r":[[532,1207,2,3,-3,12,-18,-5,-3,-1,1,-5,-4,-1,2,-8,-4,-2,27,7]]},{"n":"FRERET","r":[[177,1442,3,33,-22,2,-20,-2,3,-16,6,-23,12,7,18,-1]]},{"n":"GENTILLY TERRACE","r":[[451,1038,7,97,-20,24,-45,2,-2,-23,-7,-98,28,-3,38,-1,1,2]]},{"n":"GENTILLY WOODS","r":[[546,1064,-23,6,-51,22,-14,3,-3,0,-2,-25,-1,-34,81,-18,13,46]]},{"n":"GERT TOWN","r":[[222,1344,-20,34,-19,-12,3,6,-21,-13,2,-5,-23,-14,-4,5,-16,-14,-4,-3,-3,3,-13,-12,11,-12,-4,-4,7,-8,4,4,10,-10,13,12,12,-13,12,13,53,43]]},{"n":"HOLLYGROVE","r":[[97,1256,35,33,-10,10,-4,-4,-7,8,4,4,-11,12,-8,-8,-23,25,-28,-26,27,-54,1,-12,13,1,11,11]]},{"n":"HOLY CROSS","r":[[646,1342,-28,68,-71,-40,-9,-37,6,-22,16,4,53,14,33,13]]},{"n":"IBERVILLE","r":[[335,1335,-10,13,-20,-15,4,-5,6,-8,20,15]]},{"n":"IRISH CHANNEL","r":[[309,1533,17,28,-80,31,-57,19,1,-24,-2,-10,1,-7,75,-8,-12,-27,42,-26,15,24]]},{"n":"LAKE CATHERINE","r":[[1920,145,5,5,0,3,2,1,10,22,12,7,-1,1,2,3,1,6,-7,0,-2,5,21,13,5,15,-2,3,4,1,1,5,52,13,9,6,16,-2,10,-5,13,-2,59,-31,35,-28,2,-5,1,-9,3,-3,-2,-12,11,-10,4,0,16,6,10,8,28,12,46,27,19,16,13,19,1,7,15,0,11,6,11,2,11,6,2,-4,10,3,12,-4,26,2,27,8,-2,4,2,4,8,1,24,9,-8,33,-8,0,-13,8,-33,10,-7,22,-29,31,-7,2,-3,7,1,6,-6,12,-23,37,-9,9,-36,21,-8,11,-10,7,-13,3,-11,-2,-9,4,0,3,-2,-2,-6,2,-4,5,0,3,-7,9,-2,30,-5,15,-2,23,-5,18,-2,39,-4,13,3,4,1,10,-4,17,-32,16,-40,14,-13,-2,-29,5,-8,-2,-21,6,-6,6,-2,-1,-4,3,-19,3,-9,5,-1,6,-10,9,-2,-1,-10,3,0,4,-5,1,1,3,-4,1,-3,7,-4,2,0,6,-3,0,-2,5,2,1,-3,2,1,3,2,0,-5,19,3,4,0,5,-2,1,3,3,-3,8,2,7,3,4,5,16,35,50,7,14,1,9,12,7,3,11,5,1,-2,7,2,1,-4,7,-37,18,-18,2,-28,-1,-6,-11,-12,-11,-9,-3,-4,-6,-21,-12,-9,-13,-1,-7,-13,-13,-7,-12,-17,-5,-4,-5,-12,-2,-12,-6,-10,-12,-16,-10,-34,5,-7,-4,-30,-7,-39,-1,-9,-3,-16,3,-60,0,-25,5,-26,0,-11,4,-8,8,0,-13,-7,-2,-39,18,-22,-120,-49,-55,-7,-4,-47,2,-3,-5,-33,-214,-12,-54,-11,-1,-60,-131,2,-4,-1,4,3,6,9,0,57,-32,11,-1,3,-4,6,2,13,-2,9,-5,2,-4,3,1,2,-4,0,4,7,4,-4,4,2,10,-1,8,-3,6,-6,3,1,1,-2,6,2,0,1,3,-2,10,-1,3,-20,18,3,4,0,8,-3,4,3,9,0,10,9,24,21,38,-1,5,4,0,1,5,3,1,-2,5,2,3,2,-1,-2,6,4,5,3,0,0,6,9,9,5,10,-2,2,7,17,17,16,8,16,15,10,-1,7,5,0,1,4,-5,7,3,6,8,-1,10,4,2,6,20,2,4,-2,23,-1,5,-4,4,-14,11,3,7,11,31,-2,5,-3,24,-2,23,-8,5,0,3,-3,29,-15,18,-4,0,-4,4,-4,-1,-2,5,-5,1,2,4,-6,6,-1,-8,-14,8,-15,19,-18,6,-2,1,-4,12,-10,3,-5,4,1,2,-7,28,-27,3,-2,4,3,1,-4,4,0,-2,-4,4,-5,7,-4,4,1,17,-16,1,-4,3,-2,-2,-3,4,-1,-2,-4,5,-4,2,-6,6,-2,3,-6,3,1,5,-6,4,0,-1,-4,3,0,1,-3,1,1,-1,-3,4,2,2,-4,2,0,-2,-3,3,0,2,-4,5,1,1,-4,9,-5,2,-3,-1,-3,4,-4,-4,-5,3,1,2,-7,8,-8,0,-6,4,-7,3,-1,4,-15,6,1,-1,-6,-2,-1,2,-14,-2,-4,4,-3,-3,-4,-3,-12,-6,-2,1,-4,-3,-2,2,-2,-4,-1,1,-5,-4,-5,5,-1,0,-6,5,0,-5,-7,5,-32,8,-2,2,-5,3,5]]},{"n":"LAKESHORE - LAKE VISTA","r":[[278,964,-3,30,-13,2,-22,10,-16,1,-96,-9,-6,4,6,-45,3,-2,-1,6,9,-2,14,-4,23,2,9,-6,18,0,3,3,2,0,3,-5,12,-1,11,-5,8,2,8,11,22,2,6,6]]},{"n":"LAKEVIEW","r":[[200,1005,-15,143,-38,-4,1,-8,-32,-2,0,-13,-1,-9,7,-110,6,-4,72,7]]},{"n":"LAKE TERRACE & OAKS","r":[[506,934,-46,12,-16,13,-33,7,-35,4,-15,7,-28,3,1,11,-56,3,-3,0,4,-35,10,-11,8,-13,11,-3,10,4,5,-6,15,-1,12,-4,9,3,4,-7,0,4,5,0,1,-5,2,4,7,0,5,-1,0,-4,1,4,6,0,2,-4,4,5,7,-3,59,-8,10,2,11,7,11,14,12,-2]]},{"n":"LAKEWOOD","r":[[115,1112,2,13,-4,27,3,25,19,59,-11,-1,3,3,-7,8,-7,8,-4,-3,-4,3,-3,-3,-5,5,-11,-11,-13,-1,10,-134,32,2]]},{"n":"WEST END","r":[[131,955,-2,0,-2,7,-5,41,-7,109,-32,-2,13,-165,6,1,28,3,2,2,-1,4]]},{"n":"LEONIDAS","r":[[104,1319,13,12,-98,106,-14,15,-5,-51,45,-91,28,26,23,-25,8,8]]},{"n":"LOWER GARDEN DISTRICT","r":[[396,1454,-3,34,-5,12,-14,20,-23,-5,-28,-29,-1,6,1,2,-14,11,10,13,-9,7,3,5,-4,3,-32,-50,3,-2,22,-17,5,6,14,-22,11,5,10,-39,30,7,1,20,3,3,1,7,-3,0,0,4,22,-1]]},{"n":"MARLYVILLE - FONTAINBLEAU","r":[[165,1359,-8,12,-3,12,-4,-1,-6,20,12,3,-9,31,-17,-13,-15,-43,-3,-8,-13,18,-20,-18,41,-44,20,17,4,-5,23,14,-2,5]]},{"n":"McDONOGH","r":[[453,1395,5,0,-6,76,-9,1,-49,-54,-1,-11,23,-14,3,2,34,0]]},{"n":"MID-CITY","r":[[240,1244,-6,15,1,3,33,23,-46,59,-53,-43,-10,-11,-7,-8,-8,-15,-17,-52,42,-15,40,32,6,-8,25,20]]},{"n":"MILAN","r":[[241,1506,-22,9,-35,3,-7,-76,29,-4,6,-3,-1,16,7,17,5,-2,18,40]]},{"n":"MILNEBURG","r":[[450,1036,-44,1,-22,3,-4,-58,-1,-12,32,-4,34,-7,5,77]]},{"n":"NAVARRE","r":[[185,1148,-5,50,-23,5,-30,12,-9,-29,-2,-22,-3,-12,3,-18,32,2,-1,8,38,4]]},{"n":"PINES VILLAGE","r":[[628,963,-14,7,-6,13,5,67,-33,4,-34,10,-36,-127,3,-2,33,-7,12,36,29,-10,25,8,16,1]]},{"n":"PLUM ORCHARD","r":[[730,1031,-51,11,-66,8,-4,-51,0,-2,11,-3,57,-5,22,-7,28,-5,-2,1,5,53]]},{"n":"ST. BERNARD AREA","r":[[322,1149,-20,-1,3,6,-46,-3,1,-4,6,-18,-2,-16,55,-4,3,40]]},{"n":"PONTCHARTRAIN PARK","r":[[510,936,23,82,-72,15,-10,5,-3,-32,-3,-47,16,-13,45,-12,4,2]]},{"n":"READ BLVD EAST","r":[[968,960,-66,26,-72,21,-4,-47,-31,-49,-4,-7,177,-127,4,68,-3,32,-1,83]]},{"n":"READ BLVD WEST","r":[[830,1007,-51,14,-49,10,-5,-53,13,-2,42,-4,46,-10,4,45]]},{"n":"ST. CLAUDE","r":[[525,1245,9,2,-18,70,-57,-15,4,-13,-30,-8,9,-33,14,-52,21,6,-8,28,56,15]]},{"n":"NEW AURORA - ENGLISH TURN","r":[[747,1641,0,-3,-9,-12,11,-99,-1,-30,85,38,27,3,34,2,55,-2,50,7,30,7,14,7,24,20,25,32,18,36,17,41,14,46,3,27,-1,26,-6,23,-11,19,-14,12,-31,15,-92,-151,-115,-53,-67,-10,-19,10,-11,0,-30,-11]]},{"n":"SEVENTH WARD","r":[[401,1284,-22,3,-10,12,-70,-56,24,-31,25,-32,12,0,1,6,11,-1,0,5,17,-1,0,6,7,0,-1,22,6,67]]},{"n":"TREME - LAFITTE","r":[[369,1299,-31,39,-70,-54,8,-11,23,-30,70,56]]},{"n":"ST.  ANTHONY","r":[[384,1040,2,24,-46,4,-7,-88,26,-3,20,-7,5,70]]},{"n":"TOURO","r":[[252,1535,-32,11,-33,4,-3,-28,0,-4,35,-3,22,-9,11,29]]},{"n":"ST. ROCH","r":[[458,1186,-25,95,-32,3,-6,-67,1,-22,-7,0,0,-6,-17,1,0,-5,-11,1,-1,-6,-12,1,-2,-5,-10,0,0,-6,-14,1,-2,0,-1,-10,-13,-5,-4,-8,20,1,0,7,19,5,0,3,94,-6,3,1,20,-24,2,45,-2,6]]},{"n":"ST. THOMAS DEV","r":[[374,1520,-17,20,-31,21,-17,-28,4,-3,-3,-5,9,-7,-7,-8,-3,-5,14,-11,-1,-2,1,-6,28,29,23,5]]},{"n":"TALL TIMBERS - BRECHTEL","r":[[605,1549,29,24,60,40,14,4,10,-2,11,3,18,20,0,3,-11,-2,-9,85,-61,-46,-1,31,-27,-18,0,-7,-50,-55,-103,-112,6,-22,17,2,68,32,14,12,6,1,9,7]]},{"n":"TULANE - GRAVIER","r":[[315,1320,-50,65,-6,-10,-37,-31,46,-60,47,36]]},{"n":"UPTOWN","r":[[184,1518,3,32,-32,2,-34,-3,7,-32,10,-42,20,2,22,-2,4,43]]},{"n":"VIAVANT - VENETIAN ISLES","r":[[1543,869,-6,15,-6,4,0,3,-19,18,-23,13,-42,42,-6,10,-10,10,-6,17,-32,44,-3,8,-8,10,-7,-2,-12,8,-6,13,3,12,-6,12,-26,15,-1,6,5,7,21,14,3,6,-1,9,-14,13,-9,3,-8,-3,-6,-6,-8,-18,-8,-3,-9,6,-6,15,-9,10,-18,8,-6,0,-5,-4,-16,-25,4,-13,-4,-16,-18,-9,-5,-13,-24,-13,-6,0,-6,7,-6,1,-33,-9,-34,13,-11,28,-12,8,-17,0,-11,9,-8,-1,-20,22,-24,6,-10,5,-5,7,-12,4,-3,6,2,12,-3,4,-29,-7,-18,6,-6,-2,-15,1,-7,-9,-2,-18,-4,-4,-5,-1,-7,6,-6,1,-22,-21,-9,-1,-20,-13,-2,-10,-3,-3,-5,-2,-8,2,-24,25,-6,12,-6,3,-2,10,-5,3,-7,9,-11,22,0,4,-5,3,-27,33,-67,-28,-61,-16,-7,-5,7,-29,-32,-124,34,-10,101,-13,91,-18,120,-34,272,-104,125,-88,26,-23,9,-12,6,-13,4,-34,3,-10,11,-13,16,-7,4,0,4,10,47,-2,7,4,50,58,21,117,39,-18,7,2,0,13]]},{"n":"FRENCH QUARTER","r":[[423,1341,-10,2,-12,8,-8,15,0,22,-25,1,-15,-12,3,-5,-31,-24,7,-9,3,-4,3,3,31,-39,33,25,2,6,19,11]]},{"n":"WEST LAKE FOREST","r":[[826,962,-46,10,-34,2,-41,7,-27,8,-58,5,-11,3,-1,-17,6,-10,11,-6,70,-16,96,-44,35,58]]},{"n":"VILLAGE DE LEST","r":[[1255,286,-2,4,52,116,8,15,11,1,12,54,32,209,-17,6,-12,12,-5,12,-4,34,-6,13,-9,12,-26,23,-80,54,-33,28,-21,10,-187,71,1,-83,3,-32,-2,-27,0,-19,-7,-88,-6,-9,-15,-12,56,-55,54,-62,203,-287]]},{"n":"WEST RIVERSIDE","r":[[121,1549,34,3,32,-2,1,29,2,2,-1,30,-30,7,-33,0,-57,-11,-33,-14,14,-28,0,-7,3,-3,18,9,9,-25,41,10]]}],"pd":[{"n":"7","r":[[2040,217,9,0,20,-6,55,-26,13,-9,17,-27,7,-6,10,-5,18,-2,24,7,82,41,16,12,13,18,17,12,24,6,48,0,55,12,19,6,0,28,-12,26,-9,8,-8,0,-13,8,-33,10,-7,22,-29,31,-7,2,-3,7,1,6,-6,12,-23,37,-9,9,-36,21,-8,11,-10,7,-13,3,-11,-2,-9,4,0,3,-2,-2,-6,2,-4,5,0,3,-7,9,-2,30,-5,15,-2,23,-5,18,-2,39,-4,13,3,4,1,10,-4,17,-32,16,-40,14,-13,-2,-29,5,-8,-2,-21,6,-6,6,-2,-1,-4,3,-19,3,-9,5,-1,6,-10,9,-2,-1,-10,3,0,4,-5,1,1,3,-4,1,-3,7,-4,2,0,6,-3,0,-2,5,2,1,-3,2,1,3,2,0,-5,19,3,4,0,5,-2,1,3,3,-3,8,2,7,3,4,5,16,35,50,7,14,1,9,12,7,3,11,5,1,-2,7,2,0,0,4,-7,6,-34,16,-44,2,-20,-23,-9,-3,-4,-6,-21,-12,-9,-13,-1,-7,-13,-13,-7,-12,-17,-5,-4,-5,-12,-2,-12,-6,-10,-12,-12,-9,-12,-1,-26,5,-7,-4,-30,-7,-39,-1,-9,-3,-16,3,-60,0,-25,5,-28,0,-14,9,-9,18,-25,25,-23,13,-42,42,-6,10,-10,10,-6,17,-41,60,-15,2,-6,6,-6,13,3,12,-6,12,-26,15,-1,6,5,7,21,14,3,6,0,6,-3,6,-15,12,-9,1,-7,-4,-12,-23,-6,-4,-11,7,-6,15,-9,10,-18,8,-6,0,-5,-4,-16,-25,4,-13,-4,-16,-18,-9,-5,-13,-24,-13,-6,0,-6,7,-6,1,-33,-9,-34,13,-11,28,-12,8,-17,0,-11,9,-8,-1,-20,22,-24,6,-10,5,-5,7,-12,4,-3,6,2,12,-3,4,-29,-7,-18,6,-6,-2,-15,1,-7,-9,-2,-18,-3,-4,-6,-1,-7,6,-8,0,-20,-20,-9,-1,-20,-13,-3,-11,-7,-4,-11,4,-9,12,-12,11,-6,12,-6,3,-2,10,-8,6,-10,18,-144,-75,-15,16,-14,-9,-19,-64,10,-4,1,-7,15,-3,-3,-10,2,-1,-5,-52,-26,-84,-21,-2,0,-44,4,-10,-1,-51,13,0,0,10,9,1,6,8,6,3,1,26,17,17,32,-28,20,20,69,-26,48,-22,80,-53,106,-93,86,-80,229,-322,156,-54,-13,29,-9,48,-20,44,4,34,64,125,35,36,47,11,94,-1,52,-15,31,-30,17,-34,86,-81,103,-117,7,-44,-12,-30,7,-43,10,-18,20,-6,12,7,24,21,40,42,21,13,15,3]]},{"n":"4","r":[[618,1410,116,79,36,19,63,27,41,4,75,-1,33,4,47,10,25,14,13,13,25,32,27,55,14,44,8,24,3,27,-4,39,-7,20,-21,21,-31,15,-92,-151,-115,-53,-67,-10,-19,10,-11,0,-19,-9,-22,-4,-9,85,-61,-46,-1,31,-27,-18,0,-7,-244,-266,-1,-52,8,-15,12,-8,10,-2,52,5,72,24,71,40]]},{"n":"2","r":[[191,1610,-18,6,-47,2,-57,-11,-16,-5,-31,-18,-10,-12,-6,-20,-2,-25,2,-60,-6,-66,67,-135,51,4,26,10,8,12,-8,9,8,8,11,10,27,64,-3,1,29,79,-16,5,-21,1,7,75,6,-1,0,6,-6,1,5,60]]},{"n":"1","r":[[375,1291,-50,65,-25,-19,-36,47,-6,-11,-91,-74,-11,-11,6,-6,73,-79,7,-4,19,15,2,-2,40,1,5,-27,7,-12,60,117]]},{"n":"6","r":[[265,1383,4,8,3,2,33,16,21,15,-3,6,22,13,21,5,0,23,30,-4,-3,21,-14,26,-22,26,-27,19,-84,33,-55,18,-5,-60,6,-1,0,-6,-6,1,-7,-75,31,-4,6,-2,-2,-5,-27,-74,3,-1,-27,-63,-19,-19,12,-13,16,16,86,69,7,10]]},{"n":"8","r":[[396,1467,-30,4,0,-23,-16,-3,-22,-12,-5,-3,3,-6,-21,-15,-36,-18,-4,-8,35,-46,25,19,4,-5,50,-63,55,-6,-11,43,-1,16,-9,2,-12,8,-8,15,0,51,4,30,-1,20]]},{"n":"3","r":[[524,912,0,9,21,2,26,84,5,52,-2,1,3,10,-15,3,0,5,-3,4,-62,18,-24,15,-15,19,2,45,-2,10,-61,5,-45,-20,-22,29,-15,-29,-2,3,-5,9,-5,27,-40,-1,-2,2,-19,-15,-7,4,-83,89,-5,-10,-24,-11,-56,-5,5,-10,27,-342,219,1,183,-13,23,-25,0,35]]},{"n":"5","r":[[743,1216,-5,14,-5,3,-27,33,-24,-10,-64,154,-71,-40,-55,-20,-35,-7,-35,-2,1,-16,11,-43,-51,4,-8,5,-19,-37,-26,-51,22,-29,45,20,61,-5,2,-10,-2,-45,11,-14,11,-11,17,-9,54,-16,19,64,14,9,15,-16,144,75]]}],"pop":[2070,2289,2060,17054,4982,15480,1399,3583,1397,7928,1866,6039,3563,4351,14077,4041,2601,32656,2469,2719,2989,5413,1877,5343,5961,1045,1689,160,1643,8727,3206,4247,5188,3493,1122,3104,887,3730,9751,3609,1894,4635,6925,6202,6133,2312,14358,5551,4233,2846,4258,5390,2732,2103,7683,4694,7491,5295,10909,5748,4642,2859,7485,2295,12121,3606,5861,1052,3523,5010,9808,4742],"hu":[936,1414,1051,5862,2199,6611,513,2145,737,3381,1076,3056,2512,4491,8507,2313,1536,13976,2290,1606,1114,2483,1192,3163,2607,450,796,52,931,4330,1309,1687,2581,1852,647,1922,546,1606,4018,1180,734,2367,3927,4919,2990,1287,7257,3221,1992,1453,1691,2147,1252,796,2944,1892,4200,2092,6706,3546,2239,1783,4125,1269,5907,1910,3339,493,4694,2233,3432,2740]},"meta":{"pulled":"2026-11-19"},"biz":{"ds":["abc4-h3u3","hjcd-grvu"],"last":"2026-11-18","winStart":"2025-11-19","S":["Retail Trade","Accommodation & Food Services","Other Services (Except Public Administration)","Professional, Scientific, & Technical Services","Transportation & Warehousing","Health Care & Social Assistance","Administrative & Support & Waste Mgmt & Remediation Services","Construction","Arts, Entertainment & Recreation","Real Estate & Rental & Leasing","Other sectors","Not stated"],"out":["Approved or issued","Listed as filed or in review","Withdrawn or incomplete","Denied","Duplicate or wrong type","Not stated"],"years":[2018,2019,2020,2021,2022,2023,2024,2025,2026],"yr":[[507,335,262,198,194,120,113,83,70,65,140,444],[529,275,253,208,214,126,90,72,52,46,147,477],[485,233,170,196,110,61,76,57,35,49,109,390],[554,250,210,220,119,147,101,83,62,69,146,405],[766,246,189,163,112,106,83,67,56,40,141,474],[629,256,189,182,97,103,117,71,73,42,113,598],[322,282,169,162,246,119,74,70,61,41,150,557],[288,320,192,180,126,127,76,70,58,44,146,635],[277,185,186,176,172,141,82,64,61,48,91,635]],"yo":[[[476,23,5,0,3,0],[297,31,1,0,6,0],[241,21,0,0,0,0],[189,9,0,0,0,0],[188,6,0,0,0,0],[113,6,1,0,0,0],[104,7,2,0,0,0],[80,2,0,0,1,0],[66,2,1,0,1,0],[62,3,0,0,0,0],[129,9,1,0,1,0],[329,77,8,0,30,0]],[[471,52,3,0,3,0],[229,38,4,0,4,0],[214,30,4,0,5,0],[198,9,0,0,1,0],[199,13,0,0,2,0],[122,2,1,0,1,0],[81,7,1,1,0,0],[71,1,0,0,0,0],[44,8,0,0,0,0],[40,5,0,1,0,0],[127,15,3,0,2,0],[85,344,14,1,33,0]],[[393,54,8,0,30,0],[191,23,10,0,9,0],[136,24,4,0,6,0],[179,8,3,0,6,0],[101,5,2,0,2,0],[47,5,1,1,7,0],[64,10,1,0,1,0],[56,0,0,0,1,0],[30,3,0,0,2,0],[38,9,2,0,0,0],[93,13,1,0,2,0],[44,255,40,3,48,0]],[[404,119,12,0,19,0],[201,22,7,0,20,0],[172,30,7,0,1,0],[200,12,4,0,4,0],[94,20,2,0,3,0],[127,9,2,0,9,0],[86,13,0,1,1,0],[70,12,1,0,0,0],[52,8,1,0,1,0],[62,7,0,0,0,0],[117,23,3,0,3,0],[34,270,26,3,72,0]],[[343,302,31,21,69,0],[177,51,10,2,6,0],[133,42,9,0,5,0],[136,25,2,0,0,0],[86,21,1,1,3,0],[79,20,3,0,4,0],[63,14,1,2,3,0],[47,18,1,0,1,0],[34,18,3,0,1,0],[30,8,1,0,1,0],[103,31,5,0,2,0],[41,335,26,15,57,0]],[[248,276,43,27,35,0],[196,46,7,1,6,0],[148,32,3,2,4,0],[145,33,3,0,1,0],[61,27,4,1,4,0],[74,24,4,0,1,0],[75,36,1,2,3,0],[45,22,2,0,2,0],[51,17,2,0,3,0],[32,7,3,0,0,0],[80,31,0,0,2,0],[21,431,36,20,90,0]],[[202,92,8,1,19,0],[200,55,15,0,12,0],[125,33,3,1,7,0],[112,44,2,1,3,0],[183,46,2,3,12,0],[73,39,2,0,5,0],[41,20,5,0,8,0],[43,16,2,2,7,0],[44,13,2,0,2,0],[29,6,5,0,1,0],[106,35,1,1,7,0],[58,323,23,39,114,0]],[[183,69,12,1,23,0],[199,59,31,3,28,0],[113,53,9,0,17,0],[117,43,7,2,11,0],[70,42,4,1,9,0],[84,22,8,0,13,0],[40,21,9,1,5,0],[37,18,7,0,8,0],[37,16,3,0,2,0],[26,8,6,0,4,0],[91,38,6,1,10,0],[30,363,22,21,199,0]],[[152,94,10,1,20,0],[109,54,7,0,15,0],[102,66,1,1,16,0],[119,46,4,0,7,0],[139,21,5,0,7,0],[80,44,2,1,14,0],[46,27,3,3,3,0],[43,15,1,0,5,0],[25,30,0,1,5,0],[35,12,0,0,1,0],[42,40,2,0,7,0],[20,384,11,21,199,0]]],"home":[[697,583],[700,636],[742,549],[905,1042],[756,1387],[728,1547],[606,1620],[637,1604],[655,1461]],"nby":[[0,0,1,0,1,2,0,2,2,0,3,1,0,5,1,0,6,1,0,7,1,0,8,1,0,11,2,1,0,1,1,1,1,1,2,1,1,3,3,1,5,1,1,10,1,1,11,1,2,0,1,2,2,1,2,5,1,2,10,1,2,11,2,3,0,1,3,2,2,3,3,1,3,4,2,3,5,1,3,6,1,3,11,3,4,0,4,4,3,1,4,6,1,4,7,1,4,11,2,5,0,2,5,1,1,5,2,1,5,3,1,5,5,1,5,6,1,5,10,1,5,11,4,6,0,2,6,3,1,6,6,1,6,10,1,6,11,2,7,0,1,7,1,2,7,3,1,7,5,1,7,7,1,7,11,1,8,1,2,8,3,2,8,5,1,8,10,1,8,11,1],[0,0,1,0,1,1,0,8,1,0,11,4,1,1,1,1,2,1,1,3,1,1,5,1,1,8,1,1,10,1,1,11,6,2,0,4,2,1,2,2,2,1,2,3,2,2,6,1,2,8,1,2,9,1,2,11,4,3,0,4,3,1,1,3,2,2,3,3,1,3,5,1,3,7,2,3,11,1,4,0,3,4,1,3,4,2,1,4,6,1,4,9,1,4,11,2,5,0,3,5,1,3,5,2,1,5,3,2,5,8,2,5,11,4,6,1,1,6,2,3,6,9,1,6,10,1,6,11,7,7,0,1,7,1,1,7,2,1,7,3,1,7,6,1,7,10,1,7,11,2,8,0,3,8,1,4,8,3,1,8,4,1,8,6,1,8,11,3],[0,0,2,0,3,1,0,4,1,0,5,1,0,11,1,1,0,2,1,1,2,1,2,1,1,7,2,1,11,3,2,0,4,2,2,1,2,4,1,2,11,1,3,0,2,3,3,1,3,4,2,3,5,1,3,6,1,3,10,1,3,11,4,4,0,4,4,2,1,4,10,1,5,0,4,5,1,1,5,2,2,5,5,1,5,8,1,5,9,1,6,0,1,6,3,2,6,11,1,7,0,1,7,2,1,7,3,1,7,6,1,8,0,1,8,11,1],[0,0,3,0,1,4,0,2,3,0,3,2,0,5,1,0,7,2,0,9,1,0,10,3,0,11,6,1,0,10,1,1,3,1,3,5,1,5,2,1,6,1,1,9,1,1,11,6,2,0,2,2,1,2,2,2,1,2,3,4,2,4,1,2,5,1,2,8,1,2,9,1,2,11,6,3,0,9,3,1,3,3,2,3,3,3,5,3,4,1,3,5,4,3,6,1,3,8,2,3,10,1,3,11,6,4,0,8,4,1,1,4,2,1,4,3,7,4,5,4,4,6,1,4,8,1,4,9,1,4,10,1,4,11,9,5,0,6,5,1,2,5,2,4,5,3,7,5,5,1,5,8,1,5,11,3,6,0,3,6,1,7,6,2,2,6,3,8,6,4,2,6,6,1,6,7,1,6,9,1,6,10,4,6,11,4,7,0,10,7,1,5,7,2,7,7,3,6,7,5,1,7,6,2,7,7,1,7,8,3,7,9,1,7,10,6,7,11,4,8,0,7,8,1,1,8,2,3,8,3,5,8,5,1,8,6,1,8,7,1,8,8,1,8,10,2,8,11,8],[0,0,6,0,4,2,0,7,1,0,8,2,0,11,3,1,0,5,1,1,1,1,2,1,1,4,1,1,5,1,1,6,2,1,9,2,1,10,2,1,11,4,2,0,5,2,1,2,2,2,4,2,3,3,2,4,2,2,5,1,2,6,2,2,9,2,2,10,2,2,11,3,3,0,3,3,2,1,3,3,1,3,4,2,3,5,3,3,6,2,3,7,1,3,10,1,3,11,4,4,0,10,4,2,1,4,6,2,4,7,3,4,9,1,4,10,3,4,11,6,5,0,8,5,2,1,5,3,1,5,6,1,5,7,1,5,11,5,6,0,2,6,1,2,6,4,1,6,5,3,6,6,1,6,7,2,6,8,1,6,10,1,6,11,3,7,0,2,7,1,1,7,2,1,7,3,1,7,5,1,7,7,1,7,8,1,7,10,1,8,0,4,8,1,1,8,2,4,8,3,1,8,5,2,8,6,2,8,7,2,8,11,5],[0,0,12,0,1,7,0,2,6,0,3,6,0,4,1,0,5,2,0,6,3,0,7,5,0,9,1,0,10,2,0,11,5,1,0,17,1,1,6,1,2,1,1,3,1,1,4,4,1,5,1,1,6,6,1,7,1,1,8,1,1,9,1,1,11,12,2,0,14,2,1,2,2,2,3,2,3,3,2,4,1,2,5,2,2,6,4,2,7,3,2,10,4,2,11,10,3,0,12,3,2,5,3,3,11,3,4,4,3,5,8,3,6,6,3,7,3,3,8,5,3,10,5,3,11,11,4,0,23,4,1,8,4,2,5,4,3,4,4,4,5,4,5,2,4,6,5,4,7,5,4,8,4,4,10,7,4,11,13,5,0,21,5,1,1,5,2,6,5,3,4,5,4,4,5,5,5,5,6,12,5,7,1,5,8,3,5,9,1,5,10,4,5,11,9,6,0,3,6,1,3,6,2,2,6,3,2,6,4,6,6,5,4,6,6,1,6,7,3,6,8,2,6,11,9,7,0,4,7,1,4,7,2,1,7,3,2,7,4,4,7,5,2,7,6,1,7,7,4,7,8,2,7,10,6,7,11,14,8,0,10,8,1,2,8,2,5,8,4,2,8,5,3,8,6,3,8,7,1,8,8,1,8,9,1,8,10,1,8,11,11],[0,0,1,0,1,1,0,2,2,0,11,3,1,1,2,1,5,1,1,8,3,1,10,1,1,11,2,2,0,1,2,1,1,2,8,1,2,11,1,3,0,2,3,3,1,3,8,1,3,11,2,4,0,7,4,8,1,4,10,1,4,11,2,5,0,2,5,11,1,6,0,2,6,3,1,6,5,1,6,9,1,6,10,1,6,11,1,7,0,1,7,2,3,7,10,1,8,8,1],[0,0,6,0,1,1,0,2,2,0,3,5,0,4,2,0,5,1,0,6,2,0,7,2,0,8,2,0,9,1,0,10,2,0,11,3,1,0,9,1,1,2,1,2,4,1,3,5,1,7,1,1,11,5,2,0,2,2,1,2,2,2,1,2,3,3,2,6,1,2,7,3,2,11,3,3,0,8,3,3,8,3,4,4,3,5,2,3,7,2,3,8,1,3,9,2,3,11,3,4,0,15,4,1,3,4,2,1,4,3,3,4,4,2,4,5,3,4,6,1,4,10,1,4,11,7,5,0,7,5,1,2,5,3,3,5,5,1,5,6,2,5,9,1,5,10,3,5,11,4,6,0,3,6,2,1,6,3,3,6,4,3,6,5,2,6,7,1,6,11,7,7,0,5,7,1,1,7,3,6,7,7,1,7,10,1,7,11,6,8,0,5,8,2,2,8,3,2,8,5,1,8,7,2,8,8,2,8,9,1,8,10,1,8,11,3],[0,2,1,0,10,2,1,0,2,1,2,1,1,11,1,2,0,4,2,2,1,2,3,1,2,4,1,2,10,2,3,11,1,4,0,1,4,2,1,4,10,1,4,11,3,5,0,1,5,2,1,6,1,1,6,3,1,6,11,1,7,5,1,7,6,1,8,3,1,8,7,1,8,8,1,8,9,1,8,11,1],[0,0,8,0,1,3,0,2,2,0,4,1,0,5,7,0,6,2,0,7,1,0,9,1,0,10,1,0,11,5,1,0,6,1,1,1,1,2,5,1,3,1,1,4,1,1,5,4,1,6,1,1,7,2,1,10,1,1,11,8,2,0,12,2,1,2,2,2,4,2,3,1,2,6,1,2,9,1,2,10,1,2,11,12,3,0,7,3,1,2,3,2,5,3,3,2,3,4,1,3,5,1,3,6,1,3,7,2,3,8,1,3,9,2,3,10,4,3,11,6,4,0,11,4,1,2,4,2,1,4,3,1,4,5,4,4,6,1,4,7,2,4,8,1,4,11,3,5,0,12,5,1,1,5,2,1,5,3,5,5,4,2,5,5,4,5,6,4,5,7,3,5,8,1,5,9,2,5,10,1,5,11,6,6,0,5,6,2,8,6,3,2,6,4,3,6,5,1,6,6,2,6,7,2,6,11,8,7,0,3,7,1,3,7,2,5,7,4,3,7,5,2,7,8,2,7,10,1,7,11,9,8,0,5,8,1,5,8,2,3,8,4,1,8,5,1,8,8,1,8,10,2,8,11,11],[0,5,1,0,6,1,0,8,1,1,0,1,1,5,1,1,8,1,1,11,1,2,1,2,3,4,1,4,1,1,4,3,2,4,11,2,5,0,1,5,3,1,5,6,1,5,7,1,5,11,2,6,2,1,6,6,1,6,11,1,7,0,1,7,1,1,7,3,2,7,10,1,7,11,2,8,0,1,8,1,1,8,6,1,8,8,1,8,9,1,8,11,1],[0,0,6,0,1,1,0,2,2,0,3,4,0,5,3,0,7,1,0,10,3,0,11,3,1,0,8,1,1,4,1,2,6,1,3,1,1,6,1,1,7,1,1,8,1,1,10,1,1,11,4,2,0,10,2,2,4,2,3,4,2,4,1,2,5,1,2,6,1,2,7,2,2,10,1,2,11,5,3,0,3,3,2,1,3,3,1,3,4,1,3,6,1,3,7,1,3,10,2,3,11,4,4,0,10,4,1,4,4,2,2,4,5,1,4,8,2,4,10,3,4,11,5,5,0,14,5,3,3,5,5,1,5,7,2,5,10,5,5,11,10,6,0,7,6,1,7,6,3,2,6,5,1,6,6,1,6,10,4,6,11,6,7,0,6,7,1,14,7,2,3,7,4,2,7,7,1,7,8,1,7,9,1,7,10,3,7,11,10,8,0,3,8,1,5,8,2,2,8,3,2,8,5,4,8,6,3,8,11,9],[0,0,10,0,1,8,0,2,1,0,3,5,0,6,3,0,8,2,0,11,4,1,0,4,1,1,5,1,2,7,1,3,3,1,6,1,1,7,2,1,8,1,1,10,2,1,11,6,2,0,8,2,1,4,2,3,4,2,8,1,2,9,1,2,10,1,2,11,8,3,0,6,3,1,6,3,2,3,3,3,3,3,5,2,3,6,2,3,7,2,3,8,1,3,10,3,3,11,4,4,0,10,4,1,6,4,2,3,4,3,1,4,4,1,4,5,1,4,6,1,4,8,4,4,9,2,4,10,2,4,11,11,5,0,14,5,1,7,5,2,1,5,3,2,5,4,2,5,5,1,5,6,3,5,8,4,5,9,2,5,10,2,5,11,10,6,0,5,6,1,6,6,2,3,6,3,5,6,4,3,6,6,3,6,8,5,6,10,2,6,11,14,7,0,5,7,1,5,7,2,1,7,3,3,7,5,3,7,6,1,7,8,1,7,10,3,7,11,20,8,0,5,8,1,2,8,2,3,8,3,7,8,5,1,8,6,2,8,8,5,8,10,4,8,11,12],[0,0,43,0,1,59,0,2,17,0,3,28,0,4,6,0,5,6,0,6,9,0,7,3,0,8,9,0,9,9,0,10,29,0,11,44,1,0,37,1,1,47,1,2,24,1,3,42,1,4,11,1,5,6,1,6,10,1,7,2,1,8,11,1,9,4,1,10,29,1,11,29,2,0,26,2,1,40,2,2,15,2,3,26,2,4,6,2,5,9,2,6,2,2,7,2,2,8,2,2,9,8,2,10,21,2,11,26,3,0,33,3,1,45,3,2,23,3,3,36,3,4,3,3,5,11,3,6,11,3,7,3,3,8,8,3,9,6,3,10,27,3,11,33,4,0,54,4,1,44,4,2,22,4,3,30,4,4,4,4,5,2,4,6,17,4,7,4,4,8,7,4,9,2,4,10,16,4,11,37,5,0,46,5,1,44,5,2,32,5,3,50,5,4,4,5,5,7,5,6,10,5,7,3,5,8,3,5,9,5,5,10,10,5,11,47,6,0,22,6,1,51,6,2,24,6,3,35,6,4,9,6,5,8,6,6,15,6,7,4,6,8,6,6,9,3,6,10,23,6,11,56,7,0,33,7,1,62,7,2,21,7,3,37,7,4,11,7,5,3,7,6,10,7,7,6,7,8,5,7,9,7,7,10,16,7,11,85,8,0,18,8,1,26,8,2,21,8,3,25,8,4,1,8,5,6,8,6,9,8,7,3,8,8,3,8,9,5,8,10,6,8,11,65],[0,0,16,0,1,15,0,2,17,0,3,4,0,4,26,0,5,7,0,6,4,0,7,4,0,8,2,0,10,5,0,11,21,1,0,22,1,1,18,1,2,9,1,3,5,1,4,24,1,5,10,1,6,7,1,7,3,1,8,1,1,9,1,1,10,10,1,11,19,2,0,9,2,1,5,2,2,7,2,3,4,2,4,12,2,5,2,2,6,3,2,7,2,2,8,2,2,9,2,2,10,6,2,11,25,3,0,20,3,1,12,3,2,14,3,3,9,3,4,12,3,5,8,3,6,3,3,7,2,3,8,2,3,9,3,3,10,7,3,11,21,4,0,25,4,1,13,4,2,8,4,3,4,4,4,28,4,5,3,4,6,3,4,7,1,4,8,1,4,9,3,4,10,10,4,11,27,5,0,31,5,1,11,5,2,9,5,3,4,5,4,25,5,5,5,5,6,4,5,7,3,5,8,3,5,9,2,5,10,5,5,11,69,6,0,14,6,1,9,6,2,9,6,3,9,6,4,116,6,5,6,6,6,1,6,7,5,6,9,4,6,10,4,6,11,28,7,0,13,7,1,8,7,2,10,7,3,13,7,4,37,7,5,10,7,6,3,7,7,3,7,8,2,7,9,1,7,10,6,7,11,36,8,0,8,8,1,6,8,2,11,8,3,7,8,4,95,8,5,5,8,6,4,8,7,5,8,8,4,8,9,3,8,10,4,8,11,36],[0,1,3,0,2,2,0,3,2,0,5,1,0,6,2,0,9,3,0,10,1,0,11,3,1,0,7,1,1,1,1,2,3,1,4,1,1,5,1,1,6,1,1,10,1,1,11,2,2,0,2,2,1,3,2,2,3,2,3,5,2,8,1,3,0,2,3,1,1,3,2,1,3,3,7,3,6,1,3,9,1,3,11,2,4,0,6,4,1,1,4,2,5,4,3,1,4,4,1,4,5,1,4,11,1,5,0,7,5,2,4,5,3,2,5,8,1,5,10,3,5,11,6,6,0,2,6,1,3,6,2,1,6,3,2,6,5,2,6,9,1,6,11,8,7,0,2,7,1,4,7,2,1,7,3,1,7,4,1,7,5,3,7,8,1,7,10,1,7,11,2,8,0,2,8,1,5,8,2,3,8,3,4,8,5,3,8,6,1,8,8,1,8,9,1,8,10,2,8,11,2],[0,0,10,0,1,3,0,2,3,0,3,5,0,5,2,0,6,1,0,7,1,0,8,3,0,9,2,0,10,1,0,11,5,1,0,13,1,1,3,1,2,3,1,3,4,1,6,1,1,8,1,1,9,1,1,11,4,2,0,11,2,1,7,2,2,2,2,3,1,2,6,1,2,7,1,2,8,1,2,9,1,2,10,2,2,11,7,3,0,7,3,1,1,3,2,2,3,3,3,3,4,2,3,5,1,3,6,1,3,10,2,3,11,3,4,0,14,4,1,6,4,2,2,4,3,3,4,5,2,4,8,2,4,10,4,4,11,7,5,0,15,5,1,4,5,2,1,5,3,4,5,6,1,5,8,1,5,9,1,5,10,2,5,11,5,6,0,4,6,1,3,6,2,4,6,3,4,6,5,1,6,7,1,6,9,2,6,10,1,6,11,3,7,0,5,7,1,2,7,2,4,7,3,4,7,5,1,7,9,1,7,10,3,7,11,3,8,0,11,8,1,3,8,2,1,8,3,2,8,8,1,8,10,2,8,11,6],[0,0,24,0,1,3,0,2,11,0,3,1,0,4,12,0,5,7,0,6,8,0,7,3,0,8,5,0,9,8,0,10,8,0,11,22,1,0,27,1,1,6,1,2,14,1,3,4,1,4,6,1,5,9,1,6,2,1,7,9,1,8,2,1,9,1,1,10,9,1,11,24,2,0,39,2,1,4,2,2,4,2,3,11,2,4,3,2,5,2,2,6,6,2,7,4,2,8,1,2,9,2,2,10,5,2,11,26,3,0,33,3,1,2,3,2,6,3,3,5,3,4,11,3,5,9,3,6,3,3,7,4,3,9,4,3,10,8,3,11,17,4,0,43,4,1,3,4,2,5,4,3,6,4,4,9,4,5,3,4,6,4,4,7,3,4,8,1,4,9,2,4,10,3,4,11,17,5,0,32,5,1,4,5,2,5,5,3,2,5,4,7,5,5,6,5,6,8,5,7,2,5,8,1,5,9,2,5,10,8,5,11,13,6,0,12,6,1,3,6,2,4,6,3,6,6,4,3,6,5,7,6,6,4,6,7,4,6,8,3,6,9,1,6,10,7,6,11,21,7,0,7,7,1,10,7,2,4,7,3,9,7,4,4,7,5,9,7,6,4,7,7,8,7,8,1,7,9,2,7,10,8,7,11,20,8,0,6,8,1,3,8,2,6,8,3,5,8,4,4,8,5,8,8,6,7,8,7,3,8,8,3,8,9,4,8,10,5,8,11,25],[0,0,16,0,1,22,0,2,4,0,3,5,0,5,3,0,8,2,0,9,3,0,10,3,0,11,10,1,0,8,1,1,13,1,2,6,1,3,7,1,5,1,1,6,1,1,7,1,1,9,3,1,10,4,1,11,7,2,0,4,2,1,7,2,2,7,2,3,2,2,5,2,2,9,1,2,10,1,2,11,7,3,0,3,3,1,12,3,2,3,3,3,3,3,5,4,3,6,1,3,8,2,3,11,9,4,0,5,4,1,9,4,2,1,4,3,1,4,7,1,4,9,1,4,10,3,4,11,12,5,0,13,5,1,14,5,2,3,5,3,1,5,4,1,5,5,5,5,6,2,5,7,1,5,10,1,5,11,15,6,0,10,6,1,8,6,2,5,6,3,2,6,5,3,6,7,1,6,8,1,6,9,1,6,10,1,6,11,14,7,0,6,7,1,8,7,2,2,7,5,5,7,6,2,7,7,3,7,8,3,7,10,1,7,11,21,8,0,7,8,1,10,8,2,8,8,3,3,8,5,4,8,8,1,8,9,2,8,11,19],[0,2,1,0,3,1,0,5,1,0,6,1,0,8,2,0,10,1,1,0,1,1,1,2,1,2,2,1,3,1,1,8,2,1,10,1,1,11,2,2,0,2,2,6,2,2,10,1,2,11,1,3,0,2,3,1,1,3,2,1,3,3,2,3,6,1,3,9,1,3,10,1,3,11,1,4,0,5,4,1,1,4,3,1,4,5,2,4,8,2,4,10,4,5,0,4,5,3,2,5,5,1,5,11,1,6,1,2,6,2,1,6,8,1,6,11,4,7,5,1,7,10,1,7,11,7,8,0,1,8,1,2,8,3,1,8,5,3,8,10,1,8,11,6],[0,0,2,0,1,2,0,2,4,0,4,2,0,5,2,0,7,1,0,10,5,0,11,2,1,0,6,1,1,2,1,2,5,1,3,1,1,10,1,1,11,4,2,1,4,2,2,2,2,4,2,2,5,1,2,7,1,2,10,1,2,11,1,3,0,4,3,1,2,3,2,1,3,3,1,3,4,2,3,6,1,3,9,3,3,10,1,3,11,4,4,0,5,4,1,3,4,2,1,4,4,1,4,8,1,4,11,5,5,0,7,5,1,2,5,3,1,5,11,2,6,0,1,6,2,3,6,6,1,6,10,4,6,11,2,7,0,3,7,2,1,7,4,1,7,5,1,7,9,1,7,10,2,7,11,4,8,0,1,8,1,1,8,2,5,8,4,1,8,7,1,8,10,2,8,11,4],[0,0,3,0,1,1,0,2,8,0,3,2,0,4,4,0,5,2,0,7,2,0,10,2,0,11,5,1,0,5,1,1,2,1,2,2,1,3,1,1,4,4,1,7,1,1,10,1,1,11,4,2,0,9,2,2,1,2,3,1,2,4,3,2,6,1,2,7,2,2,8,1,2,9,1,2,11,11,3,0,9,3,1,1,3,2,3,3,3,3,3,5,1,3,6,1,3,7,2,3,9,1,3,10,1,3,11,8,4,0,9,4,1,1,4,2,4,4,3,2,4,6,1,4,7,2,4,11,11,5,0,9,5,2,1,5,4,1,5,7,2,5,8,1,5,10,3,5,11,12,6,0,4,6,2,3,6,3,3,6,4,1,6,5,1,6,6,2,6,8,1,6,11,12,7,0,4,7,2,1,7,3,1,7,5,2,7,6,1,7,7,2,7,8,1,7,9,1,7,10,2,7,11,12,8,2,2,8,3,1,8,6,1,8,7,1,8,9,1,8,11,11],[0,0,2,0,1,3,0,2,1,0,3,4,0,8,1,0,10,2,0,11,5,1,0,3,1,1,2,1,10,1,1,11,2,2,0,2,2,3,1,2,11,2,3,0,5,3,1,2,3,2,2,3,3,1,3,5,1,3,9,1,3,11,2,4,0,6,4,1,3,4,2,1,4,3,2,4,5,1,4,8,1,4,9,1,4,11,3,5,0,7,5,1,3,5,2,1,5,10,1,6,0,7,6,1,3,6,3,2,6,11,3,7,1,2,7,3,2,7,5,1,7,11,4,8,0,2,8,1,1,8,2,1,8,3,1,8,11,3],[0,0,7,0,2,6,0,3,1,0,5,3,0,7,1,0,10,1,0,11,6,1,0,6,1,1,6,1,2,3,1,4,1,1,5,1,1,6,3,1,7,3,1,9,1,1,10,3,1,11,2,2,0,5,2,1,5,2,2,1,2,3,1,2,4,2,2,5,1,2,7,2,2,8,1,2,9,2,2,11,7,3,0,1,3,1,3,3,2,1,3,4,3,3,5,1,3,6,1,3,9,1,3,10,1,3,11,3,4,0,7,4,1,2,4,5,1,4,7,1,4,8,2,4,9,1,4,11,5,5,0,4,5,1,4,5,2,1,5,3,6,5,4,1,5,6,2,5,7,3,5,8,1,5,10,5,5,11,6,6,0,5,6,1,4,6,2,1,6,3,4,6,7,3,6,10,1,6,11,13,7,0,3,7,1,4,7,2,3,7,3,3,7,6,1,7,7,2,7,8,1,7,9,2,7,10,3,7,11,13,8,0,2,8,1,1,8,2,1,8,3,4,8,6,1,8,7,1,8,8,1,8,10,1,8,11,13],[0,0,3,0,1,1,0,3,3,0,4,1,0,6,2,0,7,1,0,8,1,0,9,3,0,10,1,0,11,1,1,0,12,1,1,1,1,3,2,1,4,1,1,5,1,1,6,2,1,9,1,1,10,1,1,11,4,2,0,6,2,1,1,2,2,1,2,3,4,2,4,1,2,5,2,2,7,3,2,11,4,3,0,4,3,2,3,3,3,5,3,4,1,3,5,1,3,6,2,3,9,2,3,10,2,3,11,1,4,0,12,4,3,2,4,6,1,4,7,1,4,10,1,4,11,4,5,0,1,5,1,2,5,2,2,5,3,5,5,4,1,5,5,1,5,7,2,5,9,2,5,10,1,5,11,3,6,0,1,6,2,3,6,3,4,6,4,1,6,5,1,6,6,1,6,7,1,6,8,1,6,9,1,6,10,2,6,11,9,7,1,3,7,3,2,7,4,1,7,6,1,7,7,3,7,10,2,7,11,4,8,1,1,8,2,1,8,3,2,8,5,1,8,6,2,8,7,4,8,8,1,8,9,1,8,10,1,8,11,3],[0,1,1,1,3,2,1,11,2,2,0,1,2,2,1,2,4,1,2,5,1,2,11,1,5,0,1,6,1,1,7,11,1,8,11,1],[0,0,2,0,3,1,0,7,2,0,11,1,1,0,3,1,6,1,1,11,1,2,0,1,2,2,1,2,4,1,2,6,1,3,1,1,3,2,1,3,11,1,4,0,2,4,2,1,4,3,1,4,4,1,4,11,1,5,1,1,5,5,1,5,11,1,7,0,2,7,11,2,8,10,1],[2,0,1,3,4,1,4,0,1],[0,0,3,0,1,1,0,2,1,0,3,1,0,5,1,0,11,2,1,0,2,1,1,4,1,2,1,1,5,1,1,8,1,1,10,2,1,11,2,2,0,4,2,1,5,2,2,1,2,3,2,2,5,2,2,8,2,2,11,7,3,0,10,3,1,2,3,2,1,3,3,1,3,4,1,3,5,2,3,11,2,4,0,3,4,1,3,4,2,4,4,3,1,4,9,1,4,10,1,4,11,2,5,0,3,5,1,3,5,2,4,5,3,1,5,5,3,5,7,1,5,11,3,6,0,5,6,1,2,6,2,1,6,5,4,6,9,1,6,11,2,7,0,1,7,1,10,7,2,3,7,3,2,7,5,2,7,8,1,7,11,8,8,0,2,8,1,4,8,2,4,8,3,4,8,5,11,8,11,5],[0,0,9,0,1,3,0,2,4,0,3,1,0,5,1,0,6,2,0,7,3,0,9,1,0,10,1,0,11,7,1,0,8,1,1,1,1,2,2,1,3,3,1,4,1,1,5,1,1,6,3,1,7,3,1,8,1,1,10,1,1,11,4,2,0,5,2,1,2,2,2,1,2,3,5,2,6,2,2,7,6,2,11,3,3,0,8,3,1,1,3,2,2,3,3,3,3,5,1,3,6,3,3,7,1,3,9,1,3,10,3,3,11,5,4,0,11,4,2,4,4,3,4,4,5,1,4,6,1,4,7,1,4,8,2,4,9,3,4,10,4,4,11,3,5,0,7,5,1,1,5,2,3,5,3,1,5,7,4,5,8,1,5,10,4,5,11,1,6,0,4,6,1,2,6,2,2,6,3,4,6,5,3,6,6,2,6,7,2,6,8,2,6,10,2,6,11,11,7,0,2,7,1,6,7,2,3,7,3,3,7,5,7,7,6,3,7,9,1,7,10,2,7,11,7,8,0,4,8,1,1,8,2,2,8,3,5,8,5,4,8,6,1,8,7,1,8,8,1,8,10,3,8,11,5],[0,0,3,0,2,1,0,6,4,0,7,3,0,11,2,1,0,2,1,2,1,1,6,1,1,7,1,1,10,1,1,11,1,2,0,1,2,2,2,2,3,1,2,6,1,2,9,1,2,11,1,3,0,3,3,2,3,3,3,1,3,4,1,3,7,1,3,9,1,4,0,2,4,2,1,4,4,3,4,8,1,4,11,2,5,0,2,5,6,1,5,7,1,5,10,1,5,11,3,7,0,1,7,2,1,7,3,1,7,4,1,7,10,3,7,11,5,8,0,1,8,2,2,8,3,2],[0,0,12,0,1,8,0,2,5,0,3,4,0,4,5,0,5,1,0,6,4,0,7,3,0,8,2,0,9,2,0,10,2,0,11,9,1,0,10,1,1,5,1,2,6,1,3,4,1,4,3,1,5,2,1,6,1,1,7,3,1,8,2,1,10,4,1,11,12,2,0,9,2,1,2,2,2,2,2,3,2,2,4,1,2,5,1,2,6,2,2,7,2,2,8,1,2,10,5,2,11,5,3,0,3,3,1,5,3,2,3,3,3,1,3,4,1,3,5,3,3,6,2,3,7,2,3,8,1,3,10,3,3,11,6,4,0,13,4,1,6,4,2,7,4,4,2,4,5,3,4,6,2,4,7,5,4,10,8,4,11,7,5,0,13,5,1,5,5,2,5,5,4,2,5,6,2,5,7,3,5,9,1,5,10,4,5,11,7,6,0,5,6,1,4,6,2,3,6,3,2,6,4,10,6,5,3,6,6,4,6,7,2,6,8,3,6,9,1,6,10,1,6,11,10,7,0,2,7,1,8,7,4,9,7,5,2,7,6,1,7,7,2,7,8,1,7,9,1,7,10,7,7,11,9,8,0,5,8,1,2,8,2,2,8,4,1,8,5,1,8,7,1,8,8,2,8,9,2,8,10,2,8,11,5],[0,0,3,0,1,2,0,2,2,0,3,1,0,6,1,0,7,3,0,11,6,1,0,4,1,1,2,1,2,3,1,3,1,1,4,1,1,7,1,1,9,1,1,11,1,2,0,9,2,2,1,2,4,2,2,6,3,2,7,1,2,10,1,2,11,1,3,0,8,3,2,1,3,3,1,3,6,1,3,7,1,3,10,1,3,11,4,4,0,2,4,1,1,4,4,1,4,6,1,4,7,1,4,10,1,4,11,4,5,0,9,5,1,1,5,3,1,5,4,1,5,8,1,5,9,1,5,10,1,5,11,1,6,0,1,6,1,1,6,3,1,6,6,1,6,7,1,6,9,2,6,10,1,6,11,6,7,0,2,7,2,2,7,7,1,7,10,1,7,11,2,8,0,4,8,5,2,8,11,4],[0,1,2,0,2,4,0,5,1,0,8,1,0,10,1,1,0,4,1,2,1,1,7,2,1,10,1,1,11,1,2,0,2,2,1,1,2,2,2,2,3,2,2,4,1,2,6,1,2,9,1,2,11,4,3,0,7,3,1,1,3,2,3,3,4,4,3,7,2,3,10,1,3,11,5,4,0,1,4,4,1,4,5,1,4,6,1,4,7,1,4,11,6,5,0,2,5,2,1,5,3,2,5,5,1,5,7,1,5,11,4,6,0,4,6,1,1,6,2,1,6,4,1,6,5,3,6,10,3,6,11,3,7,0,1,7,2,3,7,3,1,7,5,1,7,7,1,7,8,1,7,10,1,7,11,4,8,0,1,8,4,1,8,5,2,8,6,1,8,7,2,8,10,1,8,11,7],[0,1,1,0,6,1,0,8,1,0,11,1,1,0,1,2,0,1,2,2,1,2,6,1,2,11,1,3,0,1,3,11,3,4,0,1],[0,0,5,0,1,4,0,2,1,0,3,2,0,6,1,0,7,2,0,8,1,0,9,1,0,10,3,0,11,2,1,0,6,1,1,3,1,2,1,1,4,1,1,5,1,1,6,1,1,7,1,1,11,4,2,0,6,2,1,3,2,2,3,2,3,4,2,8,1,2,10,3,2,11,7,3,0,7,3,1,2,3,2,6,3,3,3,3,6,1,3,8,2,3,10,2,3,11,5,4,0,4,4,3,2,4,4,1,4,5,1,4,7,1,5,0,6,5,1,5,5,2,1,5,3,2,5,5,1,5,6,1,5,8,1,5,9,1,5,10,1,5,11,7,6,0,4,6,1,3,6,2,1,6,3,1,6,10,1,6,11,4,7,0,1,7,1,3,7,2,2,7,3,3,7,6,1,7,9,1,7,10,1,7,11,7,8,0,6,8,1,1,8,2,1,8,3,1,8,5,1,8,6,2,8,10,3,8,11,2],[0,0,2,0,3,1,0,4,1,3,0,2,3,6,2,3,8,1,3,10,2,3,11,1,4,0,2,4,1,1,4,8,2,4,10,4,4,11,1,5,0,3,5,1,1,5,7,1,5,11,1,6,1,1,6,8,1,6,10,2,7,1,1,7,2,1,7,7,1,7,11,1,8,2,1,8,3,2,8,6,1,8,7,1,8,8,1],[0,1,1,0,2,1,0,3,2,0,7,1,0,8,1,0,9,1,0,11,2,1,0,1,1,2,1,1,3,1,1,11,1,2,0,1,2,3,2,2,7,1,2,10,1,2,11,2,3,0,2,3,1,1,3,2,1,3,3,2,3,6,1,3,7,2,3,11,2,4,0,2,4,1,1,4,3,1,4,5,1,4,6,2,4,7,1,4,8,1,4,9,1,4,10,1,5,0,5,5,1,1,5,3,2,5,4,1,5,6,2,5,8,3,5,10,2,5,11,3,6,0,1,6,2,1,6,5,1,6,7,1,6,10,2,6,11,6,7,1,1,7,3,2,7,4,1,7,8,1,7,11,8,8,0,3,8,2,2,8,3,1,8,5,4,8,6,1,8,11,2],[0,0,2,0,1,2,0,2,3,0,3,7,0,7,3,0,9,1,0,10,2,0,11,8,1,0,3,1,1,4,1,2,3,1,3,3,1,5,3,1,7,1,1,8,1,1,10,2,1,11,3,2,0,9,2,1,1,2,2,2,2,3,5,2,4,1,2,5,2,2,6,1,2,7,2,2,8,1,2,9,1,2,10,1,2,11,7,3,0,5,3,1,2,3,2,8,3,3,7,3,5,2,3,6,1,3,7,1,3,8,1,3,9,3,3,10,2,4,0,11,4,1,1,4,2,1,4,3,6,4,4,2,4,5,3,4,6,2,4,7,2,4,8,1,4,9,1,4,10,2,4,11,9,5,0,9,5,1,4,5,2,2,5,3,3,5,4,1,5,5,1,5,6,1,5,7,1,5,8,3,5,11,5,6,0,1,6,1,2,6,2,2,6,4,1,6,5,4,6,6,1,6,7,1,6,8,1,6,9,1,6,10,2,6,11,6,7,0,7,7,1,3,7,2,2,7,3,4,7,4,1,7,5,3,7,6,2,7,7,1,7,10,2,7,11,5,8,0,11,8,1,2,8,2,4,8,3,5,8,4,1,8,5,2,8,6,1,8,7,2,8,8,1,8,9,2,8,10,2,8,11,8],[0,2,2,0,3,2,0,5,1,0,8,1,0,10,1,1,0,2,1,1,12,1,2,1,1,3,4,1,5,1,1,6,1,1,10,1,1,11,1,2,0,2,2,1,2,2,2,1,2,5,1,2,7,1,2,11,2,3,0,4,3,1,3,3,2,1,3,3,2,3,5,1,3,7,1,3,10,2,4,0,1,4,1,1,4,2,1,4,3,3,4,7,1,4,9,2,5,0,2,5,2,1,5,3,3,5,6,1,5,7,1,5,8,1,5,9,1,6,2,1,6,3,2,6,4,1,6,5,4,6,6,1,6,9,1,6,11,2,7,0,3,7,1,1,7,2,4,7,5,2,7,7,1,7,9,1,7,10,2,7,11,3,8,1,1,8,2,3,8,3,1,8,5,2,8,7,1,8,11,4],[0,0,1,0,1,1,0,3,2,0,11,2,1,0,2,1,2,2,1,5,1,1,11,3,2,6,1,2,9,2,2,11,1,3,0,1,3,3,1,3,7,2,4,0,2,4,3,2,4,11,1,5,0,2,5,3,1,5,6,3,6,8,1,6,11,1,7,0,2,7,3,3,7,11,2,8,0,1,8,3,2,8,4,1,8,7,1,8,10,1,8,11,1],[0,0,5,0,1,5,0,2,2,0,3,2,0,4,1,0,5,1,0,6,2,0,7,1,0,8,1,0,10,1,0,11,5,1,0,5,1,1,3,1,2,2,1,4,1,1,5,4,1,8,1,1,10,1,1,11,3,2,0,2,2,1,3,2,2,1,2,3,3,2,4,1,2,5,1,2,7,1,2,10,1,2,11,4,3,0,2,3,1,2,3,2,4,3,3,1,3,5,1,3,6,2,3,9,1,3,10,2,3,11,2,4,0,6,4,2,3,4,3,3,4,4,1,4,5,2,4,7,1,4,10,1,4,11,1,5,0,3,5,2,1,5,3,2,5,4,1,5,5,1,5,6,1,5,7,2,5,10,2,5,11,5,6,0,3,6,1,3,6,6,1,6,7,2,6,10,1,6,11,6,7,0,1,7,1,2,7,2,4,7,3,1,7,5,2,7,6,1,7,7,1,7,8,1,7,10,1,7,11,2,8,0,5,8,2,4,8,3,2,8,5,1,8,7,2,8,11,6],[0,0,9,0,1,27,0,2,8,0,3,4,0,5,4,0,6,2,0,7,1,0,8,2,0,9,4,0,10,3,0,11,11,1,0,14,1,1,12,1,2,1,1,3,2,1,4,3,1,5,3,1,6,2,1,7,1,1,8,2,1,10,3,1,11,16,2,0,11,2,1,5,2,2,6,2,3,5,2,6,1,2,9,1,2,10,2,2,11,6,3,0,15,3,1,13,3,2,5,3,3,6,3,4,2,3,5,2,3,6,2,3,7,4,3,8,1,3,9,1,3,10,3,3,11,10,4,0,13,4,1,8,4,2,6,4,3,12,4,4,1,4,5,2,4,7,1,4,8,2,4,10,3,4,11,7,5,0,10,5,1,11,5,2,4,5,3,2,5,4,1,5,5,1,5,6,1,5,7,3,5,8,2,5,9,1,5,10,2,5,11,15,6,0,10,6,1,9,6,2,4,6,3,1,6,7,2,6,10,4,6,11,13,7,0,5,7,1,9,7,2,4,7,3,4,7,5,2,7,6,1,7,7,2,7,9,1,7,10,2,7,11,12,8,0,9,8,1,9,8,2,2,8,3,3,8,5,1,8,6,3,8,7,2,8,8,1,8,9,1,8,10,2,8,11,11],[0,0,21,0,1,10,0,2,6,0,3,5,0,4,12,0,5,5,0,6,3,0,7,1,0,9,1,0,10,8,0,11,20,1,0,26,1,1,11,1,2,3,1,3,8,1,4,12,1,5,3,1,6,4,1,7,1,1,8,3,1,9,1,1,10,7,1,11,24,2,0,11,2,1,17,2,2,4,2,3,7,2,4,1,2,5,3,2,6,3,2,8,2,2,9,3,2,10,5,2,11,6,3,0,20,3,1,10,3,2,6,3,3,10,3,4,2,3,5,5,3,6,5,3,7,3,3,8,2,3,9,3,3,10,2,3,11,9,4,0,27,4,1,10,4,2,7,4,3,4,4,4,2,4,5,5,4,6,2,4,7,3,4,9,1,4,10,7,4,11,13,5,0,36,5,1,17,5,2,10,5,3,9,5,4,2,5,5,1,5,6,3,5,8,4,5,9,1,5,10,2,5,11,16,6,0,8,6,1,14,6,2,1,6,3,5,6,4,16,6,5,2,6,6,3,6,7,2,6,8,2,6,9,4,6,10,3,6,11,21,7,0,10,7,1,11,7,2,6,7,3,4,7,4,2,7,5,1,7,6,3,7,8,2,7,9,4,7,10,6,7,11,25,8,0,16,8,1,12,8,2,4,8,3,12,8,4,5,8,5,4,8,6,3,8,7,2,8,8,2,8,9,1,8,10,6,8,11,19],[0,0,7,0,1,4,0,2,1,0,3,3,0,4,1,0,6,4,0,8,1,0,9,1,0,11,2,1,0,3,1,1,1,1,2,3,1,3,5,1,5,3,1,6,4,1,11,2,2,0,2,2,2,1,2,3,4,2,4,1,2,6,1,2,9,1,2,10,1,2,11,3,3,0,11,3,2,1,3,3,3,3,5,2,3,8,1,3,9,1,3,10,4,3,11,4,4,0,6,4,1,2,4,3,2,4,6,3,4,7,1,4,8,2,4,10,1,5,0,5,5,1,2,5,2,2,5,5,1,5,7,1,5,8,1,5,11,2,6,0,2,6,3,2,6,5,1,6,8,1,6,11,2,7,0,3,7,2,1,7,3,2,7,4,1,7,5,3,7,6,3,7,7,1,7,10,1,7,11,3,8,0,1,8,1,3,8,2,3,8,3,5,8,5,3,8,7,2,8,10,1,8,11,8],[0,0,4,0,2,1,0,4,2,0,5,1,0,11,3,1,0,1,1,1,1,1,2,2,1,5,2,1,7,1,1,9,1,1,10,1,1,11,3,2,0,2,2,1,1,2,2,1,2,3,3,2,4,1,2,8,1,2,11,3,3,0,4,3,2,1,3,5,1,3,6,1,3,10,2,3,11,2,4,0,11,4,2,1,4,6,1,4,7,1,4,11,6,5,0,1,5,3,2,5,5,2,5,6,1,5,8,2,5,9,1,5,10,3,5,11,5,6,0,2,6,5,1,6,7,2,6,8,1,6,11,1,7,0,1,7,1,2,7,3,2,7,4,1,7,5,2,7,6,2,7,11,4,8,0,1,8,5,1,8,6,1,8,7,1,8,8,1,8,9,1,8,11,4],[0,0,13,0,1,15,0,2,21,0,3,21,0,4,84,0,5,12,0,6,5,0,7,5,0,9,2,0,10,9,0,11,34,1,0,17,1,1,9,1,2,23,1,3,20,1,4,59,1,5,9,1,6,9,1,7,3,1,9,2,1,10,8,1,11,26,2,0,15,2,1,16,2,2,10,2,3,15,2,4,21,2,5,3,2,6,2,2,7,2,2,8,3,2,9,3,2,10,7,2,11,19,3,0,17,3,1,11,3,2,8,3,3,20,3,4,17,3,5,8,3,6,5,3,7,4,3,8,2,3,9,4,3,10,6,3,11,18,4,0,32,4,1,17,4,2,14,4,3,10,4,4,13,4,5,18,4,6,2,4,8,2,4,9,3,4,10,11,4,11,20,5,0,18,5,1,10,5,2,14,5,3,6,5,4,12,5,5,13,5,6,6,5,7,6,5,8,1,5,9,4,5,10,5,5,11,27,6,0,10,6,1,8,6,2,8,6,3,5,6,4,38,6,5,13,6,6,1,6,7,2,6,8,3,6,9,4,6,10,10,6,11,26,7,0,8,7,1,17,7,2,9,7,3,12,7,4,10,7,5,7,7,6,6,7,7,4,7,8,3,7,9,4,7,10,9,7,11,27,8,0,2,8,1,11,8,2,8,8,3,14,8,4,30,8,5,16,8,6,4,8,7,5,8,8,4,8,9,3,8,10,7,8,11,34],[0,0,6,0,1,3,0,3,1,0,5,5,0,6,1,0,7,1,0,10,2,0,11,11,1,0,7,1,2,4,1,3,2,1,4,3,1,5,9,1,10,2,1,11,6,2,0,4,2,1,4,2,2,4,2,3,1,2,4,1,2,5,2,2,6,1,2,7,1,2,9,2,2,11,7,3,0,3,3,1,4,3,2,1,3,3,2,3,4,1,3,5,3,3,8,2,3,10,1,3,11,7,4,0,9,4,1,3,4,2,2,4,3,2,4,5,3,4,11,8,5,0,4,5,1,5,5,2,2,5,3,2,5,5,7,5,6,3,5,7,2,5,8,2,5,9,3,5,11,7,6,0,5,6,3,4,6,5,4,6,6,1,6,9,2,6,10,2,6,11,4,7,2,1,7,3,1,7,5,5,7,7,1,7,9,1,7,10,2,7,11,6,8,0,4,8,2,1,8,3,3,8,5,2,8,8,2,8,9,1,8,10,3,8,11,12],[0,0,7,0,2,1,0,3,1,0,4,2,0,6,2,0,7,2,0,8,1,0,9,1,0,11,3,1,0,5,1,2,1,1,4,2,1,5,4,1,6,1,1,8,1,1,9,3,1,10,2,1,11,8,2,0,6,2,1,1,2,3,3,2,5,3,2,6,2,2,7,1,2,9,1,2,10,1,2,11,6,3,0,5,3,1,1,3,2,2,3,3,2,3,4,2,3,5,1,3,6,1,3,7,1,3,9,1,3,11,2,4,0,9,4,1,1,4,2,2,4,4,1,4,7,1,4,8,1,4,11,4,5,0,6,5,3,3,5,7,3,5,11,4,6,0,1,6,1,1,6,3,3,6,4,1,6,6,2,6,7,1,6,10,2,6,11,10,7,0,1,7,2,1,7,3,2,7,4,1,7,5,1,7,6,2,7,7,2,7,8,1,7,10,4,7,11,8,8,0,1,8,1,1,8,2,1,8,3,2,8,5,1,8,7,1,8,8,3,8,9,1,8,10,1,8,11,4],[0,0,1,0,2,1,0,3,4,0,5,1,0,10,1,0,11,2,1,0,5,1,1,1,1,2,1,1,3,1,1,10,1,1,11,3,2,0,2,2,4,1,2,7,1,2,9,1,3,0,5,3,1,3,3,2,1,3,3,1,3,5,1,3,7,1,3,8,1,3,10,1,3,11,1,4,0,4,4,2,1,4,3,1,4,5,1,4,7,2,4,9,1,4,10,1,4,11,3,5,0,4,5,1,2,5,3,1,5,4,1,5,7,1,5,11,4,6,0,1,6,1,1,6,11,2,7,0,3,7,2,2,7,3,1,7,6,2,7,8,1,7,11,3,8,3,1,8,7,4,8,10,1,8,11,1],[0,0,9,0,1,7,0,2,5,0,4,1,0,5,1,0,6,2,0,7,2,0,9,3,0,10,2,0,11,5,1,0,1,1,1,1,1,2,8,1,4,4,1,7,1,1,9,2,1,10,1,1,11,5,2,0,12,2,1,1,2,2,2,2,4,2,2,5,1,2,6,1,2,10,1,2,11,6,3,0,10,3,1,3,3,3,1,3,4,2,3,6,3,3,7,1,3,8,1,3,10,2,3,11,3,4,0,13,4,1,1,4,2,2,4,4,1,4,7,2,4,10,1,4,11,5,5,0,5,5,1,1,5,2,2,5,3,1,5,5,1,5,7,1,5,8,2,5,10,2,5,11,7,6,0,5,6,1,2,6,2,5,6,4,1,6,7,1,6,8,1,6,10,1,6,11,5,7,0,4,7,1,3,7,2,1,7,3,1,7,4,5,7,10,3,7,11,12,8,0,2,8,1,1,8,2,3,8,3,1,8,4,4,8,5,1,8,7,2,8,11,6],[0,0,7,0,1,1,0,2,2,0,3,1,0,4,1,0,5,1,0,8,2,0,11,1,1,0,3,1,1,1,1,2,2,1,3,1,1,4,2,1,6,1,1,7,1,1,10,1,1,11,7,2,0,7,2,2,1,2,4,4,2,6,2,2,8,1,2,9,1,2,11,8,3,0,7,3,2,5,3,5,2,3,6,2,3,9,2,3,10,1,3,11,3,4,0,2,4,2,4,4,5,1,4,6,1,4,10,3,4,11,4,5,0,1,5,1,2,5,2,1,5,4,2,5,6,3,5,7,1,5,9,1,5,10,1,5,11,1,6,0,3,6,4,1,6,5,1,6,6,1,6,7,2,6,10,1,6,11,2,7,0,1,7,2,2,7,4,1,7,9,1,7,11,5,8,2,2,8,5,4,8,11,8],[0,0,1,0,1,2,0,2,2,0,3,2,0,7,2,0,11,4,1,0,2,1,1,2,1,2,4,1,5,1,1,7,1,1,11,1,2,0,2,2,1,1,2,5,1,2,6,1,2,7,1,2,8,1,2,11,3,3,0,6,3,2,1,3,3,2,3,4,1,3,5,3,3,10,1,3,11,2,4,2,2,4,5,2,4,10,1,4,11,1,5,3,1,5,4,1,5,6,1,6,5,1,6,10,2,6,11,2,7,5,1,7,11,1,8,6,1,8,11,2],[0,0,2,0,3,2,0,8,1,0,10,2,0,11,1,1,0,1,1,1,1,1,3,1,1,5,1,1,7,2,1,11,4,2,0,6,2,11,3,3,0,3,3,1,1,3,3,1,3,4,3,3,7,1,3,9,2,3,10,1,4,0,3,4,1,1,4,7,1,4,10,1,5,0,1,5,4,1,5,5,1,5,6,3,5,7,1,5,11,1,6,0,1,6,1,1,6,5,2,6,10,1,6,11,2,7,0,1,7,1,1,7,5,1,7,11,2,8,5,1,8,6,1,8,10,1,8,11,2],[0,0,17,0,1,6,0,2,8,0,3,3,0,4,4,0,5,3,0,8,1,0,9,1,0,10,4,0,11,11,1,0,18,1,1,4,1,2,6,1,3,15,1,4,1,1,5,5,1,6,3,1,7,1,1,8,3,1,9,4,1,10,6,1,11,13,2,0,14,2,1,5,2,2,2,2,3,7,2,4,2,2,5,5,2,6,3,2,8,1,2,10,6,2,11,9,3,0,18,3,1,1,3,2,9,3,3,7,3,4,2,3,5,5,3,6,4,3,7,1,3,8,1,3,9,5,3,10,5,3,11,11,4,0,26,4,1,3,4,2,10,4,3,6,4,4,1,4,5,6,4,6,2,4,9,2,4,10,2,4,11,8,5,0,13,5,1,2,5,2,4,5,3,3,5,4,2,5,5,1,5,6,1,5,7,2,5,9,3,5,10,2,5,11,9,6,0,5,6,1,3,6,2,5,6,3,4,6,4,1,6,5,4,6,6,1,6,9,3,6,10,3,6,11,7,7,0,7,7,1,6,7,2,5,7,3,7,7,4,2,7,5,6,7,6,1,7,8,2,7,9,1,7,10,3,7,11,11,8,0,7,8,1,6,8,2,9,8,3,1,8,4,3,8,5,3,8,6,2,8,7,1,8,9,1,8,10,3,8,11,14],[0,0,7,0,1,1,0,2,2,0,3,2,0,4,2,0,6,3,0,7,1,0,10,3,0,11,3,1,0,3,1,1,1,1,3,1,1,4,2,1,7,2,1,10,1,1,11,11,2,0,11,2,1,1,2,2,2,2,4,3,2,6,3,2,7,1,2,8,1,2,10,1,2,11,2,3,0,9,3,2,2,3,3,2,3,4,3,3,6,4,3,8,2,3,9,1,3,10,1,3,11,3,4,0,4,4,1,1,4,2,1,4,7,1,4,10,1,4,11,6,5,0,5,5,2,1,5,4,2,5,5,1,5,6,4,5,7,1,5,10,1,5,11,3,6,0,2,6,1,1,6,5,1,6,6,1,6,9,1,6,10,1,6,11,6,7,0,1,7,1,1,7,5,1,7,6,2,7,11,9,8,0,6,8,1,1,8,3,2,8,5,1,8,6,1,8,7,1,8,11,4],[0,0,10,0,1,5,0,2,7,0,3,6,0,5,1,0,6,2,0,8,1,0,9,1,0,10,4,0,11,5,1,0,13,1,1,2,1,2,4,1,3,2,1,4,1,1,6,2,1,7,1,1,10,4,1,11,11,2,0,2,2,1,6,2,2,6,2,3,3,2,4,1,2,5,1,2,8,1,2,10,3,2,11,7,3,0,16,3,1,4,3,2,3,3,3,3,3,5,2,3,6,2,3,7,3,3,8,2,3,9,1,3,10,4,3,11,16,4,0,12,4,1,1,4,2,1,4,3,3,4,5,5,4,6,1,4,9,1,4,10,4,4,11,17,5,0,14,5,1,2,5,2,3,5,3,1,5,5,4,5,6,2,5,8,3,5,10,3,5,11,8,6,0,8,6,1,8,6,2,3,6,3,2,6,5,1,6,6,1,6,7,4,6,8,4,6,9,1,6,10,4,6,11,10,7,0,5,7,1,10,7,2,6,7,3,1,7,5,2,7,6,1,7,7,2,7,8,3,7,10,3,7,11,9,8,0,3,8,1,3,8,2,3,8,3,3,8,4,1,8,5,2,8,6,2,8,8,3,8,9,1,8,10,1,8,11,14],[0,0,7,0,3,2,0,5,1,0,6,1,1,0,3,1,3,2,1,7,1,1,11,3,2,0,2,2,3,2,2,4,1,2,7,1,2,10,1,2,11,1,3,0,6,3,2,4,3,3,2,3,6,2,3,7,2,3,11,4,4,0,5,4,3,1,4,4,1,4,7,1,4,9,1,4,11,2,5,0,5,5,1,1,5,6,1,5,7,2,6,0,4,6,1,1,6,6,2,6,7,1,6,8,2,6,10,2,6,11,5,7,0,2,7,1,1,7,2,1,7,4,2,7,5,1,7,6,1,7,7,1,7,9,2,7,10,1,7,11,2,8,3,1,8,5,1,8,6,2,8,10,1,8,11,4],[0,0,15,0,1,11,0,2,9,0,3,7,0,4,2,0,5,2,0,6,3,0,7,4,0,8,2,0,9,1,0,10,1,0,11,20,1,0,9,1,1,7,1,2,14,1,3,8,1,4,25,1,5,1,1,7,3,1,10,8,1,11,27,2,0,18,2,1,7,2,2,8,2,3,8,2,4,4,2,6,2,2,7,1,2,9,1,2,10,3,2,11,15,3,0,17,3,1,9,3,2,7,3,3,3,3,4,8,3,5,2,3,6,3,3,7,4,3,8,2,3,9,2,3,10,6,3,11,20,4,0,15,4,1,9,4,2,6,4,3,3,4,4,16,4,5,1,4,7,5,4,8,1,4,9,2,4,10,2,4,11,19,5,0,21,5,1,9,5,2,9,5,3,1,5,4,3,5,6,2,5,8,3,5,9,1,5,10,3,5,11,22,6,0,7,6,1,5,6,2,6,6,3,5,6,4,3,6,5,2,6,6,4,6,7,3,6,8,7,6,9,1,6,10,6,6,11,21,7,0,5,7,1,13,7,2,4,7,3,7,7,4,1,7,5,4,7,6,2,7,7,4,7,8,2,7,10,1,7,11,20,8,0,11,8,1,8,8,2,8,8,3,4,8,5,5,8,6,2,8,7,1,8,9,1,8,10,3,8,11,17],[0,0,6,0,1,17,0,2,7,0,3,3,0,6,4,0,8,2,0,9,1,0,10,1,0,11,7,1,0,9,1,1,9,1,2,4,1,3,2,1,4,1,1,5,1,1,6,1,1,7,1,1,8,3,1,10,1,1,11,13,2,0,8,2,1,6,2,3,2,2,4,4,2,5,1,2,6,3,2,10,1,2,11,8,3,0,12,3,1,8,3,2,3,3,3,1,3,5,4,3,6,1,3,7,1,3,8,4,3,9,2,3,10,3,3,11,15,4,0,11,4,1,3,4,2,4,4,3,1,4,6,1,4,8,2,4,9,1,4,10,2,4,11,7,5,0,13,5,1,10,5,2,2,5,3,1,5,5,3,5,8,3,5,9,2,5,10,2,5,11,18,6,0,5,6,1,9,6,2,5,6,3,3,6,4,1,6,5,2,6,8,1,6,10,5,6,11,11,7,0,2,7,1,9,7,2,2,7,3,2,7,4,1,7,5,1,7,7,1,7,10,1,7,11,7,8,0,2,8,1,5,8,3,1,8,4,2,8,5,1,8,8,3,8,11,17],[0,0,4,0,2,1,0,3,1,0,7,1,0,8,2,0,11,3,1,0,5,1,1,1,1,3,2,1,4,3,1,6,1,1,7,2,1,11,1,2,0,7,2,1,1,2,3,1,2,4,2,2,6,3,2,7,3,2,11,2,3,0,3,3,7,5,3,8,1,3,9,1,3,10,1,3,11,1,4,0,10,4,1,1,4,3,2,4,5,2,4,6,1,4,8,1,4,9,1,4,11,4,5,2,1,5,3,1,5,4,1,5,6,1,5,8,1,5,9,1,5,11,1,6,0,2,6,1,1,6,2,1,6,8,1,6,10,2,6,11,8,7,0,1,7,1,2,7,3,1,7,7,1,7,8,1,7,9,1,7,11,2,8,0,2,8,1,2,8,2,1,8,6,3,8,7,1,8,8,1,8,9,1,8,10,1,8,11,5],[0,0,7,0,1,3,0,2,2,0,3,1,0,5,5,0,8,2,0,9,1,0,11,2,1,0,11,1,1,1,1,2,1,1,3,1,1,4,1,1,5,8,1,6,1,1,7,1,1,9,1,1,10,1,1,11,2,2,0,3,2,1,3,2,2,1,2,3,4,2,5,2,2,8,1,2,11,3,3,0,4,3,1,3,3,2,1,3,3,1,3,5,15,3,8,2,3,9,1,3,11,3,4,0,8,4,1,2,4,2,1,4,3,1,4,4,1,4,5,5,4,7,1,4,9,1,4,11,2,5,0,4,5,1,4,5,3,1,5,11,5,6,0,5,6,1,3,6,2,1,6,3,2,6,4,1,6,5,2,6,8,2,6,10,4,6,11,2,7,0,9,7,1,5,7,2,3,7,3,3,7,5,7,7,9,1,7,10,1,7,11,3,8,0,6,8,1,1,8,2,2,8,3,2,8,5,4,8,8,1,8,9,1,8,10,1,8,11,1],[0,0,12,0,1,1,0,2,3,0,3,1,0,4,1,0,5,1,0,6,5,0,7,2,0,8,4,0,9,2,0,10,3,0,11,13,1,0,4,1,1,6,1,2,5,1,4,1,1,6,3,1,7,1,1,8,4,1,9,1,1,10,1,1,11,7,2,0,5,2,1,1,2,2,2,2,3,2,2,6,2,2,7,2,2,9,2,2,10,3,2,11,5,3,0,14,3,1,1,3,2,3,3,4,1,3,6,3,3,7,3,3,8,3,3,9,1,3,10,3,3,11,8,4,0,25,4,1,5,4,2,1,4,3,1,4,5,3,4,6,3,4,8,2,4,10,2,4,11,9,5,0,18,5,1,7,5,2,1,5,3,2,5,4,1,5,5,3,5,6,4,5,7,2,5,8,2,5,10,3,5,11,8,6,0,8,6,1,9,6,2,4,6,3,1,6,4,2,6,7,3,6,8,1,6,9,1,6,11,12,7,0,7,7,1,6,7,2,3,7,4,3,7,5,1,7,6,1,7,7,1,7,8,2,7,9,1,7,10,3,7,11,22,8,0,6,8,1,1,8,2,3,8,3,1,8,4,1,8,5,2,8,6,2,8,7,1,8,10,1,8,11,9],[0,0,4,0,1,4,0,2,3,0,3,1,0,4,1,0,5,2,0,6,1,0,8,1,0,10,2,0,11,2,1,0,1,1,3,3,1,4,5,1,7,1,1,10,1,1,11,2,2,0,7,2,2,3,2,3,1,2,11,2,3,0,2,3,1,3,3,2,2,3,4,2,3,5,2,3,10,1,3,11,3,4,0,3,4,1,1,4,2,1,4,11,2,5,0,2,5,1,2,5,4,1,5,6,1,5,8,1,5,11,4,6,0,2,6,1,3,6,2,3,6,3,2,6,4,7,6,8,1,7,0,1,7,1,2,7,2,3,7,3,1,7,4,1,7,6,1,7,10,2,7,11,5,8,0,3,8,4,3,8,5,1,8,8,1,8,9,1,8,11,3],[0,0,8,0,1,1,0,2,8,0,3,5,0,4,1,0,5,2,0,6,2,0,7,3,0,8,2,0,9,1,0,10,3,0,11,9,1,0,12,1,1,3,1,2,4,1,3,6,1,4,1,1,5,10,1,6,2,1,8,1,1,11,8,2,0,10,2,1,1,2,2,7,2,3,5,2,4,4,2,5,1,2,6,2,2,9,1,2,10,1,2,11,9,3,0,10,3,1,7,3,2,2,3,3,3,3,4,4,3,5,4,3,6,2,3,9,2,3,10,2,3,11,12,4,0,16,4,1,2,4,2,4,4,3,3,4,4,5,4,5,3,4,6,5,4,7,3,4,8,1,4,9,1,4,10,4,4,11,10,5,0,14,5,1,3,5,2,2,5,3,2,5,4,4,5,5,1,5,6,4,5,7,3,5,8,1,5,10,4,5,11,11,6,0,6,6,1,3,6,2,4,6,3,4,6,4,6,6,5,4,6,6,3,6,7,2,6,10,2,6,11,13,7,0,7,7,1,3,7,2,10,7,3,2,7,4,6,7,5,3,7,6,3,7,7,2,7,9,1,7,10,3,7,11,9,8,0,1,8,1,1,8,2,3,8,3,2,8,4,10,8,5,3,8,6,3,8,7,1,8,9,1,8,10,1,8,11,12],[0,0,6,0,1,5,0,2,8,0,3,3,0,4,3,0,5,2,0,6,1,0,7,5,0,10,1,0,11,5,1,0,7,1,1,5,1,2,7,1,3,5,1,4,1,1,5,2,1,6,1,1,7,2,1,9,2,1,10,2,1,11,7,2,0,8,2,1,6,2,2,3,2,3,4,2,4,3,2,5,1,2,6,1,2,9,1,2,10,2,2,11,2,3,0,9,3,1,3,3,2,2,3,3,1,3,4,1,3,5,2,3,6,1,3,7,2,3,9,1,3,11,9,4,0,11,4,1,8,4,2,4,4,3,2,4,4,1,4,5,1,4,8,1,4,10,5,4,11,9,5,0,4,5,1,3,5,2,6,5,3,3,5,4,3,5,5,6,5,6,2,5,10,2,5,11,12,6,0,6,6,1,12,6,2,5,6,3,1,6,5,4,6,9,1,6,10,1,6,11,12,7,0,3,7,1,6,7,2,6,7,3,2,7,4,2,7,5,9,7,8,3,7,9,1,7,10,5,7,11,11,8,0,7,8,2,4,8,3,5,8,5,3,8,6,2,8,8,2,8,9,2,8,10,2,8,11,19],[0,0,7,0,1,5,0,2,5,0,3,5,0,5,1,0,6,1,0,7,1,0,9,1,0,10,1,0,11,8,1,0,4,1,1,2,1,2,4,1,3,3,1,9,3,1,10,2,1,11,8,2,0,5,2,1,4,2,2,3,2,3,3,2,5,1,2,6,1,2,9,1,2,11,6,3,0,2,3,1,2,3,2,4,3,3,3,3,5,2,3,8,2,3,10,4,3,11,1,4,0,9,4,1,2,4,2,2,4,3,4,4,5,2,4,6,2,4,7,3,4,8,1,4,9,1,4,10,1,4,11,3,5,0,6,5,1,2,5,2,1,5,3,5,5,5,1,5,8,2,5,11,4,6,0,1,6,1,2,6,2,2,6,3,1,6,5,2,6,8,3,6,9,1,6,10,2,6,11,8,7,0,2,7,1,3,7,2,3,7,3,3,7,7,2,7,8,2,7,11,8,8,0,4,8,1,1,8,2,2,8,3,4,8,5,1,8,8,1,8,9,2,8,10,1,8,11,10],[0,0,8,0,1,2,0,2,10,0,3,1,0,4,7,0,5,1,0,6,2,0,8,2,0,10,4,0,11,7,1,0,2,1,1,1,1,2,8,1,3,2,1,4,23,1,7,2,1,9,1,1,10,5,1,11,10,2,0,1,2,1,2,2,2,4,2,4,9,2,7,3,2,8,2,2,10,6,2,11,5,3,0,4,3,1,4,3,2,3,3,3,1,3,4,3,3,7,4,3,8,1,3,10,2,3,11,5,4,0,9,4,1,5,4,3,1,4,4,5,4,5,1,4,7,2,4,10,3,4,11,8,5,0,3,5,1,2,5,2,3,5,3,1,5,4,5,5,7,1,5,8,1,5,10,1,5,11,13,6,0,6,6,1,5,6,2,1,6,4,2,6,6,2,6,7,2,6,10,6,6,11,6,7,0,3,7,1,1,7,4,11,7,7,1,7,11,7,8,0,1,8,1,2,8,2,1,8,3,1,8,4,2,8,6,1,8,7,1,8,9,1,8,10,1,8,11,15],[0,0,45,0,1,26,0,2,10,0,3,3,0,4,2,0,6,13,0,9,2,0,10,1,0,11,23,1,0,49,1,1,21,1,2,11,1,3,5,1,4,1,1,6,6,1,8,3,1,9,4,1,10,2,1,11,29,2,0,46,2,1,21,2,2,6,2,3,1,2,6,4,2,8,1,2,9,1,2,10,3,2,11,11,3,0,50,3,1,39,3,2,9,3,3,3,3,4,1,3,5,5,3,6,5,3,7,3,3,8,2,3,9,5,3,10,3,3,11,33,4,0,75,4,1,20,4,2,11,4,3,5,4,5,1,4,6,7,4,7,1,4,8,1,4,9,1,4,10,2,4,11,21,5,0,47,5,1,29,5,2,9,5,3,1,5,5,2,5,6,5,5,8,6,5,10,3,5,11,41,6,0,50,6,1,42,6,2,9,6,3,4,6,5,2,6,6,4,6,7,1,6,10,4,6,11,34,7,0,45,7,1,28,7,2,16,7,3,4,7,6,6,7,8,4,7,9,2,7,10,2,7,11,39,8,0,30,8,1,19,8,2,10,8,3,2,8,6,3,8,9,2,8,10,2,8,11,45],[0,0,11,0,1,4,0,2,3,0,3,2,0,4,3,0,5,7,0,8,1,0,9,3,0,10,1,0,11,5,1,0,16,1,1,4,1,2,5,1,3,4,1,5,5,1,6,2,1,7,2,1,8,1,1,9,1,1,10,1,1,11,7,2,0,6,2,1,2,2,2,5,2,3,4,2,5,1,2,8,2,2,10,1,2,11,3,3,0,13,3,1,2,3,2,4,3,3,3,3,4,1,3,5,3,3,11,5,4,0,10,4,1,3,4,2,7,4,3,2,4,4,1,4,5,2,4,6,1,4,8,1,4,11,8,5,0,8,5,2,10,5,3,4,5,5,2,5,6,2,5,8,1,5,10,1,5,11,3,6,0,6,6,1,2,6,2,4,6,3,5,6,4,2,6,5,2,6,6,2,6,10,4,6,11,2,7,0,4,7,1,2,7,2,5,7,3,1,7,5,1,7,6,1,7,8,2,7,9,2,7,10,1,7,11,4,8,0,2,8,1,1,8,2,3,8,3,2,8,5,1,8,8,1,8,9,1,8,10,2,8,11,10],[0,0,7,0,1,1,0,2,2,0,5,1,0,6,2,0,7,2,0,11,2,1,0,6,1,2,1,1,4,1,1,5,1,1,9,1,1,10,3,1,11,7,2,0,7,2,1,4,2,2,1,2,3,1,2,4,1,2,7,1,2,9,1,2,11,6,3,0,7,3,3,2,3,4,2,3,6,1,3,7,3,3,11,4,4,0,7,4,1,2,4,2,1,4,6,2,4,11,7,5,0,5,5,1,1,5,3,2,5,4,1,5,5,2,5,6,2,5,7,1,5,11,2,6,0,1,6,1,1,6,2,3,6,5,1,6,6,1,6,7,4,6,8,1,6,10,6,6,11,4,7,0,1,7,2,1,7,5,1,7,6,1,7,11,5,8,0,2,8,1,2,8,2,1,8,5,3,8,6,1,8,11,8],[0,0,9,0,1,3,0,2,5,0,3,2,0,5,4,0,8,1,0,9,1,0,10,1,0,11,11,1,0,7,1,1,3,1,2,4,1,3,2,1,4,1,1,5,3,1,7,1,1,9,2,1,11,5,2,0,9,2,1,3,2,2,5,2,3,3,2,5,2,2,11,4,3,0,9,3,1,4,3,2,5,3,3,4,3,5,3,3,8,2,3,10,2,3,11,2,4,0,17,4,1,5,4,2,6,4,3,3,4,6,1,4,8,1,4,10,1,4,11,3,5,0,14,5,1,1,5,2,3,5,3,3,5,5,2,5,6,1,5,8,2,5,9,1,5,10,3,5,11,5,6,0,6,6,1,3,6,2,3,6,5,2,6,7,1,6,8,1,6,11,5,7,0,4,7,1,4,7,2,2,7,3,2,7,5,1,7,8,1,7,10,4,7,11,7,8,0,3,8,1,2,8,2,5,8,3,2,8,4,2,8,5,2,8,7,1,8,8,2,8,11,7]],"new12":[[1,2,3,2,5,1,10,1,11,2],[0,4,1,4,3,1,4,1,6,1,11,4],[0,1,11,1],[0,10,1,1,2,3,3,7,5,1,6,2,7,1,8,1,10,2,11,8],[0,4,1,1,2,5,3,1,5,2,6,2,7,2,11,5],[0,10,1,2,2,5,4,2,5,3,6,3,7,2,8,1,9,1,10,2,11,14],[8,1],[0,5,2,2,3,3,5,1,7,2,8,2,9,1,10,1,11,3],[3,1,5,1,7,1,8,1,9,1,11,1],[0,5,1,5,2,3,4,1,5,3,8,1,10,2,11,11],[0,1,1,1,6,1,8,1,9,1,11,2],[0,4,1,5,2,2,3,2,5,4,6,3,9,1,11,10],[0,5,1,3,2,3,3,8,5,2,6,3,8,5,10,4,11,14],[0,22,1,34,2,26,3,32,4,3,5,6,6,9,7,3,8,3,9,6,10,11,11,72],[0,10,1,8,2,12,3,7,4,101,5,5,6,4,7,5,8,4,9,3,10,6,11,39],[0,2,1,5,2,3,3,5,5,4,6,1,8,2,9,1,10,2,11,2],[0,11,1,3,2,2,3,2,8,1,10,2,11,7],[0,6,1,4,2,6,3,8,4,4,5,8,6,7,7,4,8,3,9,4,10,5,11,27],[0,8,1,10,2,8,3,3,5,4,8,1,9,2,11,22],[0,1,1,2,3,1,5,3,10,1,11,8],[0,1,1,1,2,5,4,1,7,1,10,2,11,4],[0,1,2,2,3,2,6,2,7,2,9,2,10,1,11,11],[0,2,1,1,2,1,3,1,11,3],[0,2,1,3,2,1,3,5,6,1,7,1,8,1,10,1,11,13],[1,1,2,1,3,2,5,1,6,2,7,6,8,1,9,1,10,1,11,3],[11,2],[10,1],[],[0,2,1,6,2,4,3,4,5,11,8,1,11,5],[0,4,1,2,2,2,3,5,5,5,6,1,7,1,8,1,10,3,11,6],[0,2,2,2,3,2,4,1,10,1,11,1],[0,6,1,3,2,2,4,2,5,1,7,2,8,2,9,2,10,2,11,6],[0,4,5,2,11,4],[0,1,4,1,5,2,6,1,7,2,10,1,11,7],[],[0,6,1,1,2,1,3,1,5,1,6,2,9,1,10,3,11,2],[2,2,3,2,6,1,7,1,8,1],[0,3,2,2,3,1,5,4,6,1,11,3],[0,12,1,2,2,4,3,6,4,1,5,3,6,1,7,2,8,1,9,2,10,2,11,8],[1,1,2,4,3,1,5,2,7,1,11,4],[0,1,3,2,4,1,7,1,10,1,11,1],[0,5,2,6,3,2,5,1,7,2,10,1,11,6],[0,9,1,10,2,2,3,3,5,1,6,3,7,2,8,1,9,2,10,4,11,11],[0,17,1,12,2,4,3,12,4,6,5,4,6,3,7,2,8,3,9,2,10,6,11,22],[0,1,1,3,2,3,3,5,4,1,5,3,6,1,7,2,10,1,11,8],[0,1,5,1,6,1,7,1,8,1,9,1,11,6],[0,2,1,12,2,9,3,14,4,31,5,17,6,5,7,6,8,4,9,4,10,8,11,37],[0,4,2,1,3,3,5,3,8,2,9,1,10,3,11,12],[0,1,1,1,2,1,3,3,5,1,7,2,8,3,9,1,10,1,11,4],[0,1,3,1,6,1,7,4,10,1,11,1],[0,2,1,1,2,3,3,1,4,6,5,1,7,2,11,6],[2,2,5,4,9,1,11,9],[6,1,11,2],[5,2,6,1,10,1,11,3],[0,7,1,7,2,10,3,1,4,3,5,3,6,2,7,1,8,2,9,1,10,3,11,17],[0,6,1,1,3,2,5,1,6,1,7,1,11,4],[0,3,1,5,2,3,3,3,4,1,5,2,6,2,7,1,8,3,9,1,10,1,11,14],[3,1,5,1,6,3,10,1,11,4],[0,11,1,10,2,9,3,4,5,5,6,2,7,1,9,1,10,3,11,20],[0,2,1,5,3,1,4,2,5,1,8,3,11,18],[0,2,1,3,2,1,6,3,7,1,8,1,9,1,10,1,11,5],[0,7,1,1,2,2,3,4,5,6,8,1,9,1,10,1,11,2],[0,6,1,1,2,3,3,1,4,1,5,2,6,2,7,1,10,1,11,9],[0,3,4,4,5,1,8,1,9,1,11,3],[0,2,1,1,2,3,3,2,4,13,5,3,6,3,7,1,9,1,10,1,11,12],[0,8,2,4,3,5,5,4,6,2,8,3,9,2,10,2,11,19],[0,4,1,1,2,2,3,5,5,1,7,1,8,3,9,2,10,1,11,11],[0,1,1,2,2,1,3,1,4,2,6,1,7,1,9,1,10,1,11,16],[0,33,1,25,2,10,3,4,6,3,9,2,10,2,11,49],[0,2,1,2,2,4,3,2,5,1,8,1,9,1,10,2,11,11],[0,2,1,2,2,2,5,3,6,1,11,8],[0,3,1,2,2,6,3,2,4,2,5,2,7,1,8,2,10,1,11,8]],"S2":["Retail Trade","Accommodation & Food Services","Other Services (Except Public Administration)","Professional, Scientific, & Technical Services","Transportation & Warehousing","Health Care & Social Assistance","Administrative & Support & Waste Mgmt & Remediation Services","Construction","Arts, Entertainment & Recreation","Real Estate & Rental & Leasing","Other sectors","Event and street vendors","Other or not stated"],"now":[[0,16,1,12,2,19,3,10,4,2,5,7,6,6,7,4,8,3,10,2,11,11,12,5],[0,20,1,26,2,8,3,20,5,4,6,8,7,5,8,10,9,5,10,7,11,17,12,15],[0,16,1,3,2,7,3,4,4,7,5,2,6,4,7,5,8,2,9,3,10,2,11,6,12,20],[0,104,1,63,2,27,3,65,4,7,5,14,6,18,7,7,8,18,9,8,10,25,11,37,12,49],[0,33,1,9,2,11,3,5,4,11,5,5,6,11,7,10,8,8,9,1,10,8,11,22,12,14],[0,83,1,54,2,38,3,43,4,35,5,28,6,38,7,33,8,17,9,9,10,22,11,61,12,79],[0,12,1,3,2,9,3,2,5,4,6,1,7,1,8,4,9,2,10,6,11,5,12,3],[0,57,1,24,2,14,3,33,4,13,5,14,6,8,7,14,8,7,9,4,10,16,11,39,12,34],[0,8,1,3,2,3,3,2,4,2,5,3,6,2,7,3,8,2,9,1,10,7,11,6,12,9],[0,60,1,31,2,35,3,9,4,17,5,39,6,13,7,14,8,12,9,5,10,13,11,27,12,43],[0,5,1,9,2,3,3,10,4,1,5,4,6,5,7,1,8,2,9,1,10,2,11,4,12,4],[0,33,1,28,2,15,3,20,4,8,5,16,6,8,7,12,8,1,9,5,10,16,11,26,12,33],[0,58,1,70,2,29,3,27,4,9,5,2,6,10,7,10,8,30,9,4,10,25,11,79,12,33],[0,565,1,742,2,295,3,644,4,65,5,85,6,135,7,39,8,101,9,95,10,203,11,291,12,221],[0,172,1,188,2,142,3,91,4,588,5,85,6,45,7,35,8,43,9,23,10,60,11,138,12,116],[0,45,1,48,2,29,3,31,5,23,6,4,7,3,8,8,9,8,10,16,11,25,12,36],[0,90,1,48,2,28,3,43,4,4,5,9,6,6,7,10,8,8,9,10,10,10,11,41,12,43],[0,163,1,50,2,68,3,62,4,70,5,69,6,56,7,58,8,17,9,27,10,52,11,119,12,160],[0,74,1,184,2,25,3,29,4,6,5,22,6,11,7,10,8,36,9,17,10,21,11,175,12,49],[0,12,1,20,2,3,3,21,5,11,6,12,7,5,8,15,9,2,10,6,11,28,12,13],[0,48,1,33,2,17,3,3,4,9,5,5,6,3,7,11,8,4,9,10,10,12,11,10,12,12],[0,47,1,13,2,35,3,17,4,15,5,16,6,14,7,13,8,8,9,3,10,20,11,29,12,30],[0,59,1,30,2,5,3,23,5,2,6,5,7,2,8,5,9,8,10,6,11,17,12,7],[0,33,1,46,2,32,3,26,4,15,5,9,6,7,7,17,8,13,9,3,10,12,11,75,12,40],[0,27,1,17,2,12,3,24,4,6,5,11,6,17,7,26,8,4,9,11,10,9,11,27,12,34],[0,2,1,4,2,2,3,2,4,2,5,1,6,3,7,1,8,1],[0,7,1,4,2,1,3,1,4,2,5,3,6,2,7,5,10,2,11,11,12,2],[11,1,12,1],[0,40,1,68,2,19,3,17,4,1,5,47,6,3,7,4,8,4,9,1,10,10,11,43,12,12],[0,41,1,19,2,21,3,39,4,10,5,18,6,19,7,35,8,12,9,6,10,17,11,65,12,61],[0,16,1,6,2,7,3,8,4,8,5,2,6,4,7,8,8,1,9,6,10,3,11,11,12,14],[0,82,1,66,2,44,3,27,4,30,5,30,6,16,7,38,8,13,9,11,10,53,11,32,12,40],[0,35,1,13,2,11,3,4,4,8,5,4,6,5,7,16,8,3,9,6,10,7,11,34,12,21],[0,26,1,6,2,15,3,7,4,9,5,5,6,6,7,8,8,1,9,1,10,8,11,22,12,12],[0,6,1,1,7,1,10,1,11,1,12,3],[0,62,1,44,2,20,3,24,4,6,5,3,6,8,7,15,8,10,9,3,10,20,11,20,12,31],[0,9,1,6,2,2,3,3,4,1,6,4,7,3,8,9,9,1,10,6,11,1,12,4],[0,23,1,13,2,7,3,28,4,4,5,15,6,4,7,12,8,9,9,6,10,7,11,11,12,19],[0,76,1,40,2,31,3,51,4,5,5,33,6,14,7,22,8,16,9,15,10,26,11,39,12,52],[0,15,1,26,2,17,3,26,5,8,6,2,7,4,8,1,9,5,10,12,11,10,12,6],[0,17,1,4,2,1,3,15,4,2,5,1,6,3,7,10,8,2,9,4,10,2,11,3,12,15],[0,44,1,25,2,22,3,15,4,7,5,14,6,9,7,13,8,15,9,3,10,7,11,12,12,22],[0,116,1,157,2,39,3,53,4,19,5,30,6,16,7,22,8,23,9,11,10,28,11,72,12,62],[0,192,1,202,2,64,3,93,4,112,5,38,6,43,7,17,8,29,9,25,10,43,11,93,12,84],[0,45,1,28,2,12,3,48,4,2,5,21,6,16,7,9,8,6,9,5,10,7,11,26,12,45],[0,13,1,8,2,16,3,8,4,3,5,9,6,4,7,6,8,4,9,3,10,9,11,18,12,11],[0,173,1,215,2,153,3,206,4,406,5,165,6,57,7,60,8,51,9,46,10,79,11,111,12,150],[0,53,1,44,2,25,3,25,4,8,5,63,6,18,7,11,8,11,9,3,10,18,11,43,12,25],[0,20,1,14,2,13,3,17,4,8,5,10,6,8,7,9,8,3,9,3,10,8,11,25,12,41],[0,24,1,16,2,13,3,16,4,4,5,8,6,6,7,8,8,11,9,8,10,7,11,17,12,19],[0,58,1,23,2,42,3,8,4,21,5,7,6,9,7,16,8,5,9,3,10,26,11,11,12,33],[0,28,1,12,2,23,3,3,4,21,5,10,6,10,7,10,8,3,9,7,10,5,11,10,12,22],[0,9,1,5,2,11,3,6,4,1,5,4,6,3,7,7,8,1,9,1,10,3,11,16,12,9],[0,10,1,10,2,1,3,3,4,3,5,3,6,4,7,10,8,3,9,1,10,2,11,12,12,12],[0,95,1,53,2,60,3,62,4,22,5,47,6,20,7,19,8,10,9,20,10,32,11,40,12,60],[0,33,1,9,2,12,3,6,4,13,5,6,6,18,7,20,8,2,9,4,10,15,11,29,12,26],[0,86,1,56,2,38,3,26,4,6,5,19,6,10,7,13,8,21,9,5,10,31,11,61,12,36],[0,20,1,5,2,4,3,14,4,7,5,1,6,10,7,11,8,2,9,1,10,7,11,11,12,19],[0,121,1,121,2,88,3,39,4,46,5,27,6,21,7,39,8,36,9,12,10,29,11,92,12,64],[0,64,1,95,2,47,3,29,4,16,5,18,6,12,7,15,8,17,9,8,10,22,11,58,12,37],[0,20,1,18,2,3,3,11,4,9,5,1,6,8,7,14,8,6,9,4,10,8,11,24,12,22],[0,89,1,46,2,24,3,28,4,3,5,119,6,6,7,5,8,15,9,3,10,11,11,31,12,30],[0,92,1,57,2,43,3,12,4,14,5,11,6,23,7,19,8,20,9,8,10,23,11,58,12,38],[0,19,1,17,2,14,3,10,4,36,5,4,6,5,7,4,8,7,9,5,10,10,11,15,12,19],[0,66,1,46,2,39,3,35,4,38,5,47,6,20,7,37,8,15,9,15,10,22,11,114,12,58],[0,76,1,74,2,64,3,27,4,30,5,45,6,22,7,11,8,10,9,17,10,41,11,41,12,56],[0,52,1,51,2,35,3,55,4,2,5,10,6,10,7,13,8,19,9,9,10,20,11,40,12,55],[0,82,1,60,2,59,3,6,4,70,5,1,6,13,7,26,8,15,9,15,10,38,11,5,12,43],[0,771,1,589,2,104,3,84,4,15,5,9,6,82,7,10,8,98,9,29,10,53,11,1115,12,91],[0,73,1,31,2,46,3,21,4,8,5,45,6,13,7,6,8,11,9,8,10,14,11,23,12,39],[0,48,1,24,2,25,3,8,4,9,5,13,6,13,7,10,8,2,9,4,10,2,11,12,12,25],[0,111,1,70,2,49,3,43,4,8,5,30,6,7,7,8,8,16,9,9,10,12,11,46,12,43]],"nowTotal":38198,"nowNoLoc":9065,"total":21300,"noLoc":138}};</script>
+<script>// Shared helpers for the NOLA open data pages
+const NOLA = (() => {
+  const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const S = i => `var(--s${i + 1})`;
+  const fmt = d3.format(',');
+  const pct = (a, b) => b ? Math.round(100 * a / b) + '%' : '—';
+
+  // ---------- tooltip ----------
+  const tipEl = document.createElement('div');
+  tipEl.className = 'tip'; document.body.appendChild(tipEl);
+  const tip = {
+    show(html, ev) {
+      tipEl.innerHTML = html; tipEl.style.opacity = 1;
+      const w = tipEl.offsetWidth, h = tipEl.offsetHeight;
+      let x = ev.clientX + 14, y = ev.clientY + 14;
+      if (x + w > innerWidth - 8) x = ev.clientX - w - 14;
+      if (y + h > innerHeight - 8) y = ev.clientY - h - 14;
+      tipEl.style.left = x + 'px'; tipEl.style.top = y + 'px';
+    },
+    hide() { tipEl.style.opacity = 0; }
+  };
+  const row = (k, v) => `<div class="r"><span>${k}</span><span>${v}</span></div>`;
+
+  // ---------- geography ----------
+  const decode = r => { const o = []; let x = 0, y = 0; for (let i = 0; i < r.length; i += 2) { x += r[i]; y += r[i + 1]; o.push([x, y]); } return o; };
+  const pathOf = rings => rings.map(r => 'M' + decode(r).map(p => p.join(',')).join('L') + 'Z').join('');
+  const title = s => s.toLowerCase().replace(/(^|[\s\-\/.(&])([a-z])/g, (m, a, b) => a + b.toUpperCase()).replace(/\bMcdonogh\b/, 'McDonogh').replace(/\bB\. W\./, 'B.W.').replace(/\bSt\.\s+/g, 'St. ').replace(/\bDev\b/, 'Development');
+  let GEO = null;
+  // ---------- per-resident rates (2020 Census population per neighborhood, GEO.pop) ----------
+  // Use only for things residents generate (e.g. calls for service), not for land- or street-based counts.
+  const MIN_POP = 1000; // rates for neighborhoods smaller than this swing wildly, so they're left out
+  const popOf = i => GEO.pop ? GEO.pop[i] : null;
+  const perK = (n, pop) => n != null && pop >= MIN_POP ? 1000 * n / pop : null;
+  const fmtRate = v => v == null ? '—' : v >= 100 ? d3.format(',')(Math.round(v)) : v >= 10 ? v.toFixed(0) : v.toFixed(1);
+  const POP_NOTE = '<div class="legend popnote">Per 1,000 residents (2020 Census). Visitors, workers and highway traffic also generate calls, so rates run high where few people live, like the CBD and French Quarter. Neighborhoods under 1,000 residents are left out.</div>';
+  // Total / Per 1,000 residents switch
+  const basisChips = (el, onSel, sel = 'n') => chips(el, [{ label: 'Total', value: 'n' }, { label: 'Per 1,000 residents', value: 'pc' }], onSel, { sel });
+  // ---------- the opening view ----------
+  // Every neighborhood is mapped and counted. Maps open on the populated city, leaving out the mostly
+  // uninhabited marsh to the east (under 100 residents per square mile: Lake Catherine, Viavant–Venetian Isles),
+  // which would otherwise shrink everything else. Zoom out or pick one from the menu to see it.
+  const MIN_DENSITY = 100;
+  const SQMI = 400 / 2589988; // one map unit is about 20 m
+  let FULL = [-70, 130, 2110, 1730];
+  const bboxOf = rings => { let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9; rings.forEach(r => decode(r).forEach(([x, y]) => { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); })); return [x0, y0, x1, y1]; };
+  const pad = ([x0, y0, x1, y1], f) => { const dx = (x1 - x0) * f, dy = (y1 - y0) * f; return [x0 - dx, y0 - dy, x1 + dx, y1 + dy]; };
+  function setGeo(g) {
+    GEO = g;
+    GEO.nb.forEach((f, i) => {
+      f.idx = i; f.d = pathOf(f.r); f.name = title(f.n); f.bbox = bboxOf(f.r);
+      f.sqmi = f.r.reduce((a, r) => a + Math.abs(d3.polygonArea(decode(r))), 0) * SQMI;
+      f.skip = !!(g.pop && g.pop[i] / f.sqmi < MIN_DENSITY);
+    });
+    GEO.pd.forEach(f => { f.d = pathOf(f.r); });
+    const kept = GEO.nb.filter(f => !f.skip).map(f => f.bbox);
+    FULL = pad([d3.min(kept, b => b[0]), d3.min(kept, b => b[1]), d3.max(kept, b => b[2]), d3.max(kept, b => b[3])], 0.03);
+  }
+  const shown = i => i >= 0; // a record in neighborhood i appears on maps
+  const nbList = () => GEO.nb.slice().sort((a, b) => a.name.localeCompare(b.name));
+  // neighborhood picker: <select> with "All neighborhoods" (-1) and every mapped neighborhood
+  function nbSelect(el, onSel, sel = -1, label = 'All neighborhoods') {
+    el.innerHTML = `<option value="-1">${label}</option>` + nbList().map(f => `<option value="${f.idx}">${f.name}</option>`).join('');
+    el.value = sel; el.onchange = () => onSel(+el.value);
+  }
+  // projected map units -> [lon, lat] (for CSV downloads)
+  const lonlat = (x, y) => [+(x / 4830 - 90.14).toFixed(5), +(30.20 - y / 5550).toFixed(5)];
+
+  // map(el, opts) -> {svg, layer, zoomTo, setFill, focus, k()}
+  // The map fills el. It keeps clear of an on-map filter panel (o.panel) when fitting, and carries its own
+  // zoom controls, scale bar and street-name labels.
+  // Input: the mouse wheel (or trackpad pinch) zooms and dragging pans; the page never scrolls under the map.
+  // On touch screens one finger scrolls the page and two fingers move and zoom the map (see stage()).
+  // The map follows its box when the page is resized: one unit is one CSS pixel once the map is over 1000px wide
+  // (narrower maps scale down, as before), so text and dots keep their size on wide screens.
+  let mapN = 0;
+  function map(el, o) {
+    el.classList.add('map');
+    const dims = () => { const cw = el.clientWidth, ch = el.clientHeight, w = Math.max(1000, Math.round(cw));
+      return [w, Math.round(w * (ch > 50 && cw > 0 ? ch / cw : (o.height || 640) / 1000))]; };
+    let [W, H] = dims();
+    const svg = d3.select(el).append('svg').attr('viewBox', `0 0 ${W} ${H}`).attr('role', 'img').attr('aria-label', o.label || 'Map of New Orleans');
+    const root = svg.append('g');
+    const base = root.append('g');
+    const nbs = GEO.nb;
+    const nbSel = base.selectAll('path').data(nbs).join('path').attr('class', 'nbpath' + (o.tip ? ' hot' : '')).attr('d', f => f.d);
+    // street base map (City centerlines, in streets.js), clipped to the mapped neighborhoods; local streets fade in as you zoom
+    const ST = window.STREETS;
+    let localSt = null;
+    if (ST) {
+      const cid = 'nbclip' + (++mapN);
+      root.append('clipPath').attr('id', cid).selectAll('path').data(nbs).join('path').attr('d', f => f.d);
+      const sg = root.append('g').attr('clip-path', `url(#${cid})`).append('g').attr('class', 'streets').attr('transform', `scale(${1 / ST.q})`).attr('aria-hidden', 'true');
+      localSt = sg.append('path').attr('class', 'st st3').attr('d', ST.d[3]);
+      sg.append('path').attr('class', 'st st2').attr('d', ST.d[2]);
+      sg.append('path').attr('class', 'st st1').attr('d', ST.d[1]);
+      sg.append('path').attr('class', 'st st0').attr('d', ST.d[0]);
+    }
+    const streetZoom = k => { if (localSt) localSt.style('opacity', Math.max(0.35, Math.min(1, (k - 0.6) / 2.4))); };
+    const focusG = root.append('g').style('pointer-events', 'none');
+    if (o.districts) root.append('g').selectAll('path').data(GEO.pd).join('path').attr('d', f => f.d)
+      .attr('fill', 'none').attr('stroke', 'var(--ink2)').attr('stroke-width', 1.4).attr('vector-effect', 'non-scaling-stroke').attr('opacity', .55).style('pointer-events', 'none');
+    const stLabG = root.append('g').attr('aria-hidden', 'true');
+    const layer = root.append('g');
+    if (o.tip) nbSel.on('mousemove', (ev, f) => tip.show(o.tip(f.idx), ev)).on('mouseleave', tip.hide);
+
+    // ---- street names, placed after each zoom so they never overlap; longer streets first ----
+    const SL = ST && ST.lab, q = ST ? ST.q : 1;
+    const AN = SL ? SL.a.length / 6 : 0;
+    const order = SL ? d3.range(AN).sort((a, b) => SL.a[a * 6 + 5] - SL.a[b * 6 + 5] || SL.a[b * 6 + 3] - SL.a[a * 6 + 3]) : [];
+    function layoutLabels() {
+      if (!SL) return;
+      const t = d3.zoomTransform(svg.node()), k = t.k, placed = [], seen = new Map(), cell = 60, grid = new Map();
+      const hit = b => { for (let gx = Math.floor(b[0] / cell); gx <= Math.floor(b[2] / cell); gx++) for (let gy = Math.floor(b[1] / cell); gy <= Math.floor(b[3] / cell); gy++) { const L = grid.get(gx * 9973 + gy); if (L) for (const r of L) if (b[0] < r[2] && b[2] > r[0] && b[1] < r[3] && b[3] > r[1]) return true; } return false; };
+      const add = b => { for (let gx = Math.floor(b[0] / cell); gx <= Math.floor(b[2] / cell); gx++) for (let gy = Math.floor(b[1] / cell); gy <= Math.floor(b[3] / cell); gy++) { const key = gx * 9973 + gy; (grid.get(key) || grid.set(key, []).get(key)).push(b); } };
+      if (k >= 2) for (const i of order) {
+        const b = i * 6, tier = SL.a[b + 5];
+        if (tier === 2 && k < 5) continue;
+        const [sx, sy] = t.apply([SL.a[b] / q, SL.a[b + 1] / q]);
+        if (sx < -40 || sx > W + 40 || sy < -20 || sy > H + 20) continue;
+        const name = SL.names[SL.a[b + 4]], fs = tier < 2 ? 11.5 : 10.5, w = name.length * fs * 0.56 + 8;
+        if (w > 2 * SL.a[b + 3] / q * k) continue; // the street is too short at this zoom
+        const a = SL.a[b + 2] * Math.PI / 180, c = Math.abs(Math.cos(a)), sn = Math.abs(Math.sin(a)), hw = w / 2, hh = fs / 2 + 2;
+        const sh = c > .3 && sn > .3 ? .8 : 1, ex = (hw * c + hh * sn) * sh, ey = (hw * sn + hh * c) * sh, box = [sx - ex, sy - ey, sx + ex, sy + ey];
+        if (hit(box)) continue;
+        const prev = seen.get(name); if (prev && prev.some(([px, py]) => (px - sx) ** 2 + (py - sy) ** 2 < 260 * 260)) continue;
+        add(box); if (prev) prev.push([sx, sy]); else seen.set(name, [[sx, sy]]);
+        placed.push({ x: SL.a[b] / q, y: SL.a[b + 1] / q, a: SL.a[b + 2], name, fs, major: tier < 2 });
+        if (placed.length > 260) break;
+      }
+      stLabG.selectAll('text').data(placed).join('text').attr('class', d => 'stlab' + (d.major ? ' major' : ''))
+        .attr('transform', d => `translate(${d.x},${d.y}) rotate(${d.a})`).attr('text-anchor', 'middle').attr('dy', '0.35em')
+        .style('font-size', d => (d.fs / k) + 'px').style('stroke-width', (3 / k) + 'px').style('fill', 'var(--ink2)').text(d => d.name);
+    }
+
+    // ---- zoom, controls, scale bar ----
+    let k = 1, lt = 0, moved = false, target = null; const listeners = [];
+    const scaleEl = document.createElement('div'); scaleEl.className = 'scalebar'; scaleEl.innerHTML = '<span></span><i></i>'; el.appendChild(scaleEl);
+    function drawScale() {
+      const pxPerMile = 80.47 * k * (el.clientWidth || W) / W, opts = [0.05, 0.1, 0.25, 0.5, 1, 2, 5]; let m = opts[0];
+      for (const v of opts) if (v * pxPerMile <= 110) m = v;
+      scaleEl.lastChild.style.width = (m * pxPerMile).toFixed(0) + 'px';
+      scaleEl.firstChild.textContent = m < 1 ? (m * 5280 >= 1000 ? m + ' mi' : Math.round(m * 5280) + ' ft') : m + ' mi';
+    }
+    // the opening view is about k = 0.45; allow zooming out far enough to see the whole parish, east marsh included
+    const zoom = d3.zoom().scaleExtent([0.25, 40])
+      // touch: only two-finger gestures move the map, so one finger still scrolls the page (touch-action in lib.css);
+      // in full screen there's no page to scroll, so one finger moves the map too
+      .filter(ev => ev.type.startsWith('touch') ? ev.touches.length >= 2 || !!el.closest('.mapfs') : (!ev.ctrlKey || ev.type === 'wheel') && !ev.button)
+      .on('zoom', ev => {
+        if (ev.sourceEvent) moved = true; // the reader moved the map, so a resize keeps their view instead of refitting
+        root.attr('transform', ev.transform); k = ev.transform.k; streetZoom(k); drawScale();
+        stLabG.selectAll('text').style('font-size', d => (d.fs / k) + 'px').style('stroke-width', (3 / k) + 'px');
+        listeners.forEach(f => f(k)); clearTimeout(lt); lt = setTimeout(layoutLabels, 90);
+      });
+    svg.call(zoom).on('dblclick.zoom', null);
+    // Safari's trackpad pinch arrives as gesture events rather than ctrl+wheel; zoom the map instead of the page
+    // (on iPhone/iPad the same events come with two-finger touches, which d3 already handles)
+    let gk = 1, touching = false;
+    el.addEventListener('touchstart', e => { touching = true; }, { passive: true });
+    const untouch = e => { touching = e.touches.length > 0; };
+    el.addEventListener('touchend', untouch, { passive: true }); el.addEventListener('touchcancel', untouch, { passive: true });
+    el.addEventListener('gesturestart', e => { e.preventDefault(); gk = k; });
+    el.addEventListener('gesturechange', e => { e.preventDefault(); if (touching) return; moved = true;
+      const r = svg.node().getBoundingClientRect(); svg.call(zoom.scaleTo, gk * e.scale, [(e.clientX - r.left) * W / r.width, (e.clientY - r.top) * H / r.height]); });
+    // fit an extent into the part of the map the filter panel doesn't cover
+    const inset = () => panelInset(o.panel, el.clientWidth) * W / Math.max(1, el.clientWidth);
+    function zoomTo(ext, dur = 0) {
+      const [x0, y0, x1, y1] = ext; target = ext; moved = false;
+      const L = inset(), s = Math.min((W - L) / (x1 - x0), H / (y1 - y0)) * 0.96;
+      const tr = d3.zoomIdentity.translate(L + (W - L) / 2, H / 2).scale(s).translate(-(x0 + x1) / 2, -(y0 + y1) / 2);
+      (dur ? svg.transition().duration(dur) : svg).call(zoom.transform, tr);
+    }
+    const home = o.extent || FULL;
+    let focused = -1;
+    const by = f => () => { moved = true; svg.transition().duration(250).call(zoom.scaleBy, f); };
+    // entering or leaving full screen resizes the map: fit() refits it (or keeps the reader's view) and places labels again
+    mapButtons(el, { zoomIn: by(1.7), zoomOut: by(1 / 1.7), reset: () => api.focus(focused), onFull: () => { fit(); drawScale(); layoutLabels(); } });
+    zoomTo(home); drawScale(); layoutLabels();
+    // follow the map's box (window resizes, the page's scrollbar appearing, rotating a phone): an untouched map is
+    // refitted to what it was showing; one the reader has moved keeps its center and scale
+    const fit = () => {
+      if (!el.clientWidth || !el.clientHeight) return;
+      const [nw, nh] = dims(); if (nw === W && nh === H) return;
+      const t = d3.zoomTransform(svg.node()), c = t.invert([W / 2, H / 2]);
+      W = nw; H = nh; svg.interrupt().attr('viewBox', `0 0 ${W} ${H}`);
+      if (!moved && target) zoomTo(target);
+      else svg.call(zoom.transform, d3.zoomIdentity.translate(W / 2, H / 2).scale(t.k).translate(-c[0], -c[1]));
+      drawScale();
+    };
+    if (window.ResizeObserver) new ResizeObserver(fit).observe(el);
+    addEventListener('resize', fit);
+    const api = {
+      svg, layer, nbSel, zoomTo, k: () => k, onZoom: f => listeners.push(f), home,
+      setFill(fn) { nbSel.attr('fill', f => fn(f.idx) || null).style('fill', f => fn(f.idx) || null); },
+      // outline one neighborhood and zoom to it (-1: clear and go back to the whole mapped city)
+      focus(i, dur = 450) {
+        focused = i;
+        focusG.selectAll('path').data(i >= 0 ? [GEO.nb[i]] : []).join('path').attr('d', f => f.d).attr('class', 'nbfocus');
+        zoomTo(i >= 0 ? pad(GEO.nb[i].bbox, 0.25) : home, dur);
+      }
+    };
+    return api;
+  }
+  // how far (CSS px) the floating filter panel reaches into a map `mapW` px wide, so fits keep clear of it.
+  // 0 when the panel isn't floating, is folded away, or covers most of a narrow map (phones in full screen).
+  function panelInset(panel, mapW) {
+    if (!panel || !panel.childElementCount || getComputedStyle(panel).position !== 'absolute') return 0;
+    const w = panel.offsetWidth; return w && w < mapW / 2 ? w + 24 : 0;
+  }
+
+  // ---------- map controls: full screen, zoom in, zoom out, reset ----------
+  const ico = d => `<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><path d="${d}"/></svg>`;
+  const ICON = {
+    full: ico('M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5'),
+    exit: ico('M9 4v5H4M15 4v5h5M20 15h-5v5M4 15h5v5'),
+    plus: ico('M12 5v14M5 12h14'),
+    minus: ico('M5 12h14'),
+    reset: ico('M4.6 13.5A7.6 7.6 0 1 0 6.6 6.6M6.6 2.4v4.2h4.2') // circular arrow, back to the opening view
+  };
+  const D = document, fsElement = () => D.fullscreenElement || D.webkitFullscreenElement || null;
+  // mapButtons(host, { zoomIn, zoomOut, reset, onFull(on) }) adds the control stack to a map's box (host) and returns it.
+  // Full screen takes the map's whole stage (filter panel, legend, scale bar, controls) with the Fullscreen API, or,
+  // where that isn't offered (iPhone Safari) or is refused, a fixed layer over the page with the page's scroll locked.
+  // Esc and the browser's own exit keep the button in step. onFull runs once the new size has settled.
+  function mapButtons(host, { zoomIn, zoomOut, reset, onFull } = {}) {
+    if (!host) return null;
+    const box = host.closest('.stage') || host;
+    const ctl = D.createElement('div'); ctl.className = 'mapctl';
+    const add = (icon, label, fn) => { const b = D.createElement('button'); b.type = 'button'; b.innerHTML = icon; b.title = label; b.setAttribute('aria-label', label); b.onclick = fn; ctl.appendChild(b); return b; };
+    let mode = null, sy = 0; // mode: 'api' | 'css' | null
+    const fsb = add(ICON.full, 'Full screen', () => (mode ? exit() : enter()));
+    fsb.setAttribute('aria-pressed', 'false'); fsb.classList.add('fsbtn');
+    if (zoomIn) add(ICON.plus, 'Zoom in', zoomIn);
+    if (zoomOut) add(ICON.minus, 'Zoom out', zoomOut);
+    if (reset) add(ICON.reset, 'Reset view', reset);
+    host.appendChild(ctl);
+    const settle = on => { let n = 0; const go = () => { if (onFull) onFull(on); if (++n < 3) requestAnimationFrame(go); }; requestAnimationFrame(go); };
+    const onKey = e => { if (e.key === 'Escape' && mode === 'css' && !/^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) { e.preventDefault(); exit(); } };
+    function show(on) {
+      box.classList.toggle('mapfs', on); box.classList.toggle('mapfs-css', on && mode === 'css');
+      D.documentElement.classList.toggle('mapfs-lock', on && mode === 'css');
+      fsb.innerHTML = on ? ICON.exit : ICON.full; fsb.setAttribute('aria-pressed', on); fsb.title = on ? 'Exit full screen (Esc)' : 'Full screen';
+      // the tooltip has to live inside the full-screen layer to be seen there
+      tip.hide(); (on ? box : D.body).appendChild(tipEl);
+      if (on) D.addEventListener('keydown', onKey); else { D.removeEventListener('keydown', onKey); mode = null; if (Math.abs(scrollY - sy) > 1) scrollTo(scrollX, sy); }
+      settle(on);
+    }
+    function css() { mode = 'css'; show(true); }
+    function enter() {
+      sy = scrollY;
+      const req = box.requestFullscreen || box.webkitRequestFullscreen;
+      if (!(D.fullscreenEnabled || D.webkitFullscreenEnabled) || !req) return css();
+      mode = 'api';
+      let p; try { p = req.call(box, { navigationUI: 'hide' }); } catch (e) { return css(); }
+      if (p && p.catch) p.catch(failed);
+      // a browser that neither enters nor refuses (some embedded views leave the request hanging) gets the fallback
+      setTimeout(failed, 1200);
+    }
+    function exit() {
+      if (mode === 'api' && fsElement() === box) (D.exitFullscreen || D.webkitExitFullscreen).call(D);
+      else if (mode) show(false);
+    }
+    const changed = () => { const on = fsElement() === box;
+      if (on && (mode !== 'api' || !box.classList.contains('mapfs'))) { mode = 'api'; show(true); } // (also a late success after the fallback took over)
+      else if (!on && mode === 'api' && box.classList.contains('mapfs')) show(false); };
+    const failed = () => { if (mode === 'api' && fsElement() !== box) css(); }; // older Safari reports a refusal by event, not a promise
+    ['fullscreenchange', 'webkitfullscreenchange'].forEach(t => D.addEventListener(t, changed));
+    ['fullscreenerror', 'webkitfullscreenerror'].forEach(t => D.addEventListener(t, failed));
+    return ctl;
+  }
+
+  // ---------- filters on the chart ----------
+  // stage(el, { map }) turns a view's pane into a filter panel + plot area. On maps the panel floats over the map,
+  // and the section holding the map spans the window (see .vsec.wide in lib.css).
+  function stage(el, { map: isMap = false, open = false } = {}) {
+    el.classList.add('stage', isMap ? 'mapstage' : 'chartstage');
+    el.innerHTML = '<div class="fpanel"></div><div class="plot"></div>';
+    const panel = el.firstChild, plot = el.lastChild;
+    if (isMap) { // on phones the map's filters fold away behind a button, so the map shows first
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'btn ftoggle'; b.textContent = 'Filters';
+      if (open) b.textContent = 'Hide filters'; else panel.classList.add('collapsed');
+      b.onclick = () => { panel.classList.toggle('collapsed'); b.textContent = panel.classList.contains('collapsed') ? 'Filters' : 'Hide filters'; };
+      el.insertBefore(b, panel);
+      const sec = el.closest('.vsec'); if (sec) sec.classList.add('wide');
+      lockInput(panel, plot);
+    }
+    return { panel, plot };
+  }
+  // Keep input over a map in the map. The wheel over the map belongs to the map (each map zooms on it), even at the
+  // zoom limits, where it would otherwise fall through and scroll the page. The floating filter panel scrolls itself
+  // and stops at its ends instead of handing the scroll on to the page. On touch screens one finger scrolls the page
+  // and two fingers move the map (each map does the moving); a one-finger swipe over the map shows a short hint.
+  function lockInput(panel, plot) {
+    plot.addEventListener('wheel', e => e.preventDefault(), { passive: false });
+    panel.addEventListener('wheel', e => {
+      if (e.ctrlKey || getComputedStyle(panel).position !== 'absolute') return; // page zoom; phones: the panel is part of the page
+      for (let n = e.target; n && n !== panel.parentNode; n = n.parentNode) {
+        if (n.nodeType !== 1 || n.scrollHeight <= n.clientHeight + 1 || !/auto|scroll/.test(getComputedStyle(n).overflowY)) continue;
+        if (e.deltaY < 0 ? n.scrollTop > 0 : n.scrollTop + n.clientHeight < n.scrollHeight - 1) return; // this box can still scroll
+      }
+      e.preventDefault();
+    }, { passive: false });
+    let y0 = null, two = false, ht = 0;
+    plot.addEventListener('touchstart', e => { two = e.touches.length > 1; y0 = two ? null : [e.touches[0].clientX, e.touches[0].clientY]; }, { passive: true });
+    plot.addEventListener('touchmove', e => {
+      if (two || !y0 || e.touches.length !== 1 || plot.closest('.mapfs')) return; // in full screen one finger moves the map
+      const t = e.touches[0]; if (Math.hypot(t.clientX - y0[0], t.clientY - y0[1]) < 12) return; y0 = null;
+      let h = plot.querySelector(':scope>.maphint');
+      if (!h) { h = document.createElement('div'); h.className = 'maphint'; h.setAttribute('aria-hidden', 'true'); h.textContent = 'Use two fingers to move the map'; plot.appendChild(h); }
+      h.classList.add('on'); clearTimeout(ht); ht = setTimeout(() => h.classList.remove('on'), 1400);
+    }, { passive: true });
+  }
+  // the page's scrollbar width, so full-width sections (lib.css) span the window without a sideways scroll
+  const setSbw = () => document.documentElement.style.setProperty('--sbw', Math.max(0, innerWidth - document.documentElement.clientWidth) + 'px');
+  if (window.ResizeObserver) new ResizeObserver(setSbw).observe(document.documentElement);
+  addEventListener('resize', setSbw); setSbw();
+  // panel section with a small heading and an optional link-style action ("Show all")
+  function fsec(panel, title, action) {
+    const sec = document.createElement('div'); sec.className = 'fsec';
+    sec.innerHTML = `<div class="fsec-h"><span class="eyebrow">${title}</span></div>`;
+    if (action) { const b = document.createElement('button'); b.type = 'button'; b.className = 'linkbtn'; b.textContent = action[0]; b.onclick = action[1]; sec.firstChild.appendChild(b); }
+    panel.appendChild(sec); return sec;
+  }
+  // legend-style filter rows: swatch, name (+ sub), proportion bar, count. mode 'pick' (one at a time) or 'toggle' (each on/off)
+  function flist(sec, rows, { pressed, onClick, mode = 'pick' }) {
+    const ul = document.createElement('ul'); ul.className = 'flist' + (mode === 'toggle' ? ' toggles' : '');
+    const mx = Math.max(1, ...rows.map(r => r.count || 0)); let any = false;
+    rows.forEach(r => {
+      const li = document.createElement('li'), b = document.createElement('button'); b.type = 'button';
+      const on = !!pressed(r.key); if (on) any = true; b.setAttribute('aria-pressed', on);
+      const col = r.color || 'var(--muted)';
+      b.innerHTML = `<span class="sw" style="background:${col}${r.square ? ';border-radius:3px' : ''}"></span><span class="nm"><span>${r.name}</span>${r.sub ? `<em>${r.sub}</em>` : ''}${r.count != null ? `<span class="fb"><i style="width:${(100 * r.count / mx).toFixed(1)}%;background:${col}"></i></span>` : ''}</span><span class="ct">${r.count != null ? fmt(r.count) : ''}</span>`;
+      b.onclick = () => onClick(r.key); li.appendChild(b); ul.appendChild(li);
+    });
+    if (mode === 'pick' && any) ul.classList.add('filtering');
+    sec.appendChild(ul); return ul;
+  }
+  // segmented switch
+  function seg(sec, opts, value, onChange) {
+    const d = document.createElement('div'); d.className = 'seg';
+    opts.forEach(([v, l]) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = l; b.setAttribute('aria-pressed', v === value); b.onclick = () => onChange(v); d.appendChild(b); });
+    sec.appendChild(d); return d;
+  }
+  // ftabs(panel, [[value, label], ...], value, onChange): a tab row at the very top of a filter panel, for one chart
+  // section that switches between closely related charts of the same data (e.g. two maps). Returns the row.
+  function ftabs(panel, opts, value, onChange) {
+    const d = document.createElement('div'); d.className = 'ftabs'; d.setAttribute('role', 'tablist');
+    opts.forEach(([v, l]) => {
+      const b = document.createElement('button'); b.type = 'button'; b.textContent = l; b.setAttribute('role', 'tab');
+      b.setAttribute('aria-selected', v === value); b.onclick = () => { if (v !== value) onChange(v); }; d.appendChild(b);
+    });
+    panel.prepend(d); return d;
+  }
+  // neighborhood picker inside a panel section
+  function nbPick(sec, value, onSel, label = 'All neighborhoods') {
+    const s = document.createElement('select'); s.className = 'fsel'; s.setAttribute('aria-label', 'Neighborhood'); sec.appendChild(s);
+    nbSelect(s, onSel, value, label); return s;
+  }
+  // on phones the panel collapses behind a "Filters" button
+  function phoneToggle(panel) {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'btn ftoggle'; b.textContent = 'Filters';
+    b.onclick = () => panel.classList.toggle('collapsed'); panel.prepend(b);
+  }
+
+  // sequential color for a value in [0,1]
+  const SEQ = ['--q1', '--q2', '--q3', '--q4', '--q5', '--q6', '--q7'];
+  const seqVar = t => `var(${SEQ[Math.max(0, Math.min(6, Math.floor(t * 7)))]})`;
+  // breaks = [low, high]; the top swatch gets a "+" only when values run past `high` (open = true)
+  function seqLegend(el, breaks, fmtf, label, open = true) {
+    el.innerHTML = `<span>${label}</span>` + SEQ.map((s, i) => `<span><i style="background:var(${s})"></i>${i === 0 ? fmtf(breaks[0]) : i === 6 ? fmtf(breaks[1]) + (open ? '+' : '') : ''}</span>`).join('');
+  }
+  // Seven equal-count classes, so each color holds about the same number of areas and differences across most of
+  // the city stay visible even when a few places are far above the rest. classes(values) -> { color(v), edges }
+  function classes(vals) {
+    const v = vals.filter(x => x != null && isFinite(x)).sort(d3.ascending);
+    const q = d3.scaleQuantile().domain(v).range(d3.range(7));
+    return { color: x => x == null ? 'var(--none)' : `var(${SEQ[q(x)]})`, edges: [v[0], ...q.quantiles(), v[v.length - 1]] };
+  }
+  // legend for classes(): a stepped bar with the value where each color starts, and a swatch for areas with no value
+  function stepLegend(el, edges, fmtf, none) {
+    el.innerHTML = '<div class="steps">' + SEQ.map((s, i) => `<span><i style="background:var(${s})"></i><em>${fmtf(edges[i])}</em></span>`).join('')
+      + `<span class="end"><em>${fmtf(edges[7])}</em></span></div>` + (none ? `<span class="nonekey"><i style="background:var(--none)"></i>${none}</span>` : '');
+  }
+  // compact numbers for legends: 950, 1.3k, 12k
+  const short = v => v >= 1000 ? d3.format('.2~s')(v).replace('G', 'B') : fmtRate(v);
+
+  // ---------- small chart helpers ----------
+  function frame(el, { h = 260, m = { t: 12, r: 16, b: 28, l: 44 } } = {}) {
+    const W = Math.max(320, el.clientWidth || 600); // never narrower than a phone, even if drawn while hidden
+    const svg = d3.select(el).append('svg').attr('viewBox', `0 0 ${W} ${h}`);
+    return { svg, W, H: h, m, iw: W - m.l - m.r, ih: h - m.t - m.b, g: svg.append('g').attr('transform', `translate(${m.l},${m.t})`) };
+  }
+  function yGrid(f, y, ticks = 4, tf = d3.format('~s')) {
+    f.g.append('g').attr('class', 'gridl').call(d3.axisLeft(y).ticks(ticks).tickSize(-f.iw).tickFormat(tf)).call(g => g.select('.domain').remove()).call(g => g.selectAll('text').attr('x', -6));
+    f.g.selectAll('.gridl .tick line').attr('stroke', 'var(--grid)');
+  }
+  function chips(el, items, onSel, { multi = false, sel = null } = {}) {
+    el.innerHTML = '';
+    let cur = sel;
+    items.forEach((it, i) => {
+      const b = document.createElement('button'); b.className = 'chip'; b.type = 'button';
+      b.innerHTML = (it.color ? `<i style="background:${it.color}"></i>` : '') + it.label;
+      b.onclick = () => { cur = it.value; [...el.children].forEach(c => c.classList.remove('on')); b.classList.add('on'); onSel(it.value); };
+      if (it.value === sel) b.classList.add('on');
+      el.appendChild(b);
+    });
+  }
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const monthsLong = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  // the calendar year a page covers; day-of-year (doy) values count from Jan 1 of it
+  let YEAR = new Date().getFullYear();
+  const setYear = y => { YEAR = y; };
+  const doyTime = (d, y = YEAR) => new Date(Date.UTC(y, 0, 1) + d * 864e5);
+  const doyDate = (d, y = YEAR) => { const t = doyTime(d, y); return months[t.getUTCMonth()] + ' ' + t.getUTCDate(); };
+  const doyMonth = (d, y = YEAR) => doyTime(d, y).getUTCMonth();
+  const doyISO = (d, y = YEAR) => doyTime(d, y).toISOString().slice(0, 10);
+  // first doy of each month (only months that start on or before `last`, if given)
+  const monthStarts = (y = YEAR, last = 400) => d3.range(12).map(m => (Date.UTC(y, m, 1) - Date.UTC(y, 0, 1)) / 864e5).filter(d => d <= last);
+  // month labels for a time axis: every month when there's room, every other month on narrow charts,
+  // and never one that would run off the right edge. starts: first doy of each month; x: doy -> px
+  const monthTicks = (starts, x, iw) => {
+    const step = iw / Math.max(1, starts.length) < 34 ? 2 : 1;
+    return starts.map((d, i) => ({ x: x(d), label: months[i], i })).filter(t => t.i % step === 0 && t.x + 22 <= iw);
+  };
+  // 'YYYY-MM-DD' -> 'Nov 18, 2026'
+  const isoDate = s => { const [y, m, d] = s.slice(0, 10).split('-').map(Number); return `${months[m - 1]} ${d}, ${y}`; };
+  // plain-language share: .33 -> 'about a third'
+  function share(p) {
+    const named = [[1 / 4, 'about a quarter'], [1 / 3, 'about a third'], [1 / 2, 'about half'], [2 / 3, 'about two-thirds'], [3 / 4, 'about three-quarters']];
+    const hit = named.find(([v]) => Math.abs(p - v) < 0.025);
+    return hit ? hit[1] : `about ${Math.round(p * 100)}%`;
+  }
+  const numWord = n => ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'][n] || fmt(n);
+  const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
+  const setText = (id, s) => { const el = document.getElementById(id); if (el) el.textContent = s; };
+  const setHTML = (id, s) => { const el = document.getElementById(id); if (el) el.innerHTML = s; };
+
+  // ---------- one subject per page: a row of tabs, one per chart ----------
+  // The URL hash holds the open chart and the page's filters: #chartId&key=value&... so a link opens
+  // that chart with exactly those filters.
+  function hashState() {
+    const [view, ...kv] = location.hash.slice(1).split('&'), o = { view };
+    kv.forEach(p => { const [k, v] = p.split('='); if (k) o[k] = decodeURIComponent(v || ''); });
+    return o;
+  }
+  // views(list, { state, ds }) -- list: [{ id, label, tab, cls, keep, draw(el, first), csv() -> rows, file() -> CSV name (default id), ds: [id, name] }]
+  // A bar at the top of #chart holds a tab per chart (`tab`, or `label`) and Copy link / Download CSV for the open one.
+  // Below it, each chart is its own section (heading `label`, then the chart); only the open one shows.
+  // With a single chart there are no tabs: its heading takes their place in the bar.
+  // Filters are shared page state: refresh() redraws the open chart, and the others redraw when next opened.
+  // state() returns the filters that differ from their defaults; they're written into the link.
+  // A page can open a chart with location.hash = 'chartId'.
+  function views(list, opts = {}) {
+    const host = document.getElementById('chart');
+    const panes = {}, secs = {}, tabs = {}, drawn = new Set(), stale = new Set();
+    const stateKV = () => {
+      const st = opts.state ? opts.state() : {};
+      return Object.entries(st).filter(([, v]) => v != null && v !== '').map(([k, v]) => `&${k}=${encodeURIComponent(v)}`).join('');
+    };
+    const h0 = hashState().view;
+    let cur = list.find(v => v.id === h0) || list[0];
+    const linkFor = () => location.href.split('#')[0] + '#' + cur.id + stateKV();
+    const writeHash = () => history.replaceState(null, '', '#' + cur.id + stateKV());
+    const btn = t => { const b = document.createElement('button'); b.className = 'btn'; b.type = 'button'; b.textContent = t; return b; };
+    // the bar: tabs, then the open chart's Copy link / Download CSV
+    const bar = document.createElement('div'); bar.className = 'vbar';
+    const tabRow = document.createElement('div'); tabRow.className = 'vtabs'; tabRow.setAttribute('role', 'tablist'); tabRow.setAttribute('aria-label', 'Charts');
+    const tools = document.createElement('div'); tools.className = 'tools';
+    const linkB = btn('Copy link'), csvB = btn('Download CSV');
+    linkB.onclick = async () => {
+      writeHash(); const url = linkFor();
+      try { await navigator.clipboard.writeText(url); linkB.textContent = 'Link copied'; }
+      catch (e) { prompt('Copy this link:', url); }
+      setTimeout(() => linkB.textContent = 'Copy link', 1600);
+    };
+    csvB.onclick = () => downloadCSV(cur);
+    tools.append(linkB, csvB);
+    // a page with a single chart has no tabs: the bar holds that chart's heading instead
+    const one = list.length === 1;
+    if (one) bar.classList.add('one');
+    bar.append(one ? document.createElement('h2') : tabRow, tools); host.appendChild(bar);
+    list.forEach(v => {
+      const t = document.createElement('button'); t.type = 'button'; t.textContent = v.tab || v.label;
+      t.id = 'vt-' + v.id; t.setAttribute('role', 'tab'); t.setAttribute('aria-controls', 'v-' + v.id);
+      t.onclick = () => open(v.id); tabRow.appendChild(t); tabs[v.id] = t;
+      const sec = document.createElement('section'); sec.className = 'vsec'; sec.id = 'v-' + v.id;
+      const h = one ? bar.firstChild : document.createElement('h2'); h.textContent = v.label;
+      const p = document.createElement('div'); p.className = 'pane ' + (v.cls || 'card');
+      if (one) { h.id = 'vh-' + v.id; sec.setAttribute('aria-labelledby', h.id); sec.append(p); }
+      else {
+        sec.setAttribute('role', 'tabpanel'); sec.setAttribute('aria-labelledby', 'vt-' + v.id);
+        const head = document.createElement('div'); head.className = 'vsec-h'; head.appendChild(h); sec.append(head, p);
+      }
+      host.appendChild(sec); panes[v.id] = p; secs[v.id] = sec;
+    });
+    // footer "Data:" link goes to the page's City dataset
+    const dataLink = document.getElementById('dataLink'), ds = opts.ds || (list.find(v => v.ds) || {}).ds;
+    if (dataLink && ds) { dataLink.href = 'https://data.nola.gov/d/' + ds[0]; dataLink.textContent = ds[1] + ' on data.nola.gov'; }
+    // charts are drawn only while shown (hidden ones have no size); a hidden chart whose filters changed redraws when opened
+    const drawOne = v => { v.draw(panes[v.id], !drawn.has(v.id)); drawn.add(v.id); stale.delete(v.id); };
+    const draw = () => { tip.hide(); list.forEach(v => { if (v !== cur && drawn.has(v.id)) stale.add(v.id); }); drawOne(cur); writeHash(); setSbw(); };
+    function show(v) {
+      cur = v;
+      list.forEach(x => { secs[x.id].hidden = x !== v; tabs[x.id].setAttribute('aria-selected', x === v); tabs[x.id].tabIndex = x === v ? 0 : -1; });
+      csvB.hidden = !v.csv;
+      if (!drawn.has(v.id) || stale.has(v.id)) drawOne(v);
+      // on phones the tab row scrolls sideways: bring the open tab into view
+      const r = tabRow.getBoundingClientRect(), t = tabs[v.id].getBoundingClientRect();
+      if (t.left < r.left || t.right > r.right) tabRow.scrollLeft += t.left - r.left - 16;
+    }
+    function open(id, focusTab) {
+      const v = list.find(x => x.id === id); if (!v) return;
+      tip.hide(); if (v !== cur || !drawn.has(v.id)) show(v); writeHash();
+      if (focusTab) tabs[id].focus();
+      if (bar.getBoundingClientRect().top < 0) bar.scrollIntoView({ block: 'start' }); // jumped here from further down the page
+    }
+    // arrow keys move between tabs
+    tabRow.addEventListener('keydown', ev => {
+      const i = list.indexOf(cur), n = list.length;
+      const j = ev.key === 'ArrowRight' ? (i + 1) % n : ev.key === 'ArrowLeft' ? (i - 1 + n) % n : ev.key === 'Home' ? 0 : ev.key === 'End' ? n - 1 : -1;
+      if (j >= 0) { ev.preventDefault(); open(list[j].id, true); }
+    });
+    // a link with filters opened on this same page (only the hash changes) reloads, so its filters apply;
+    // the pages' own jumps to a chart set a bare chart id and keep the current filters
+    addEventListener('hashchange', () => {
+      const h = hashState(), st = opts.state ? opts.state() : {};
+      const want = Object.entries(h).filter(([k]) => k !== 'view'), have = Object.entries(st).filter(([, v]) => v != null && v !== '');
+      if (want.length && (want.length !== have.length || want.some(([k, v]) => String(st[k]) !== v))) return location.reload();
+      if (list.some(v => v.id === h.view) && h.view !== cur.id) { list.forEach(x => { if (drawn.has(x.id)) stale.add(x.id); }); open(h.view); } else draw();
+    });
+    let rt, lastW = innerWidth;
+    addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => {
+      if (innerWidth === lastW) return; lastW = innerWidth; // phones fire resize on scroll (address bar); only width matters
+      list.forEach(v => { if (!v.keep && drawn.has(v.id)) { if (v === cur) drawOne(v); else stale.add(v.id); } });
+    }, 150); });
+    function downloadCSV(v) {
+      const rows = v.csv && v.csv(); if (!rows || !rows.length) return;
+      const keys = Object.keys(rows[0]);
+      const cell = x => { x = x == null ? '' : String(x); return /[",\n]/.test(x) ? '"' + x.replace(/"/g, '""') + '"' : x; };
+      const text = [keys.map(cell).join(','), ...rows.map(r => keys.map(k => cell(r[k])).join(','))].join('\n');
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob(['\ufeff' + text], { type: 'text/csv;charset=utf-8' }));
+      a.download = `${location.pathname.split('/').pop().replace('.html', '') || 'index'}-${v.file ? v.file() : v.id}.csv`;
+      document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    }
+    show(cur); writeHash();
+    return { refresh: draw, open, get id() { return cur.id; } };
+  }
+  const legendHTML = items => '<div class="legend">' + items.map(([c, l, round]) => `<span><i style="background:${c}${round ? ';border-radius:50%' : ''}"></i>${l}</span>`).join('') + '</div>';
+
+  return { css, S, fmt, pct, tip, row, setGeo, views, hashState, legendHTML, stage, fsec, flist, seg, ftabs, nbPick, phoneToggle, popOf, perK, fmtRate, POP_NOTE, basisChips, shown, nbList, nbSelect, lonlat, get FULL() { return FULL; }, get GEO() { return GEO; }, map, mapButtons, panelInset, seqVar, seqLegend, classes, stepLegend, short, frame, yGrid, chips, months, monthsLong,
+    setYear, get YEAR() { return YEAR; }, monthTicks, doyTime, doyDate, doyISO, doyMonth, monthStarts, isoDate, share, numWord, cap, setText, setHTML, title };
+})();
+</script>
+<script>// New businesses page (occupational license applications and current licenses)
+(() => {
+  const D = DATA.biz; NOLA.setGeo(DATA.geo);
+  const { fmt, tip, row } = NOLA;
+  const GEO = NOLA.GEO;
+  const nbName = i => i >= 0 ? GEO.nb[i].name : '—';
+  const sw = c => `<i style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${c}"></i> `;
+  const SHORT = { 'Retail Trade': 'Retail', 'Accommodation & Food Services': 'Food service and lodging', 'Other Services (Except Public Administration)': 'Repair, personal and other services',
+    'Professional, Scientific, & Technical Services': 'Professional and technical services', 'Transportation & Warehousing': 'Transportation and warehousing',
+    'Health Care & Social Assistance': 'Health care and social assistance', 'Administrative & Support & Waste Mgmt & Remediation Services': 'Administrative, support and cleanup services',
+    'Arts, Entertainment & Recreation': 'Arts, entertainment and recreation', 'Real Estate & Rental & Leasing': 'Real estate, rental and leasing', 'Educational Services': 'Education',
+    'Finance & Insurance': 'Finance and insurance', 'Wholesale Trade': 'Wholesale' };
+  const nm = s => SHORT[s] || s;
+  const PAL = ['var(--s1)', 'var(--s2)', 'var(--s3)', 'var(--s4)', 'var(--s5)', 'var(--s7)', 'var(--s6)', 'var(--s8)'];
+  const colorOf = name => { const k = D.S.indexOf(name); return k >= 0 && k < PAL.length ? PAL[k] : name === 'Event and street vendors' ? 'var(--ink2)' : /^(Not stated|Other or not stated)$/.test(name) ? 'var(--landline)' : 'var(--muted)'; };
+  const OUT_C = ['var(--s3)', 'var(--s4)', 'var(--muted)', 'var(--s8)', 'var(--s7)', 'var(--s5)'];
+  const lastLabel = NOLA.isoDate(D.last).replace(/, \d+$/, ''), YEAR = +D.last.slice(0, 4), partialYear = y => y === YEAR && !D.last.endsWith('-12-31');
+  const pairs = a => { const o = []; for (let i = 0; i < a.length; i += 2) o.push([a[i], a[i + 1]]); return o; };
+  const new12 = D.new12.map(pairs), now = D.now.map(pairs);
+  const nby = D.nby.map(a => { const o = []; for (let i = 0; i < a.length; i += 3) o.push(a.slice(i, i + 3)); return o; });
+
+  const H = NOLA.hashState();
+  const st = { nb: H.nb != null ? +H.nb : -1, measure: H.measure === 'now' ? 'now' : 'new', sec: H.sec != null ? +H.sec : -1, sec2: H.sec2 != null ? +H.sec2 : -1 };
+  if (!(st.sec < D.S.length)) st.sec = -1; if (!(st.sec2 < D.S2.length)) st.sec2 = -1;
+  const staged = (el, first, isMap) => { if (first) el._s = NOLA.stage(el, { map: isMap }); return el._s; };
+  const set = (k, v) => { st[k] = v; V.refresh(); };
+  const toggle = k => v => set(k, st[k] === v ? -1 : v);
+  const kvList = (sec, items) => sec.insertAdjacentHTML('beforeend', '<div class="srages">' + items.map(([l, c, n]) => `<span>${c ? `<i style="background:${c}"></i>` : '<i></i>'}${l}<b>${n}</b></span>`).join('') + '</div>');
+  const sumOf = (list, s) => d3.sum(list.filter(([k]) => s < 0 || k === s), d => d[1]);
+  const newOf = (nb, s = st.sec) => sumOf(new12[nb], s), nowOf = (nb, s = st.sec2) => sumOf(now[nb], s);
+  const val = i => st.measure === 'now' ? nowOf(i) : newOf(i);
+
+  // ---------- map ----------
+  let m;
+  function drawMap(pane, first) {
+    const { panel, plot } = staged(pane, first, true);
+    panel.innerHTML = '';
+    NOLA.ftabs(panel, [['new', 'New applications, past 12 months'], ['now', 'Licensed now']], st.measure, v => set('measure', v));
+    NOLA.nbPick(NOLA.fsec(panel, 'Neighborhood'), st.nb, v => set('nb', v));
+    const nbs = d3.range(72).filter(nb => st.nb < 0 || nb === st.nb);
+    if (st.measure === 'new')
+      NOLA.flist(NOLA.fsec(panel, `Sector · since ${NOLA.isoDate(D.winStart).replace(/, \d+$/, '')}`, st.sec >= 0 ? ['Show all', () => set('sec', -1)] : null),
+        D.S.map((s, k) => ({ key: k, name: nm(s), color: colorOf(s), count: d3.sum(nbs, nb => newOf(nb, k)) })), { pressed: k => st.sec === k, onClick: toggle('sec') });
+    else
+      NOLA.flist(NOLA.fsec(panel, 'Sector', st.sec2 >= 0 ? ['Show all', () => set('sec2', -1)] : null),
+        D.S2.map((s, k) => ({ key: k, name: nm(s), color: colorOf(s), count: d3.sum(nbs, nb => nowOf(nb, k)) })), { pressed: k => st.sec2 === k, onClick: toggle('sec2') });
+    const ls = NOLA.fsec(panel, 'Legend'), leg = document.createElement('div'); leg.className = 'legend'; ls.appendChild(leg);
+    if (first) {
+      m = NOLA.map(plot, { panel, label: 'Map of business licenses by neighborhood', tip: mapTip });
+      m.lastNb = -1;
+      plot.insertAdjacentHTML('beforeend', '<div class="maplegend"></div>');
+    }
+    const cl = NOLA.classes(d3.range(72).map(val));
+    m.setFill(i => cl.color(val(i)));
+    NOLA.stepLegend(leg, cl.edges, NOLA.short);
+    const ml = plot.querySelector('.maplegend'); NOLA.stepLegend(ml, cl.edges, NOLA.short);
+    const sel = st.measure === 'now' ? (st.sec2 >= 0 ? nm(D.S2[st.sec2]) : '') : (st.sec >= 0 ? nm(D.S[st.sec]) : '');
+    ml.insertAdjacentHTML('afterbegin', `<div class="mlh">${st.measure === 'now' ? 'Businesses licensed now' : 'New license applications, past 12 months'}${sel ? ': ' + sel : ''}</div>`);
+    if (m.lastNb !== st.nb) { m.focus(st.nb, first ? 0 : 450); m.lastNb = st.nb; }
+  }
+  function mapTip(i) {
+    const top = new12[i].slice().sort((a, b) => b[1] - a[1]).filter(([k]) => D.S[k] !== 'Not stated').slice(0, 4);
+    return `<b>${GEO.nb[i].name}</b>` + row('New license applications, past 12 months', fmt(newOf(i, -1)))
+      + top.map(([k, n]) => row(sw(colorOf(D.S[k])) + nm(D.S[k]), fmt(n))).join('') + row('Businesses licensed now', fmt(nowOf(i, -1)));
+  }
+
+  // ---------- applications per year ----------
+  const yearCounts = () => st.nb >= 0
+    ? D.years.map((y, k) => D.S.map((s, j) => d3.sum(nby[st.nb].filter(a => a[0] === k && a[1] === j), a => a[2])))
+    : D.yr;
+  function drawYears(pane, first) {
+    const { panel, plot } = staged(pane, first);
+    panel.innerHTML = '';
+    NOLA.nbPick(NOLA.fsec(panel, 'Neighborhood'), st.nb, v => set('nb', v));
+    const data = yearCounts();
+    NOLA.flist(NOLA.fsec(panel, `Sector · since ${D.years[0]}`, st.sec >= 0 ? ['Show all', () => set('sec', -1)] : null),
+      D.S.map((s, k) => ({ key: k, name: nm(s), color: colorOf(s), count: d3.sum(data, d => d[k]) })), { pressed: k => st.sec === k, onClick: toggle('sec') });
+    if (st.nb < 0) kvList(NOLA.fsec(panel, 'Home-based'), [['Yes', null, fmt(d3.sum(D.home, h => h[0]))], ['No', null, fmt(d3.sum(D.home, h => h[1]))]]);
+    stacked(plot, data, D.S.map(colorOf), s => st.sec < 0 || s === st.sec, (yy, d, tot) => `<b>Filed in ${yy}${partialYear(yy) ? ', through ' + lastLabel : ''}</b>`
+      + (st.nb >= 0 ? `<div style="color:var(--ink2)">${nbName(st.nb)}</div>` : '') + row('Applications', fmt(tot))
+      + (st.sec < 0 ? D.S.map((s, k) => d[k] ? row(sw(colorOf(s)) + nm(s), fmt(d[k])) : '').join('') : ''));
+  }
+  function stacked(plot, data, colors, show, tipFor) {
+    plot.innerHTML = '';
+    const tot = d => d3.sum(d.filter((v, k) => show(k)));
+    const f = NOLA.frame(plot, { h: 360, m: { t: 18, r: 10, b: 28, l: 44 } });
+    const x = d3.scaleBand().domain(D.years).range([0, f.iw]).paddingInner(.22);
+    const y = d3.scaleLinear().domain([0, (d3.max(data, tot) || 1) * 1.05]).range([f.ih, 0]).nice();
+    NOLA.yGrid(f, y, 5, d3.format(','));
+    data.forEach((d, k) => { let y0 = 0; d.forEach((v, s) => { if (!v || !show(s)) return;
+      f.g.append('rect').attr('x', x(D.years[k])).attr('width', x.bandwidth()).attr('y', y(y0 + v)).attr('height', Math.max(.5, y(y0) - y(y0 + v))).attr('fill', colors[s]).attr('opacity', partialYear(D.years[k]) ? .55 : 1); y0 += v; }); });
+    data.forEach((d, k) => { if (partialYear(D.years[k])) f.g.append('text').attr('class', 'halo').attr('x', x(D.years[k]) + x.bandwidth()).attr('y', y(tot(d)) - 5).attr('text-anchor', 'end').style('fill', 'var(--ink2)').text('to ' + lastLabel); });
+    f.g.selectAll('rect.h').data(D.years).join('rect').attr('class', 'h').attr('x', yy => x(yy) - 2).attr('width', x.step()).attr('height', f.ih).attr('fill', 'transparent')
+      .on('mousemove', (ev, yy) => { const d = data[D.years.indexOf(yy)]; tip.show(tipFor(yy, d, tot(d)), ev); }).on('mouseleave', tip.hide);
+    f.g.selectAll('text.x').data(D.years).join('text').attr('class', 'x').attr('x', yy => x(yy) + x.bandwidth() / 2).attr('y', f.ih + 18).attr('text-anchor', 'middle').text(yy => f.iw < 420 ? "'" + String(yy).slice(2) : yy);
+    f.g.append('line').attr('x1', 0).attr('x2', f.iw).attr('y1', f.ih).attr('y2', f.ih).attr('stroke', 'var(--axis)');
+  }
+
+  // ---------- outcomes ----------
+  const outCounts = () => D.yo.map(per => D.out.map((o, j) => d3.sum(per.filter((v, s) => st.sec < 0 || s === st.sec), v => v[j])));
+  function drawOut(pane, first) {
+    const { panel, plot } = staged(pane, first);
+    panel.innerHTML = '';
+    const data = outCounts();
+    NOLA.flist(NOLA.fsec(panel, 'Sector', st.sec >= 0 ? ['Show all', () => set('sec', -1)] : null),
+      D.S.map((s, k) => ({ key: k, name: nm(s), color: colorOf(s), count: d3.sum(D.yr, d => d[k]) })), { pressed: k => st.sec === k, onClick: toggle('sec') });
+    kvList(NOLA.fsec(panel, 'Status now'), D.out.map((o, j) => [o, OUT_C[j], fmt(d3.sum(data, d => d[j]))]).filter(d => d[2] !== '0'));
+    stacked(plot, data, OUT_C, () => true, (yy, d, tot) => `<b>Filed in ${yy}${partialYear(yy) ? ', through ' + lastLabel : ''}</b>` + (st.sec >= 0 ? `<div style="color:var(--ink2)">${nm(D.S[st.sec])}</div>` : '')
+      + row('Applications', fmt(tot)) + D.out.map((o, j) => d[j] ? row(sw(OUT_C[j]) + o, fmt(d[j])) : '').join(''));
+  }
+
+  // ---------- CSV downloads ----------
+  const csvMap = () => NOLA.nbList().map(f => Object.assign({ neighborhood: f.name, new_applications_past_12_months: newOf(f.idx, -1) },
+    ...D.S.map((s, k) => ({ ['new, ' + nm(s)]: newOf(f.idx, k) })), { licensed_now: nowOf(f.idx, -1) }, ...D.S2.map((s, k) => ({ ['now, ' + nm(s)]: nowOf(f.idx, k) }))));
+  const csvYears = () => yearCounts().map((d, k) => Object.assign({ year_filed: D.years[k], area: st.nb >= 0 ? nbName(st.nb) : 'New Orleans', applications: d3.sum(d) }, ...D.S.map((s, j) => ({ [nm(s)]: d[j] }))));
+  const csvOut = () => outCounts().map((d, k) => Object.assign({ year_filed: D.years[k], sector: st.sec >= 0 ? nm(D.S[st.sec]) : 'All' }, ...D.out.map((o, j) => ({ [o]: d[j] }))));
+
+  const V = NOLA.views([
+    { id: 'map', label: 'Business licenses by neighborhood', tab: 'Map of licenses', keep: true, draw: drawMap, csv: csvMap },
+    { id: 'years', label: 'New business license applications per year', tab: 'Applications per year', draw: drawYears, csv: csvYears },
+    { id: 'outcomes', label: 'What happened to each year’s applications', tab: 'Outcomes', draw: drawOut, csv: csvOut },
+  ], { ds: [D.ds[0], 'Occupational Business License Data'],
+       state: () => ({ measure: st.measure !== 'new' ? st.measure : null, sec: st.sec >= 0 ? st.sec : null, sec2: st.sec2 >= 0 ? st.sec2 : null, nb: st.nb >= 0 ? st.nb : null }) });
+})();
+</script>
+</body></html>
