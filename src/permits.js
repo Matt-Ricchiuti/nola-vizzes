@@ -38,7 +38,7 @@
     if (!POINTS.includes(st.cat)) NOLA.seg(NOLA.fsec(panel, 'Count'), [['n', 'Total'], ['hu', 'Per 1,000 homes']], st.basis, v => set('basis', v));
     const ls = NOLA.fsec(panel, 'Legend'), leg = document.createElement('div'); leg.className = 'legend'; ls.appendChild(leg);
     if (POINTS.includes(st.cat)) ls.insertAdjacentHTML('beforeend', NOLA.legendHTML([[CCOL[st.cat], 'Each permit', 1]]));
-    if (st.basis === 'hu' && !POINTS.includes(st.cat)) ls.insertAdjacentHTML('beforeend', `<div class="legend popnote">Per 1,000 housing units (2020 Census). Neighborhoods under ${MIN_HU} housing units are left out.</div>`);
+    if (st.basis === 'hu' && !POINTS.includes(st.cat)) ls.insertAdjacentHTML('beforeend', '<div class="legend popnote">Per 1,000 homes (2020 Census housing units)</div>');
     if (first) {
       m = NOLA.map(plot, { panel, label: 'Map of building permits by neighborhood', tip: mapTip });
       dotG = m.layer.append('g'); m.lastNb = -1;
@@ -132,9 +132,9 @@
   const csvDays = () => D.cats.flatMap((c, k) => [...D.lu, 'All'].map((l, j) => ({ permit_type: c, land_use: l, issued_past_12_months: D.days[k][j][0], median_days: D.days[k][j][1] ?? '', slowest_10pct_days: D.days[k][j][2] ?? '' })));
 
   const V = NOLA.views([
-    { id: 'map', label: 'Permits issued in the past 12 months', keep: true, draw: drawMap, csv: csvMap },
-    { id: 'years', label: 'Permits issued per year', draw: drawYears, csv: csvYears },
-    { id: 'days', label: 'Days from application to permit, past 12 months', draw: drawDays, csv: csvDays },
+    { id: 'map', label: 'Permits issued in the past 12 months', tab: 'Map of permits', keep: true, draw: drawMap, csv: csvMap },
+    { id: 'years', label: 'Permits issued per year', tab: 'Per year', draw: drawYears, csv: csvYears },
+    { id: 'days', label: 'Days from application to permit, past 12 months', tab: 'Days to permit', draw: drawDays, csv: csvDays },
   ], { ds: [D.ds, 'Permits'],
        state: () => ({ cat: st.cat >= 0 ? st.cat : null, lu: st.lu >= 0 ? st.lu : null, basis: st.basis !== 'n' ? st.basis : null, nb: st.nb >= 0 ? st.nb : null }) });
 })();

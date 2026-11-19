@@ -32,7 +32,7 @@
   const measureLabel = () => (st.measure === 'open' ? 'Open requests' : 'Requests, past 12 months')
     + (st.reason >= 0 && st.measure === 'made' ? ': ' + reasonName(st.reason) : st.type >= 0 ? ': ' + D.T[st.type] : '')
     + (st.basis === 'pc' ? ' per 1,000 residents' : '');
-  const POP_NOTE = '<div class="legend popnote">Per 1,000 residents (2020 Census). Requests can be about any place, so rates run high where few people live, like the CBD. Neighborhoods under 1,000 residents are left out.</div>';
+  const POP_NOTE = '<div class="legend popnote">Per 1,000 residents (2020 Census)</div>';
 
   // ---------- neighborhood map ----------
   let m;
@@ -204,8 +204,8 @@
   const V = NOLA.views([
     { id: 'map', label: 'Requests by neighborhood', keep: true, draw: drawMap, csv: csvMap },
     { id: 'monthly', label: 'Requests per month', draw: drawMonthly, csv: csvMonthly },
-    { id: 'close', label: 'Time to close, requests closed in the past 12 months', draw: drawClose, csv: csvClose },
-    { id: 'open', label: 'Open requests, by how long they have been open', draw: drawOpen, csv: csvOpen },
+    { id: 'close', label: 'Time to close, requests closed in the past 12 months', tab: 'Time to Close', draw: drawClose, csv: csvClose },
+    { id: 'open', label: 'Open requests, by how long they have been open', tab: 'Open Requests', draw: drawOpen, csv: csvOpen },
   ], { ds: [D.ds, '311 OPCD Calls'],
        state: () => ({ measure: st.measure !== 'made' ? st.measure : null, type: st.type >= 0 ? st.type : null, reason: st.reason >= 0 ? st.reason : null,
                        basis: st.basis !== 'n' ? st.basis : null, nb: st.nb >= 0 ? st.nb : null }) });

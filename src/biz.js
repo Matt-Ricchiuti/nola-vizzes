@@ -116,9 +116,9 @@
   const csvOut = () => outCounts().map((d, k) => Object.assign({ year_filed: D.years[k], sector: st.sec >= 0 ? nm(D.S[st.sec]) : 'All' }, ...D.out.map((o, j) => ({ [o]: d[j] }))));
 
   const V = NOLA.views([
-    { id: 'map', label: 'Business licenses by neighborhood', keep: true, draw: drawMap, csv: csvMap },
-    { id: 'years', label: 'New business license applications per year', draw: drawYears, csv: csvYears },
-    { id: 'outcomes', label: 'What happened to each year’s applications', draw: drawOut, csv: csvOut },
+    { id: 'map', label: 'Business licenses by neighborhood', tab: 'Map of licenses', keep: true, draw: drawMap, csv: csvMap },
+    { id: 'years', label: 'New business license applications per year', tab: 'Applications per year', draw: drawYears, csv: csvYears },
+    { id: 'outcomes', label: 'What happened to each year’s applications', tab: 'Outcomes', draw: drawOut, csv: csvOut },
   ], { ds: [D.ds[0], 'Occupational Business License Data'],
        state: () => ({ measure: st.measure !== 'new' ? st.measure : null, sec: st.sec >= 0 ? st.sec : null, sec2: st.sec2 >= 0 ? st.sec2 : null, nb: st.nb >= 0 ? st.nb : null }) });
 })();

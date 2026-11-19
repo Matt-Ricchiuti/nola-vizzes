@@ -43,7 +43,7 @@
     if (st.view === 'shade') {
       NOLA.seg(NOLA.fsec(panel, 'Count'), [['n', 'Total'], ['hu', 'Per 100 homes']], st.basis, v => set('basis', v));
       const ls = NOLA.fsec(panel, 'Legend'); leg = document.createElement('div'); leg.className = 'legend'; ls.appendChild(leg);
-      if (st.basis === 'hu') ls.insertAdjacentHTML('beforeend', `<div class="legend popnote">Licenses per 100 housing units (2020 Census). Neighborhoods under ${MIN_HU} housing units are left out.</div>`);
+      if (st.basis === 'hu') ls.insertAdjacentHTML('beforeend', '<div class="legend popnote">Per 100 homes (2020 Census housing units)</div>');
     }
     if (first) {
       m = NOLA.map(plot, { panel, label: 'Map of short-term rental licenses', tip: mapTip });
@@ -150,8 +150,8 @@
 
   const V = NOLA.views([
     { id: 'map', label: 'Active short-term rental licenses', keep: true, draw: drawMap, csv: csvMap },
-    { id: 'noncommercial', label: 'Non-commercial licenses, by type of building', draw: drawNC, csv: csvNC },
-    { id: 'applications', label: 'Permit applications per year, by outcome', draw: drawApps, csv: csvApps },
+    { id: 'noncommercial', label: 'Non-commercial licenses, by type of building', tab: 'Non-commercial Licenses', draw: drawNC, csv: csvNC },
+    { id: 'applications', label: 'Permit applications per year, by outcome', tab: 'Permit applications', draw: drawApps, csv: csvApps },
   ], { ds: [D.ds[0], 'Active Short-Term Rental Licenses'],
        state: () => ({ mapview: st.view !== 'dots' ? st.view : null, cats: st.cats.length < 3 ? st.cats.join('') : null, basis: st.basis !== 'n' ? st.basis : null,
                        group: st.group >= 0 ? st.group : null, nb: st.nb >= 0 ? st.nb : null }) });

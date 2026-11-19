@@ -54,7 +54,7 @@
     }
     NOLA.seg(NOLA.fsec(panel, 'Count'), [['n', 'Total'], ['hu', 'Per 1,000 homes']], st.basis, v => set('basis', v));
     const ls = NOLA.fsec(panel, 'Legend'), leg = document.createElement('div'); leg.className = 'legend'; ls.appendChild(leg);
-    if (st.basis === 'hu') ls.insertAdjacentHTML('beforeend', `<div class="legend popnote">Per 1,000 housing units (2020 Census). Neighborhoods under ${MIN_HU} housing units are left out.</div>`);
+    if (st.basis === 'hu') ls.insertAdjacentHTML('beforeend', '<div class="legend popnote">Per 1,000 homes (2020 Census housing units)</div>');
     if (first) {
       m = NOLA.map(plot, { panel, label: 'Map of code enforcement by neighborhood', tip: mapTip });
       m.lastNb = -1;
@@ -204,12 +204,12 @@
   const csvInsp = () => imon.map(d => Object.assign({ month: `${d.y}-${String(d.mo + 1).padStart(2, '0')}` }, ...D.inspGroups.map((g, k) => ({ [g]: d.a[k] }))));
 
   const V = NOLA.views([
-    { id: 'map', label: 'Code enforcement by neighborhood', keep: true, draw: drawMap, csv: csvMap },
+    { id: 'map', label: 'Code enforcement by neighborhood', tab: 'Map of cases', keep: true, draw: drawMap, csv: csvMap },
     { id: 'years', label: 'Cases filed per year', draw: drawYears, csv: csvYears },
-    { id: 'open', label: 'Open cases, by stage and how long they have been open', draw: drawOpen, csv: csvOpen },
-    { id: 'violations', label: 'Most cited violations, past 12 months', draw: drawViol, csv: csvViol },
-    { id: 'hearings', label: 'Hearing results per year', draw: drawHear, csv: csvHear },
-    { id: 'inspections', label: 'Inspections per month', draw: drawInsp, csv: csvInsp },
+    { id: 'open', label: 'Open cases, by stage and how long they have been open', tab: 'Open cases', draw: drawOpen, csv: csvOpen },
+    { id: 'violations', label: 'Most cited violations, past 12 months', tab: 'Violations', draw: drawViol, csv: csvViol },
+    { id: 'hearings', label: 'Hearing results per year', tab: 'Hearings', draw: drawHear, csv: csvHear },
+    { id: 'inspections', label: 'Inspections per month', tab: 'Inspections', draw: drawInsp, csv: csvInsp },
   ], { ds: [D.ds[0], 'Code Enforcement All Cases'],
        state: () => ({ measure: st.measure !== 'open' ? st.measure : null, stage: st.stage >= 0 ? st.stage : null, res: st.res >= 0 ? st.res : null, basis: st.basis !== 'n' ? st.basis : null,
                        kind: st.kind !== 'ce' ? st.kind : null, ig: st.ig >= 0 ? st.ig : null, nb: st.nb >= 0 ? st.nb : null }) });
