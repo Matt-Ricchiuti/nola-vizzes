@@ -26,13 +26,13 @@ def load(f): return json.load(open(P('data', f), encoding='utf-8'))
 
 PAGES = {'drone': ('NOPD drone flights', {'drone': 'drone.json'}),
          'cfs': ('Calls for service', {'cfs': 'cfs.json', 'hist': 'hist.json'}),
-         'cpc': ('Planning cases', {'cpc': 'cpc.json'}),
-         '311': ('311 service requests', {'sr': '311.json'}),
-         'str': ('Short-term rentals', {'str': 'str.json'}),
-         'blight': ('Blight and code enforcement', {'ce': 'blight.json'}),
-         'permits': ('Building permits', {'permits': 'permits.json'}),
-         'biz': ('New businesses', {'biz': 'biz.json'}),
-         'trees': ('Street trees', {'trees': 'trees.json'})}
+         'cpc': ('City Planning Cases', {'cpc': 'cpc.json'}),
+         '311': ('311 Requests', {'sr': '311.json'}),
+         'str': ('Short-Term Rentals (STRs)', {'str': 'str.json'}),
+         'blight': ('Blight/Code-enforcement', {'ce': 'blight.json'}),
+         'permits': ('Permits', {'permits': 'permits.json'}),
+         'trees': ('Trees', {'trees': 'trees.json'}),
+         'biz': ('New Businesses', {'biz': 'biz.json'})}
 EXTRA = {'about': 'About'}
 # Pages still built (so old links keep working and they can come back) but left out of the header and home-page
 # menus. Remove a key to list the page again.
