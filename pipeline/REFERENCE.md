@@ -25,6 +25,7 @@ The workflow runs at 10:30 UTC. The City reloads most datasets between 04:30 and
 | `hist.json` | with `cfs.json` (current year); a past year when its dataset's `rowsUpdatedAt` moved | Past years are checked daily for last year in January–February, and all years on the 1st of the month. The City loads each year's final rows on January 1. |
 | `cpc.json` | `xxb5-5azv`'s `rowsUpdatedAt` or `geo.json` changed | "Today" for upcoming hearings and the 365-day window is the day the City loaded the data. |
 | `311.json` | `2jgv-pqrq`'s `rowsUpdatedAt` or `geo.json` changed | Incremental download (see below). "Today" is the newest request in the data. |
+| `treereq.json` | with `311.json` (same rows, same key) | No requests of its own: built from the 311 rows already downloaded. |
 | `str.json` | any of `ufdg-ajws`, `en36-xvxg`, `2ei9-wqw2` or `geo.json` changed | All three are replaced by the City every night, so they're downloaded whole (3 requests). A dataset whose date didn't move is read from the saved answers. |
 | `permits.json` | `rcm3-fn58`'s `rowsUpdatedAt` or `geo.json` changed | The City rewrites 99% of rows every night, so incremental downloads don't help. API counts by year and code (with the newest issue date in the same request), plus the past 12 months' rows: 2 requests. |
 | `biz.json` | `abc4-h3u3`'s or `hjcd-grvu`'s `rowsUpdatedAt`, or `geo.json`, changed | Both replaced every night: two whole downloads. |
@@ -50,7 +51,7 @@ Measured 2026-11-19 (MB as the API sends it, uncompressed; about a sixth of that
 | Calls for Service 2026 `es9j-6y5d` | in place, nightly at ~09:00 UTC (~1,800 of 305,000 rows) | daily (catalog) | count + changed rows | 2 requests, 0.2–0.5 MB | 2 requests, 0.2–0.5 MB |
 | Calls for Service 2014–2025 | closed; final rows loaded January 1 | monthly, and last year daily in Jan–Feb (catalog) | monthly counts, when a year's date moved | 0 (13 metadata requests on the 1st) | 0 |
 | CPC projects `xxb5-5azv` | replaced nightly at ~06:00 UTC | daily (catalog) | all rows | 1 request, 9.2 MB | 1 request, 9.2 MB |
-| 311 `2jgv-pqrq` | in place, nightly at ~08:10 UTC (~1,500 of 1,048,000 rows) | daily (catalog) | count + changed rows | 2 requests, 0.1–0.3 MB | 2 requests, 0.1–0.3 MB |
+| 311 `2jgv-pqrq` (311.json and the trees page's treereq.json, built from the same rows) | in place, nightly at ~08:10 UTC (~1,500 of 1,048,000 rows) | daily (catalog) | count + changed rows; treereq.json adds none | 2 requests, 0.1–0.3 MB | 2 requests, 0.1–0.3 MB |
 | STR licenses `ufdg-ajws`, `2ei9-wqw2`, applications `en36-xvxg` | replaced nightly | daily (catalog) | all rows of each one that moved | 3 requests, 8.5 MB | 3 requests, 8.5 MB |
 | Code enforcement cases `u6yx-v2tw` | replaced nightly | daily (catalog) | open cases and cases since 2016 | 1 request, 7.2 MB | 1 request, 7.2 MB |
 | Violations `3ehi-je3s`, hearings `44ct-56tr`, inspections `uh5a-f7uw` | replaced nightly | daily (catalog) | API counts | 5 requests, 0.1 MB | 3 requests, 0.1 MB |
@@ -268,6 +269,17 @@ Rows with `date_created >= 2019-02-01` (about 730,000), columns `request_type, r
 - The page offers requests per 1,000 residents (2020 population), since requests come from people; neighborhoods under 1,000 residents get no rate.
 
 Checked against the API on 2026-11-19: past-12-month total, open total, October 2026 total and Streetlights in October 2026 match `count(*)` queries exactly, and Lakeview and St. Roch match `within_polygon` counts.
+
+## `data/treereq.json`: 311 tree requests (trees page)
+
+The "Tree requests (311)" map on the trees page. `build_311` keeps every 311 request of type `Tree Service` (about 10,800 since November 2020; nearly all since 2022) and writes one point per located request:
+
+- `R`: reasons with at least 30 requests, by count (ties by name), then "Other". Today: Tree Trim, Street or Sidewalk Blocked, Dead or Dying Tree (added April 2026), Blocking Stop Sign or Traffic Signal.
+- `x`, `y`: longitude / latitude x 1e5. `nb`: neighborhood index in `geo.json` (the page maps it to the inventory's own neighborhood list by name).
+- `r`: reason index. `d`: day filed, as days since `t0`. `c`: days from filing to the City's close date (-1 still pending, -2 closed with no close date).
+- `last`: the newest 311 request, the page's "today" for the Month / 6 months / Year filter.
+
+Checked against the API on 2026-11-19: 1,706 tree requests filed in the 182 days to Nov 18, 846 still pending; the page shows 1,705 (one has no location) and 846 open.
 
 ## `data/str.json`: short-term rentals
 

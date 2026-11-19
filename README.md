@@ -45,11 +45,11 @@ Commit and push changes to `src/` together with the rebuilt `site/`.
 
 ## Page layout
 
-Every page has a title, one source line linking to its City dataset, then a row of tabs (one per chart) with **Copy link** / **Download CSV** for the open chart at the end of the row. The chart's title and the chart sit below. A page with one chart (street trees) has no tabs: the chart's title sits in that row instead, and the trees map fills the window below it. The open chart and its filters are kept in the URL.
+Every page has a title, one source line linking to its City dataset, then a row of tabs (one per chart) with **Copy link** / **Download CSV** for the open chart at the end of the row. **Download CSV** links to the open chart's City dataset on data.nola.gov, where the City's own export is; the site doesn't build CSVs itself. The chart's title and the chart sit below. A page with one chart (street trees) has no tabs: the chart's title sits in that row instead, and the trees map fills the window below it. The open chart and its filters are kept in the URL.
 
 Filters live **on the chart**, in a panel styled after the original street-trees map: legend-style rows (swatch, name, live count, proportion bar), segmented switches and a neighborhood picker. On maps the panel floats over the top-left corner, with zoom buttons and a scale bar on the map; on charts it's a sidebar inside the chart card; on phones it stacks above (maps fold it behind a "Filters" button).
 
-How to build a view (`src/lib.js`): `NOLA.views([...])` lists the views; each view's `draw(pane, first)` calls `NOLA.stage(pane, { map })` once to get `{ panel, plot }`, fills the panel with `NOLA.fsec` / `NOLA.flist` / `NOLA.seg` / `NOLA.nbPick`, and draws into `plot`. Maps come from `NOLA.map(plot, { panel })`, which adds the City street map, street names (placed after each zoom, never overlapping), zoom controls and a scale bar. Give each view a `csv()` for its download. Keep text to titles, axis labels and legends; caveats go on the About page. Every neighborhood is drawn and counted; maps just open framed on the populated city (neighborhoods under 100 residents per square mile, `MIN_DENSITY`, start out of view). Map controls are deliberately neutral (no named regions).
+How to build a view (`src/lib.js`): `NOLA.views([...])` lists the views; each view's `draw(pane, first)` calls `NOLA.stage(pane, { map })` once to get `{ panel, plot }`, fills the panel with `NOLA.fsec` / `NOLA.flist` / `NOLA.seg` / `NOLA.nbPick`, and draws into `plot`. Maps come from `NOLA.map(plot, { panel })`, which adds the City street map, street names (placed after each zoom, never overlapping), zoom controls and a scale bar. Give each view a `ds: [id, name]` for the City dataset its chart is about (a function returning one if the chart's filters switch datasets); it falls back to the page's `ds`. Supporting data (neighborhoods, population, street centerlines) is credited on the About page, not on the button. Keep text to titles, axis labels and legends; caveats go on the About page. Every neighborhood is drawn and counted; maps just open framed on the populated city (neighborhoods under 100 residents per square mile, `MIN_DENSITY`, start out of view). Map controls are deliberately neutral (no named regions).
 
 ## Pages
 
@@ -63,7 +63,7 @@ How to build a view (`src/lib.js`): `NOLA.views([...])` lists the views; each vi
 | `permits.html` | Permits (`rcm3-fn58`) | daily |
 | `biz.html` | Occupational Business License Data (`abc4-h3u3`, applications) and Occupational Business Licenses (`hjcd-grvu`, current) | daily |
 | `str.html` | Active Short-Term Rental Licenses (`ufdg-ajws`), Non-Commercial STR Licenses (`2ei9-wqw2`), STR Permit Applications (`en36-xvxg`) | daily |
-| `trees.html` | Tree Location (`3tyj-9x33`) + green space, Oct 2026 export in `data/trees.json` | static (street map daily) |
+| `trees.html` | Tree Location (`3tyj-9x33`) + green space, Oct 2026 export in `data/trees.json`; 311 tree requests (`2jgv-pqrq`) in `data/treereq.json` | inventory static; requests daily with 311 |
 | `about.html` | About the site, sources, disclaimer | with each build |
 
 Pages listed in `UNLISTED` in `build.py` are still refreshed and built, so old links work, but are left out of the header and home-page menus. Remove a page from that set to list it again.

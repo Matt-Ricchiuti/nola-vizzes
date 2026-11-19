@@ -104,6 +104,7 @@ tbody tr:hover td{background:var(--chip)}
 .bar{height:8px;border-radius:0 4px 4px 0;background:var(--s1);display:inline-block;vertical-align:middle}
 .zoomhint{font-size:12px;color:var(--muted);margin-top:6px}
 .btn{font:inherit;font-size:12px;border:1px solid var(--ring);background:var(--surface);color:var(--ink2);border-radius:8px;padding:3px 9px;cursor:pointer}
+a.btn{text-decoration:none;display:inline-block}
 .foot{margin-top:40px;border-top:1px solid var(--grid);padding-top:14px;font-size:12px;color:var(--muted)}
 .foot a{color:var(--muted)}
 .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
@@ -252,6 +253,19 @@ table.static tbody tr{cursor:auto}
 .cpc-kt b{font-weight:600}
 .cpc-kt p{margin:1px 0 0;color:var(--ink2)}
 @media(max-width:600px){.cpc-key{grid-template-columns:1fr;gap:10px}}
+/* the map panel is wider here: it holds the agenda, which matters more than the map's width */
+@media(min-width:761px){.stage.mapstage.cpc-stage>.fpanel{width:380px}}
+/* meeting dates: small boxes per month, the month on its side at the left with a thin rule; groups wrap as wholes */
+.cpc-days{display:flex;flex-wrap:wrap;gap:8px 14px;margin:4px 0 2px}
+.cpc-days .mo{display:flex;gap:5px;max-width:100%}
+.cpc-days .ml{writing-mode:vertical-rl;transform:rotate(180deg);font:600 9.5px/1 "IBM Plex Mono",ui-monospace,monospace;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);text-align:center;padding-left:4px;border-left:1px solid var(--axis)}
+.cpc-days .bx{display:flex;flex-wrap:wrap;gap:4px;min-width:0}
+.cpc-days button{width:28px;height:28px;padding:0;font:500 12px/1 "IBM Plex Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums;color:var(--ink);background:var(--surface);border:1px solid var(--axis);border-radius:5px;cursor:pointer}
+.cpc-days button:hover{background:var(--chip)}
+.cpc-days button.none{color:var(--muted);border-color:var(--grid)}
+.cpc-days button.off{box-shadow:inset 0 -2px 0 var(--s8)}
+.cpc-days button[aria-pressed="true"]{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.cpc-days button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 
 /* ===================== 311 service requests page (src/311.js) ===================== */
 .srmini svg text{fill:var(--ink2)}
@@ -280,7 +294,7 @@ table.static tbody tr{cursor:auto}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script><script src="streets.js"></script>
 </head><body><div class="wrap">
-<div class="site"><b><a href="index.html" style="color:inherit;text-decoration:none">Nola Vizzes</a></b><nav class="topnav" aria-label="Site"><div class="dd"><button type="button" class="ddbtn on" aria-haspopup="true" aria-expanded="false">Visualizations<span aria-hidden="true">▾</span></button><ul class="dd1"><li><a href="cpc.html" class="on" aria-current="page">Planning cases</a></li><li><a href="311.html">311 service requests</a></li><li><a href="str.html">Short-term rentals</a></li><li><a href="blight.html">Blight and code enforcement</a></li><li><a href="permits.html">Building permits</a></li><li><a href="biz.html">New businesses</a></li><li><a href="trees.html">Street trees</a></li></ul></div><a class="xlink" href="about.html">About</a></nav><script>(()=>{const dd=document.currentScript.closest(".site").querySelector(".dd"),b=dd.querySelector(".ddbtn");const set=o=>{dd.classList.toggle("open",o);b.setAttribute("aria-expanded",o)};b.onclick=e=>{e.stopPropagation();set(!dd.classList.contains("open"))};document.addEventListener("click",e=>{if(!dd.contains(e.target))set(false)});dd.addEventListener("keydown",e=>{if(e.key==="Escape"){set(false);b.focus()}})})()</script></div>
+<div class="site"><b><a href="index.html" style="color:inherit;text-decoration:none">Nola Vizzes</a></b><nav class="topnav" aria-label="Site"><div class="dd"><button type="button" class="ddbtn on" aria-haspopup="true" aria-expanded="false">Visualizations<span aria-hidden="true">▾</span></button><ul class="dd1"><li><a href="cpc.html" class="on" aria-current="page">City Planning Cases</a></li><li><a href="311.html">311 Requests</a></li><li><a href="str.html">Short-Term Rentals (STRs)</a></li><li><a href="blight.html">Blight/Code-enforcement</a></li><li><a href="permits.html">Permits</a></li><li><a href="trees.html">Trees</a></li><li><a href="biz.html">New Businesses</a></li></ul></div><a class="xlink" href="about.html">About</a></nav><script>(()=>{const dd=document.currentScript.closest(".site").querySelector(".dd"),b=dd.querySelector(".ddbtn");const set=o=>{dd.classList.toggle("open",o);b.setAttribute("aria-expanded",o)};b.onclick=e=>{e.stopPropagation();set(!dd.classList.contains("open"))};document.addEventListener("click",e=>{if(!dd.contains(e.target))set(false)});dd.addEventListener("keydown",e=>{if(e.key==="Escape"){set(false);b.focus()}})})()</script></div>
 <h1>City Planning Commission cases</h1>
 <div class="src"><a href="https://data.nola.gov/d/xxb5-5azv">CPC Projects</a> · data.nola.gov · Filings through Nov 18, 2026 · Updated Nov 19, 2026</div>
 <div id="chart"></div>
@@ -351,8 +365,6 @@ const NOLA = (() => {
     el.innerHTML = `<option value="-1">${label}</option>` + nbList().map(f => `<option value="${f.idx}">${f.name}</option>`).join('');
     el.value = sel; el.onchange = () => onSel(+el.value);
   }
-  // projected map units -> [lon, lat] (for CSV downloads)
-  const lonlat = (x, y) => [+(x / 4830 - 90.14).toFixed(5), +(30.20 - y / 5550).toFixed(5)];
 
   // map(el, opts) -> {svg, layer, zoomTo, setFill, focus, k()}
   // The map fills el. It keeps clear of an on-map filter panel (o.panel) when fitting, and carries its own
@@ -732,8 +744,10 @@ const NOLA = (() => {
     kv.forEach(p => { const [k, v] = p.split('='); if (k) o[k] = decodeURIComponent(v || ''); });
     return o;
   }
-  // views(list, { state, ds }) -- list: [{ id, label, tab, cls, keep, draw(el, first), csv() -> rows, file() -> CSV name (default id), ds: [id, name] }]
+  // views(list, { state, ds }) -- list: [{ id, label, tab, cls, keep, draw(el, first), ds: [id, name] or () => [id, name] }]
   // A bar at the top of #chart holds a tab per chart (`tab`, or `label`) and Copy link / Download CSV for the open one.
+  // Download CSV links to the open chart's City dataset on data.nola.gov (its export is there): the view's `ds`, which
+  // can be a function of the filters when one chart switches between datasets, else the page's `opts.ds`.
   // Below it, each chart is its own section (heading `label`, then the chart); only the open one shows.
   // With a single chart there are no tabs: its heading takes their place in the bar.
   // Filters are shared page state: refresh() redraws the open chart, and the others redraw when next opened.
@@ -755,14 +769,16 @@ const NOLA = (() => {
     const bar = document.createElement('div'); bar.className = 'vbar';
     const tabRow = document.createElement('div'); tabRow.className = 'vtabs'; tabRow.setAttribute('role', 'tablist'); tabRow.setAttribute('aria-label', 'Charts');
     const tools = document.createElement('div'); tools.className = 'tools';
-    const linkB = btn('Copy link'), csvB = btn('Download CSV');
+    const linkB = btn('Copy link'), csvB = document.createElement('a');
+    csvB.className = 'btn'; csvB.textContent = 'Download CSV'; csvB.target = '_blank'; csvB.rel = 'noopener';
+    const dsOf = v => (typeof v.ds === 'function' ? v.ds() : v.ds) || opts.ds;
+    const setDs = () => { const d = dsOf(cur); csvB.href = 'https://data.nola.gov/d/' + d[0]; csvB.title = `Open the ${d[1]} dataset on data.nola.gov`; };
     linkB.onclick = async () => {
       writeHash(); const url = linkFor();
       try { await navigator.clipboard.writeText(url); linkB.textContent = 'Link copied'; }
       catch (e) { prompt('Copy this link:', url); }
       setTimeout(() => linkB.textContent = 'Copy link', 1600);
     };
-    csvB.onclick = () => downloadCSV(cur);
     tools.append(linkB, csvB);
     // a page with a single chart has no tabs: the bar holds that chart's heading instead
     const one = list.length === 1;
@@ -787,11 +803,11 @@ const NOLA = (() => {
     if (dataLink && ds) { dataLink.href = 'https://data.nola.gov/d/' + ds[0]; dataLink.textContent = ds[1] + ' on data.nola.gov'; }
     // charts are drawn only while shown (hidden ones have no size); a hidden chart whose filters changed redraws when opened
     const drawOne = v => { v.draw(panes[v.id], !drawn.has(v.id)); drawn.add(v.id); stale.delete(v.id); };
-    const draw = () => { tip.hide(); list.forEach(v => { if (v !== cur && drawn.has(v.id)) stale.add(v.id); }); drawOne(cur); writeHash(); setSbw(); };
+    const draw = () => { tip.hide(); list.forEach(v => { if (v !== cur && drawn.has(v.id)) stale.add(v.id); }); drawOne(cur); writeHash(); setDs(); setSbw(); };
     function show(v) {
       cur = v;
       list.forEach(x => { secs[x.id].hidden = x !== v; tabs[x.id].setAttribute('aria-selected', x === v); tabs[x.id].tabIndex = x === v ? 0 : -1; });
-      csvB.hidden = !v.csv;
+      setDs();
       if (!drawn.has(v.id) || stale.has(v.id)) drawOne(v);
       // on phones the tab row scrolls sideways: bring the open tab into view
       const r = tabRow.getBoundingClientRect(), t = tabs[v.id].getBoundingClientRect();
@@ -822,22 +838,12 @@ const NOLA = (() => {
       if (innerWidth === lastW) return; lastW = innerWidth; // phones fire resize on scroll (address bar); only width matters
       list.forEach(v => { if (!v.keep && drawn.has(v.id)) { if (v === cur) drawOne(v); else stale.add(v.id); } });
     }, 150); });
-    function downloadCSV(v) {
-      const rows = v.csv && v.csv(); if (!rows || !rows.length) return;
-      const keys = Object.keys(rows[0]);
-      const cell = x => { x = x == null ? '' : String(x); return /[",\n]/.test(x) ? '"' + x.replace(/"/g, '""') + '"' : x; };
-      const text = [keys.map(cell).join(','), ...rows.map(r => keys.map(k => cell(r[k])).join(','))].join('\n');
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(new Blob(['\ufeff' + text], { type: 'text/csv;charset=utf-8' }));
-      a.download = `${location.pathname.split('/').pop().replace('.html', '') || 'index'}-${v.file ? v.file() : v.id}.csv`;
-      document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-    }
     show(cur); writeHash();
     return { refresh: draw, open, get id() { return cur.id; } };
   }
   const legendHTML = items => '<div class="legend">' + items.map(([c, l, round]) => `<span><i style="background:${c}${round ? ';border-radius:50%' : ''}"></i>${l}</span>`).join('') + '</div>';
 
-  return { css, S, fmt, pct, tip, row, setGeo, views, hashState, legendHTML, stage, fsec, flist, seg, ftabs, nbPick, phoneToggle, popOf, perK, fmtRate, POP_NOTE, basisChips, shown, nbList, nbSelect, lonlat, get FULL() { return FULL; }, get GEO() { return GEO; }, map, mapButtons, panelInset, seqVar, seqLegend, classes, stepLegend, short, frame, yGrid, chips, months, monthsLong,
+  return { css, S, fmt, pct, tip, row, setGeo, views, hashState, legendHTML, stage, fsec, flist, seg, ftabs, nbPick, phoneToggle, popOf, perK, fmtRate, POP_NOTE, basisChips, shown, nbList, nbSelect, get FULL() { return FULL; }, get GEO() { return GEO; }, map, mapButtons, panelInset, seqVar, seqLegend, classes, stepLegend, short, frame, yGrid, chips, months, monthsLong,
     setYear, get YEAR() { return YEAR; }, monthTicks, doyTime, doyDate, doyISO, doyMonth, monthStarts, isoDate, share, numWord, cap, setText, setHTML, title };
 })();
 </script>
@@ -909,8 +915,17 @@ const NOLA = (() => {
   const dayFmt = s => new Date(s.slice(0, 10) + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
   const timeFmt = s => { const h = +s.slice(11, 13), mi = s.slice(14, 16); return !h && mi === '00' ? '' : (h % 12 || 12) + ':' + mi + (h < 12 ? ' a.m.' : ' p.m.'); };
   const cleanDesc = s => s.replace(/^Zoning Docket \d+\/\d+\s*/, '').replace(/^Applicant\(s\):\s*/, '').replace(/^Request:\s*/, '') + (s.length >= 170 ? '…' : '');
+  // meeting dates: past ones drop off (unless the data has nothing newer); the next one starts selected
+  const dayOf_ = u => u.when.slice(0, 10);
+  const TODAY = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Chicago' });
+  const ALLDAYS = [...new Set(up.map(dayOf_))].sort();
+  const DAYS = ALLDAYS.some(d => d >= TODAY) ? ALLDAYS.filter(d => d >= TODAY) : ALLDAYS;
+  const NEXT = DAYS[0] || null;
+  st.day = H.date === 'all' ? 'all' : DAYS.includes(H.date) ? H.date : NEXT;
+  const upLive = up.filter(u => DAYS.includes(dayOf_(u)));
+  const okDay = u => st.day == null || st.day === 'all' || dayOf_(u) === st.day;
   const okFold = u => st.fold < 0 || u.fold === st.fold;
-  const upNb = () => up.filter(u => st.nb < 0 || u.nb === st.nb);
+  const upNb = () => upLive.filter(u => okDay(u) && (st.nb < 0 || u.nb === st.nb));
   const upF = () => upNb().filter(okFold);
 
   // ---------- cases filed ----------
@@ -947,8 +962,11 @@ const NOLA = (() => {
   }
   function drawMap(pane, first) {
     const { panel, plot } = staged(pane, first, true, true); // the tabs and agenda live in the panel, so phones show it open
+    pane.classList.add('cpc-stage'); // a wider panel on this page (lib.css)
     const filed = st.tab === 'filed';
     pane.parentElement.querySelector('.vsec-h h2').textContent = mapTitle();
+    // redrawing the panel empties it for a moment; keep the reader where they were (the panel's scroll, or the page's on phones)
+    const keep = [panel.scrollTop, scrollX, scrollY];
     [...panel.children].forEach(c => { if (!(filed && c === rangeSec)) c.remove(); });
     const nbSec = nbSection(panel);
     if (filed) {
@@ -959,7 +977,7 @@ const NOLA = (() => {
     }
     if (first) {
       mp = NOLA.map(plot, { panel, label: 'Map of City Planning Commission cases',
-        tip: i => `<b>${NOLA.GEO.nb[i].name}</b>` + row(st.tab === 'up' ? 'Upcoming hearings' : `Matching cases, ${rangeTxt()}`, fmt(nbCnt[i] || 0)) });
+        tip: i => `<b>${NOLA.GEO.nb[i].name}</b>` + row(st.tab === 'up' ? (st.day && st.day !== 'all' ? 'Cases, ' + dayFmt(st.day) : 'Upcoming hearings') : `Matching cases, ${rangeTxt()}`, fmt(nbCnt[i] || 0)) });
       rg = mp.layer.append('g'); ud = mp.layer.append('g'); mp.lastNb = -1;
       mp.onZoom(k => {
         ud.selectAll('circle').attr('r', 7 / Math.sqrt(k)).attr('stroke-width', 2 / Math.sqrt(k));
@@ -974,17 +992,19 @@ const NOLA = (() => {
     ud.style('display', filed ? 'none' : null); rg.style('display', filed ? null : 'none');
     if (filed) drawFiled(panel); else drawUpcoming(panel);
     NOLA.ftabs(panel, [['up', 'Upcoming hearings'], ['filed', 'Cases filed']], st.tab, v => set('tab', v));
+    if (!first) { panel.scrollTop = keep[0]; if (scrollY !== keep[2]) scrollTo(keep[1], keep[2]); }
   }
 
   function drawUpcoming(panel) {
     const list = upF();
-    nbCnt = []; up.filter(okFold).forEach(u => { if (u.nb >= 0) nbCnt[u.nb] = (nbCnt[u.nb] || 0) + 1; });
+    nbCnt = []; upLive.filter(u => okDay(u) && okFold(u)).forEach(u => { if (u.nb >= 0) nbCnt[u.nb] = (nbCnt[u.nb] || 0) + 1; });
     typeSection(panel, FOLD.map((f, i) => upNb().filter(u => u.fold === i).length));
-    const ag = NOLA.fsec(panel, `Agenda · ${fmt(list.length)} case${list.length === 1 ? '' : 's'}`);
+    const ag = NOLA.fsec(panel, `Agenda · ${fmt(list.length)} case${list.length === 1 ? '' : 's'}`, st.day && st.day !== 'all' && DAYS.length > 1 ? ['All dates', () => pickDay('all')] : null);
+    datePick(ag);
     const box = document.createElement('div'); box.className = 'agenda'; ag.appendChild(box);
     box.innerHTML = list.length ? d3.groups(list, u => u.when.slice(0, 10)).map(([day, us]) => `<div class="day"><div class="dh">${dayFmt(day)} · ${[...new Set(us.map(u => u.body))].join(', ')}${offDay(day) ? ` <span class="offday" title="This is the next meeting date the City lists for these cases, but it falls on a ${offDay(day)}.">${offDay(day)}: date as listed</span>` : ''}</div>` +
       us.map(u => `<div class="ui" data-c="${u.cnum}${u.when}"><i style="background:${FOLD[u.fold].color}"></i><div><b>${u.addr}</b> <span class="ty">${u.type}</span><div class="ds">${cleanDesc(u.desc)}</div><div class="nb">${nbName(u.nb)} · ${u.cnum}</div></div></div>`).join('') + '</div>').join('')
-      : `<div class="ds">No hearings scheduled${st.nb >= 0 ? ' in ' + nbName(st.nb) : ''}.</div>`;
+      : `<div class="ds">No hearings${st.day && st.day !== 'all' ? ' this date' : ' scheduled'}${st.nb >= 0 ? ' in ' + nbName(st.nb) : ''}${st.fold >= 0 ? ' of this type' : ''}.</div>`;
     const upTip = d => `<b>${d.addr}</b><div style="color:var(--ink2)">${d.type} · ${d.cnum}</div>` + row('Hearing', dayFmt(d.when) + (timeFmt(d.when) ? ', ' + timeFmt(d.when) : '') + (offDay(d.when) ? ` (${offDay(d.when)}, as listed)` : '')) + row('Body', d.body) + row('Neighborhood', nbName(d.nb)) + `<div style="margin-top:6px">${cleanDesc(d.desc)}</div>`;
     const k = mp.k();
     const dots = ud.selectAll('circle').data(list.filter(u => (u.x || u.y) && NOLA.shown(u.nb)), d => d.cnum + d.when).join('circle')
@@ -996,8 +1016,31 @@ const NOLA = (() => {
     function hi(u) {
       dots.attr('opacity', d => !u || d === u ? 1 : .25);
       items.forEach(it => it.classList.toggle('on', !!u && it.dataset.c === u.cnum + u.when));
-      if (u && !panel.matches(':hover')) { const it = items.find(e => e.dataset.c === u.cnum + u.when); if (it) it.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }
     }
+  }
+
+  // meeting dates as a row of small boxes per month, the month turned on its side at the left; one date (or all) at a time
+  let refocus = false;
+  const pickDay = (d, focus) => { refocus = !!focus; set('day', d); };
+  function datePick(sec) {
+    if (!DAYS.length) return;
+    const n = d3.rollup(upLive.filter(u => (st.nb < 0 || u.nb === st.nb) && okFold(u)), v => v.length, dayOf_);
+    const bodies = d3.rollup(upLive, v => [...new Set(v.map(u => u.body))].join(', '), dayOf_);
+    const box = document.createElement('div'); box.className = 'cpc-days'; box.setAttribute('role', 'group'); box.setAttribute('aria-label', 'Meeting date');
+    box.innerHTML = d3.groups(DAYS, d => d.slice(0, 7)).map(([m, ds]) => `<div class="mo"><span class="ml" aria-hidden="true">${new Date(m + '-15T12:00:00').toLocaleDateString('en-US', { month: 'short' })}</span><div class="bx">` +
+      ds.map(d => { const c = n.get(d) || 0, off = offDay(d), lab = `${dayFmt(d)} · ${bodies.get(d)} · ${c} case${c === 1 ? '' : 's'}${off ? ` · ${off}: date as listed` : ''}`;
+        return `<button type="button" data-d="${d}" class="${c ? '' : 'none'}${off ? ' off' : ''}" aria-pressed="${d === st.day}" aria-label="${lab}" title="${lab}">${+d.slice(8)}</button>`; }).join('') + '</div></div>').join('');
+    const bs = [...box.querySelectorAll('button')];
+    const cur = bs.find(b => b.dataset.d === st.day) || bs[0]; bs.forEach(b => b.tabIndex = b === cur ? 0 : -1);
+    bs.forEach(b => b.onclick = () => { if (b.dataset.d !== st.day) pickDay(b.dataset.d, true); });
+    // arrow keys move between dates (and pick them, like tabs)
+    box.addEventListener('keydown', ev => {
+      const i = bs.indexOf(document.activeElement); if (i < 0) return;
+      const j = ev.key === 'ArrowRight' ? Math.min(bs.length - 1, i + 1) : ev.key === 'ArrowLeft' ? Math.max(0, i - 1) : ev.key === 'Home' ? 0 : ev.key === 'End' ? bs.length - 1 : -1;
+      if (j < 0) return; ev.preventDefault(); if (j !== i || bs[j].dataset.d !== st.day) pickDay(bs[j].dataset.d, true);
+    });
+    sec.appendChild(box);
+    if (refocus) { refocus = false; cur.focus({ preventScroll: true }); }
   }
 
   function drawFiled(panel) {
@@ -1072,19 +1115,12 @@ const NOLA = (() => {
     });
   }
 
-  // ---------- CSV downloads ----------
-  const csvUp = () => upF().map(u => ({ hearing: u.when.replace('T', ' '), body: u.body, case_number: u.cnum, type: u.type, address: u.addr, neighborhood: nbName(u.nb), description: u.desc }));
-  const csvFiled = () => matching().filter(okNb).map(p => { const [lon, lat] = p[2] || p[3] ? NOLA.lonlat(p[2], p[3]) : ['', ''];
-    return { filed: isoOf(p[0]), type: P.TYP[p[1]], neighborhood: nbName(p[4]), topics: P.TH.filter((t, i) => (p[5] >> i) & 1).join('; '), lon, lat }; });
-  const csvYears = () => Object.keys(P.typeY).sort().map(y => Object.assign({ year: y }, ...P.TYP.map((t, i) => ({ [t]: P.typeY[y][i] }))));
-  const csvTopics = () => Object.keys(P.themeY).sort().map(y => Object.assign({ year: y }, ...P.TH.map((t, i) => ({ [t]: P.themeY[y][i] }))));
-
   const V = NOLA.views([
-    { id: 'map', label: mapTitle(), tab: 'Map of cases', keep: true, draw: drawMap, csv: () => st.tab === 'up' ? csvUp() : csvFiled() },
-    { id: 'years', label: 'Cases filed per year, by type', draw: drawYears, csv: csvYears },
-    { id: 'topics', label: 'Cases per year mentioning each topic', draw: drawTopics, csv: csvTopics },
+    { id: 'map', label: mapTitle(), tab: 'Map of cases', keep: true, draw: drawMap },
+    { id: 'years', label: 'Cases filed per year, by type', draw: drawYears },
+    { id: 'topics', label: 'Cases per year mentioning each topic', draw: drawTopics },
   ], { ds: ['xxb5-5azv', 'CPC Projects'],
-       state: () => ({ tab: st.tab === 'filed' ? 'filed' : null, from: st.from !== DEF_FROM ? isoOf(st.from) : null, to: st.to !== LAST ? isoOf(st.to) : null,
+       state: () => ({ tab: st.tab === 'filed' ? 'filed' : null, date: st.day !== NEXT ? st.day : null, from: st.from !== DEF_FROM ? isoOf(st.from) : null, to: st.to !== LAST ? isoOf(st.to) : null,
          fold: st.fold >= 0 ? st.fold : null, theme: st.theme >= 0 ? st.theme : null, nb: st.nb >= 0 ? st.nb : null }) });
 })();
 </script>

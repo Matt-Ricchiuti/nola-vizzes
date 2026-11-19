@@ -1019,7 +1019,8 @@ def build_311(api, nbp):
                 if nb >= 0:
                     closeNb[nb][t].append(d)
     stat = lambda v: [len(v), median(v), p90(v)]
-    return {
+    trees = tree_requests(rows, created, closed, nbs, typ, reason, pending, last)
+    return trees, {
         'ds': SR_DS, 'start': SR_START[:7], 'last': last.strftime('%Y-%m-%d'), 'winStart': win0.isoformat(),
         'T': T, 'R': R, 'mon': mon, 'years': years, 'nby': nby,
         'nb12': [[v for r in sorted(c) for v in (r, c[r])] for c in nb12],   # [reason, n, reason, n, ...]
@@ -1028,6 +1029,38 @@ def build_311(api, nbp):
         'closeNb': [[[len(v), median(v)] for v in row] for row in closeNb],
         'total': n, 'recent': sum(recent), 'open': sum(pending), 'noLoc': sum(nb < 0 for nb in nbs),
     }
+
+
+TR_TYPE = 'Tree Service'  # the 311 request type for trees (trims, dead or dying trees, blocked streets and signs)
+TR_REASON_MIN = 30        # a reason needs this many tree requests in all to be listed by name; the rest are "Other"
+
+
+def tree_requests(rows, created, closed, nbs, typ, reason, pending, last):
+    """The 311 tree requests, one point each, for the trees page's request map. Built from the 311 rows already
+    downloaded, so it costs no extra API requests. Points: lon/lat x 1e5, reason index, day filed (days since
+    `t0`), and days to close (-1 still open, -2 closed with no close date)."""
+    idx = [i for i in range(len(rows)) if typ[i] == TR_TYPE]
+    need(len(idx) > 1000, f'311 tree requests: only {len(idx)} found')
+    rc = Counter(reason[i] for i in idx)
+    R = [r for r in ranked(rc) if rc[r] >= TR_REASON_MIN]
+    R += ['Other'] * any(rc[r] < TR_REASON_MIN for r in rc)
+    ri = {r: k for k, r in enumerate(R)}
+    t0 = min(created[i] for i in idx).date()
+    x, y, rr, d, c, nb = [], [], [], [], [], []
+    no_loc = 0
+    for i in idx:
+        lo, la = fnum(rows[i]['longitude']), fnum(rows[i]['latitude'])
+        if nbs[i] < 0 or lo is None or la is None:
+            no_loc += 1
+            continue
+        x.append(round(lo * 1e5)); y.append(round(la * 1e5))
+        rr.append(ri.get(reason[i], len(R) - 1))
+        d.append((created[i].date() - t0).days)
+        days = days_between(created[i], closed[i]) if not pending[i] else None
+        c.append(-1 if pending[i] else -2 if days is None else round(days))
+        nb.append(nbs[i])
+    return {'ds': SR_DS, 't0': t0.isoformat(), 'last': last.strftime('%Y-%m-%d'), 'R': R,
+            'x': x, 'y': y, 'r': rr, 'd': d, 'c': c, 'nb': nb, 'total': len(idx), 'noLoc': no_loc}
 
 
 # ---------------------------------------------------------------- short-term rentals
@@ -1436,7 +1469,7 @@ def build_biz(api, nbp):
 
 # Data files of the pages added with the 311 / housing / business set, and when each counts as stale
 # (file, label, field holding its newest record date, days without a new record before warning).
-NEW_FILES = ['311.json', 'str.json', 'blight.json', 'permits.json', 'biz.json']
+NEW_FILES = ['311.json', 'treereq.json', 'str.json', 'blight.json', 'permits.json', 'biz.json']
 STALE = [('311.json', '311 calls', 'last', 7), ('str.json', 'Short-term rental permit applications', 'last', 14),
          ('blight.json', 'Code enforcement cases', 'last', 14), ('permits.json', 'Permits', 'last', 14),
          ('biz.json', 'Business license applications', 'last', 14)]
@@ -1517,6 +1550,11 @@ def validate(name, obj, prev, same_year=True):
         need(obj['total'] > 100000 and obj['recent'] > 20000, '311: suspiciously few requests')
         need(obj['noLoc'] < 0.1 * obj['total'], '311: most requests failed to map to a neighborhood')
         check_not_collapsed('311 requests', obj['total'], prev and prev.get('total'))
+    elif name == 'treereq.json':
+        n = len(obj['x'])
+        need(all(len(obj[k]) == n for k in ('y', 'r', 'd', 'c', 'nb')) and len(obj['R']) >= 2, 'tree requests: shape')
+        need(obj['noLoc'] < 0.1 * obj['total'], 'tree requests: most failed to map to a neighborhood')
+        check_not_collapsed('311 tree requests', obj['total'], prev and prev.get('total'))
     elif name == 'str.json':
         need(len(obj['nby']) == 72 and len(obj['yr']) == len(obj['years']) and all(len(p) == 5 for p in obj['pts']), 'str: shape')
         need(obj['total'] > 500 and len(obj['nc']['rows']) > 100, 'str: suspiciously few licenses')
@@ -1724,11 +1762,12 @@ def main():
     attempt(['cpc.json'], cpc)
 
     # ---- pages added with the 311 / housing / business set: each file is rebuilt when its dataset(s) or geo changed
-    def sr():
-        if not unchanged('311.json', f'{api.version(SR_DS)}|{geo_key}'):
-            out['311.json'] = build_311(api, P()[0])
+    def sr():  # 311.json and the trees page's tree requests come from the same rows
+        key = f'{api.version(SR_DS)}|{geo_key}'
+        if not (unchanged('311.json', key) & unchanged('treereq.json', key)):
+            out['treereq.json'], out['311.json'] = build_311(api, P()[0])
     print('311 requests ...', flush=True)
-    attempt(['311.json'], sr)
+    attempt(['311.json', 'treereq.json'], sr)
 
     def strs():
         if not unchanged('str.json', '|'.join([api.version(d) for d in (STR_ACTIVE, STR_APPS, STR_NC)] + [geo_key])):

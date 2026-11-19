@@ -137,21 +137,10 @@
     f.g.append('line').attr('x1', 0).attr('x2', f.iw).attr('y1', f.ih).attr('y2', f.ih).attr('stroke', 'var(--axis)');
   }
 
-  // ---------- CSV downloads ----------
-  const csvMap = () => st.view === 'dots'
-    ? pts.filter(p => catOn(p.cat) && (st.nb < 0 || p.nb === st.nb)).map(p => { const [lon, lat] = p.x || p.y ? NOLA.lonlat(p.x, p.y) : ['', ''];
-      return { license: CAT[p.cat].n, bedrooms: p.beds || '', neighborhood: nbName(p.nb), lon, lat }; })
-    : NOLA.nbList().map(f => Object.assign({ neighborhood: f.name, housing_units_2020: HU[f.idx] }, ...CAT.map((c, k) => ({ [c.n.toLowerCase().replace(/ /g, '_') + '_licenses']: byNb[f.idx][k] })),
-      { selected_per_100_homes: perHU(cnt(f.idx), f.idx) == null ? '' : +perHU(cnt(f.idx), f.idx).toFixed(2) }));
-  const csvNC = () => NC.B.map((b, k) => { const rs = ncRows.filter(r => r.b === k && (st.nb < 0 || r.nb === st.nb));
-    return { area: st.nb >= 0 ? nbName(st.nb) : 'New Orleans', building: b, licenses: rs.length, part_of_home: rs.filter(r => r.whole === 0).length, whole_unit: rs.filter(r => r.whole === 1).length }; });
-  const csvApps = () => appCounts().map((d, k) => Object.assign({ year: D.years[k], area: st.nb >= 0 ? nbName(st.nb) : 'New Orleans', license_type: st.group >= 0 ? GNAME[st.group][0] : 'All' },
-    ...D.status.map((s, j) => ({ [STATUS[s] || s]: d[j] }))));
-
   const V = NOLA.views([
-    { id: 'map', label: 'Active short-term rental licenses', keep: true, draw: drawMap, csv: csvMap },
-    { id: 'noncommercial', label: 'Non-commercial licenses, by type of building', tab: 'Non-commercial Licenses', draw: drawNC, csv: csvNC },
-    { id: 'applications', label: 'Permit applications per year, by outcome', tab: 'Permit applications', draw: drawApps, csv: csvApps },
+    { id: 'map', label: 'Active short-term rental licenses', keep: true, draw: drawMap, ds: [D.ds[0], 'Active Short-Term Rental Licenses'] },
+    { id: 'noncommercial', label: 'Non-commercial licenses, by type of building', tab: 'Non-commercial Licenses', draw: drawNC, ds: [D.ds[2], 'Non-Commercial Short-Term Rental Licenses'] },
+    { id: 'applications', label: 'Permit applications per year, by outcome', tab: 'Permit applications', draw: drawApps, ds: [D.ds[1], 'Short-Term Rental Permit Applications'] },
   ], { ds: [D.ds[0], 'Active Short-Term Rental Licenses'],
        state: () => ({ mapview: st.view !== 'dots' ? st.view : null, cats: st.cats.length < 3 ? st.cats.join('') : null, basis: st.basis !== 'n' ? st.basis : null,
                        group: st.group >= 0 ? st.group : null, nb: st.nb >= 0 ? st.nb : null }) });

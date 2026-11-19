@@ -66,8 +66,17 @@
   const dayFmt = s => new Date(s.slice(0, 10) + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
   const timeFmt = s => { const h = +s.slice(11, 13), mi = s.slice(14, 16); return !h && mi === '00' ? '' : (h % 12 || 12) + ':' + mi + (h < 12 ? ' a.m.' : ' p.m.'); };
   const cleanDesc = s => s.replace(/^Zoning Docket \d+\/\d+\s*/, '').replace(/^Applicant\(s\):\s*/, '').replace(/^Request:\s*/, '') + (s.length >= 170 ? '…' : '');
+  // meeting dates: past ones drop off (unless the data has nothing newer); the next one starts selected
+  const dayOf_ = u => u.when.slice(0, 10);
+  const TODAY = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Chicago' });
+  const ALLDAYS = [...new Set(up.map(dayOf_))].sort();
+  const DAYS = ALLDAYS.some(d => d >= TODAY) ? ALLDAYS.filter(d => d >= TODAY) : ALLDAYS;
+  const NEXT = DAYS[0] || null;
+  st.day = H.date === 'all' ? 'all' : DAYS.includes(H.date) ? H.date : NEXT;
+  const upLive = up.filter(u => DAYS.includes(dayOf_(u)));
+  const okDay = u => st.day == null || st.day === 'all' || dayOf_(u) === st.day;
   const okFold = u => st.fold < 0 || u.fold === st.fold;
-  const upNb = () => up.filter(u => st.nb < 0 || u.nb === st.nb);
+  const upNb = () => upLive.filter(u => okDay(u) && (st.nb < 0 || u.nb === st.nb));
   const upF = () => upNb().filter(okFold);
 
   // ---------- cases filed ----------
@@ -104,8 +113,11 @@
   }
   function drawMap(pane, first) {
     const { panel, plot } = staged(pane, first, true, true); // the tabs and agenda live in the panel, so phones show it open
+    pane.classList.add('cpc-stage'); // a wider panel on this page (lib.css)
     const filed = st.tab === 'filed';
     pane.parentElement.querySelector('.vsec-h h2').textContent = mapTitle();
+    // redrawing the panel empties it for a moment; keep the reader where they were (the panel's scroll, or the page's on phones)
+    const keep = [panel.scrollTop, scrollX, scrollY];
     [...panel.children].forEach(c => { if (!(filed && c === rangeSec)) c.remove(); });
     const nbSec = nbSection(panel);
     if (filed) {
@@ -116,7 +128,7 @@
     }
     if (first) {
       mp = NOLA.map(plot, { panel, label: 'Map of City Planning Commission cases',
-        tip: i => `<b>${NOLA.GEO.nb[i].name}</b>` + row(st.tab === 'up' ? 'Upcoming hearings' : `Matching cases, ${rangeTxt()}`, fmt(nbCnt[i] || 0)) });
+        tip: i => `<b>${NOLA.GEO.nb[i].name}</b>` + row(st.tab === 'up' ? (st.day && st.day !== 'all' ? 'Cases, ' + dayFmt(st.day) : 'Upcoming hearings') : `Matching cases, ${rangeTxt()}`, fmt(nbCnt[i] || 0)) });
       rg = mp.layer.append('g'); ud = mp.layer.append('g'); mp.lastNb = -1;
       mp.onZoom(k => {
         ud.selectAll('circle').attr('r', 7 / Math.sqrt(k)).attr('stroke-width', 2 / Math.sqrt(k));
@@ -131,17 +143,19 @@
     ud.style('display', filed ? 'none' : null); rg.style('display', filed ? null : 'none');
     if (filed) drawFiled(panel); else drawUpcoming(panel);
     NOLA.ftabs(panel, [['up', 'Upcoming hearings'], ['filed', 'Cases filed']], st.tab, v => set('tab', v));
+    if (!first) { panel.scrollTop = keep[0]; if (scrollY !== keep[2]) scrollTo(keep[1], keep[2]); }
   }
 
   function drawUpcoming(panel) {
     const list = upF();
-    nbCnt = []; up.filter(okFold).forEach(u => { if (u.nb >= 0) nbCnt[u.nb] = (nbCnt[u.nb] || 0) + 1; });
+    nbCnt = []; upLive.filter(u => okDay(u) && okFold(u)).forEach(u => { if (u.nb >= 0) nbCnt[u.nb] = (nbCnt[u.nb] || 0) + 1; });
     typeSection(panel, FOLD.map((f, i) => upNb().filter(u => u.fold === i).length));
-    const ag = NOLA.fsec(panel, `Agenda · ${fmt(list.length)} case${list.length === 1 ? '' : 's'}`);
+    const ag = NOLA.fsec(panel, `Agenda · ${fmt(list.length)} case${list.length === 1 ? '' : 's'}`, st.day && st.day !== 'all' && DAYS.length > 1 ? ['All dates', () => pickDay('all')] : null);
+    datePick(ag);
     const box = document.createElement('div'); box.className = 'agenda'; ag.appendChild(box);
     box.innerHTML = list.length ? d3.groups(list, u => u.when.slice(0, 10)).map(([day, us]) => `<div class="day"><div class="dh">${dayFmt(day)} · ${[...new Set(us.map(u => u.body))].join(', ')}${offDay(day) ? ` <span class="offday" title="This is the next meeting date the City lists for these cases, but it falls on a ${offDay(day)}.">${offDay(day)}: date as listed</span>` : ''}</div>` +
       us.map(u => `<div class="ui" data-c="${u.cnum}${u.when}"><i style="background:${FOLD[u.fold].color}"></i><div><b>${u.addr}</b> <span class="ty">${u.type}</span><div class="ds">${cleanDesc(u.desc)}</div><div class="nb">${nbName(u.nb)} · ${u.cnum}</div></div></div>`).join('') + '</div>').join('')
-      : `<div class="ds">No hearings scheduled${st.nb >= 0 ? ' in ' + nbName(st.nb) : ''}.</div>`;
+      : `<div class="ds">No hearings${st.day && st.day !== 'all' ? ' this date' : ' scheduled'}${st.nb >= 0 ? ' in ' + nbName(st.nb) : ''}${st.fold >= 0 ? ' of this type' : ''}.</div>`;
     const upTip = d => `<b>${d.addr}</b><div style="color:var(--ink2)">${d.type} · ${d.cnum}</div>` + row('Hearing', dayFmt(d.when) + (timeFmt(d.when) ? ', ' + timeFmt(d.when) : '') + (offDay(d.when) ? ` (${offDay(d.when)}, as listed)` : '')) + row('Body', d.body) + row('Neighborhood', nbName(d.nb)) + `<div style="margin-top:6px">${cleanDesc(d.desc)}</div>`;
     const k = mp.k();
     const dots = ud.selectAll('circle').data(list.filter(u => (u.x || u.y) && NOLA.shown(u.nb)), d => d.cnum + d.when).join('circle')
@@ -153,8 +167,31 @@
     function hi(u) {
       dots.attr('opacity', d => !u || d === u ? 1 : .25);
       items.forEach(it => it.classList.toggle('on', !!u && it.dataset.c === u.cnum + u.when));
-      if (u && !panel.matches(':hover')) { const it = items.find(e => e.dataset.c === u.cnum + u.when); if (it) it.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }
     }
+  }
+
+  // meeting dates as a row of small boxes per month, the month turned on its side at the left; one date (or all) at a time
+  let refocus = false;
+  const pickDay = (d, focus) => { refocus = !!focus; set('day', d); };
+  function datePick(sec) {
+    if (!DAYS.length) return;
+    const n = d3.rollup(upLive.filter(u => (st.nb < 0 || u.nb === st.nb) && okFold(u)), v => v.length, dayOf_);
+    const bodies = d3.rollup(upLive, v => [...new Set(v.map(u => u.body))].join(', '), dayOf_);
+    const box = document.createElement('div'); box.className = 'cpc-days'; box.setAttribute('role', 'group'); box.setAttribute('aria-label', 'Meeting date');
+    box.innerHTML = d3.groups(DAYS, d => d.slice(0, 7)).map(([m, ds]) => `<div class="mo"><span class="ml" aria-hidden="true">${new Date(m + '-15T12:00:00').toLocaleDateString('en-US', { month: 'short' })}</span><div class="bx">` +
+      ds.map(d => { const c = n.get(d) || 0, off = offDay(d), lab = `${dayFmt(d)} · ${bodies.get(d)} · ${c} case${c === 1 ? '' : 's'}${off ? ` · ${off}: date as listed` : ''}`;
+        return `<button type="button" data-d="${d}" class="${c ? '' : 'none'}${off ? ' off' : ''}" aria-pressed="${d === st.day}" aria-label="${lab}" title="${lab}">${+d.slice(8)}</button>`; }).join('') + '</div></div>').join('');
+    const bs = [...box.querySelectorAll('button')];
+    const cur = bs.find(b => b.dataset.d === st.day) || bs[0]; bs.forEach(b => b.tabIndex = b === cur ? 0 : -1);
+    bs.forEach(b => b.onclick = () => { if (b.dataset.d !== st.day) pickDay(b.dataset.d, true); });
+    // arrow keys move between dates (and pick them, like tabs)
+    box.addEventListener('keydown', ev => {
+      const i = bs.indexOf(document.activeElement); if (i < 0) return;
+      const j = ev.key === 'ArrowRight' ? Math.min(bs.length - 1, i + 1) : ev.key === 'ArrowLeft' ? Math.max(0, i - 1) : ev.key === 'Home' ? 0 : ev.key === 'End' ? bs.length - 1 : -1;
+      if (j < 0) return; ev.preventDefault(); if (j !== i || bs[j].dataset.d !== st.day) pickDay(bs[j].dataset.d, true);
+    });
+    sec.appendChild(box);
+    if (refocus) { refocus = false; cur.focus({ preventScroll: true }); }
   }
 
   function drawFiled(panel) {
@@ -229,18 +266,11 @@
     });
   }
 
-  // ---------- CSV downloads ----------
-  const csvUp = () => upF().map(u => ({ hearing: u.when.replace('T', ' '), body: u.body, case_number: u.cnum, type: u.type, address: u.addr, neighborhood: nbName(u.nb), description: u.desc }));
-  const csvFiled = () => matching().filter(okNb).map(p => { const [lon, lat] = p[2] || p[3] ? NOLA.lonlat(p[2], p[3]) : ['', ''];
-    return { filed: isoOf(p[0]), type: P.TYP[p[1]], neighborhood: nbName(p[4]), topics: P.TH.filter((t, i) => (p[5] >> i) & 1).join('; '), lon, lat }; });
-  const csvYears = () => Object.keys(P.typeY).sort().map(y => Object.assign({ year: y }, ...P.TYP.map((t, i) => ({ [t]: P.typeY[y][i] }))));
-  const csvTopics = () => Object.keys(P.themeY).sort().map(y => Object.assign({ year: y }, ...P.TH.map((t, i) => ({ [t]: P.themeY[y][i] }))));
-
   const V = NOLA.views([
-    { id: 'map', label: mapTitle(), tab: 'Map of cases', keep: true, draw: drawMap, csv: () => st.tab === 'up' ? csvUp() : csvFiled() },
-    { id: 'years', label: 'Cases filed per year, by type', draw: drawYears, csv: csvYears },
-    { id: 'topics', label: 'Cases per year mentioning each topic', draw: drawTopics, csv: csvTopics },
+    { id: 'map', label: mapTitle(), tab: 'Map of cases', keep: true, draw: drawMap },
+    { id: 'years', label: 'Cases filed per year, by type', draw: drawYears },
+    { id: 'topics', label: 'Cases per year mentioning each topic', draw: drawTopics },
   ], { ds: ['xxb5-5azv', 'CPC Projects'],
-       state: () => ({ tab: st.tab === 'filed' ? 'filed' : null, from: st.from !== DEF_FROM ? isoOf(st.from) : null, to: st.to !== LAST ? isoOf(st.to) : null,
+       state: () => ({ tab: st.tab === 'filed' ? 'filed' : null, date: st.day !== NEXT ? st.day : null, from: st.from !== DEF_FROM ? isoOf(st.from) : null, to: st.to !== LAST ? isoOf(st.to) : null,
          fold: st.fold >= 0 ? st.fold : null, theme: st.theme >= 0 ? st.theme : null, nb: st.nb >= 0 ? st.nb : null }) });
 })();
