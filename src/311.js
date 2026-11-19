@@ -27,8 +27,8 @@
 
   // ---------- the map: a dot per request ----------
   // Dots: every request filed in the past 12 months, and every request still open, of any age (D.dots, from the
-  // pipeline). The "Past 12 months" tab filters by when it was filed and its status; "Open now" by how long it has
-  // been open. The heatmap (a checkbox on the map) counts the dots shown per neighborhood.
+  // pipeline). The "Filed" tab filters by when it was filed (the past month, 6 months or year) and its status; "Open now"
+  // by how long it has been open. The heatmap (a checkbox on the map) counts the dots shown per neighborhood.
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const P = NOLA.dotData(D.dots), PN = P.n;
   const pType = Int16Array.from(P.r, r => P.R[r][0]);
@@ -69,7 +69,7 @@
       if (b && ty && rs) { nbCnt[P.nb[i]]++; if (nb) shown++; }
       if (st.measure === 'open' && isOpen(i) && ty && rs && nb) aCnt[ageBucket(i)]++;
     }
-    NOLA.ftabs(panel, [['made', 'Past 12 months'], ['open', 'Open now']], st.measure, v => set('measure', v));
+    NOLA.ftabs(panel, [['made', 'Filed'], ['open', 'Open now']], st.measure, v => set('measure', v));
     NOLA.nbPick(NOLA.fsec(panel, 'Neighborhood'), st.nb, v => set('nb', v));
     if (st.nb >= 0) yearsMini(NOLA.fsec(panel, 'Requests per year' + (st.type >= 0 ? ' · ' + D.T[st.type] : '')), st.nb);
     if (st.measure === 'made') {

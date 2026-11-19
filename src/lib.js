@@ -121,8 +121,11 @@ const NOLA = (() => {
     svg.on('pointerdown.hover', ev => { ptrType = ev.pointerType || 'mouse'; });
     function hover(ev, tap) {
       if (layer.node().contains(ev.target)) return;
-      const d = DL && DL.hit(ev, tap);
-      if (d >= 0) { hoverP.datum(null).attr('d', null); setHot(d); tip.show(DL.o.tip(d), ev); return; }
+      const d = DL ? DL.hit(ev, tap) : -1; // (not DL && …: null >= 0 is true)
+      if (d >= 0) { // records at the very same spot draw as one dot: say how many more are under it
+        hoverP.datum(null).attr('d', null); setHot(d); const more = DL.o.stack === false ? 0 : DL.here(d) - 1;
+        tip.show(DL.o.tip(d) + (more > 0 ? `<div class="more">${fmt(more)} more at this spot</div>` : ''), ev); return;
+      }
       setHot(-1);
       const f = ev.target.classList && ev.target.classList.contains('nbpath') ? ev.target.__data__ : null, h = f && o.tip && o.tip(f.idx);
       if (!h) return unhover();
@@ -244,7 +247,8 @@ const NOLA = (() => {
       }
       L.resolve = () => { cols = L.o.colors.map(c => { const [cc, a] = Array.isArray(c) ? c : [c, 1]; return [/^var\(/.test(cc) ? css(cc.slice(4, -1)) : cc, a]; }); };
       // set(o): { x, y: map-unit arrays; n; colors: [css color or [color, alpha]], drawn in this order (later on top);
-      // color(i) -> index into colors; visible(i); r(k) -> radius in CSS px at zoom k; tip(i) -> html }
+      // color(i) -> index into colors; visible(i); r(k) -> radius in CSS px at zoom k; tip(i) -> html; stack: false when tip(i)
+      // already covers every record at that spot }
       L.set = opts => { L.o = opts; if (gridOf !== opts.x) { grid = buildGrid(opts.x, opts.y, opts.n); gridOf = opts.x; } L.resolve(); L.update(); };
       // after the filters change: which dots show, grouped by color
       L.update = () => {
@@ -292,6 +296,12 @@ const NOLA = (() => {
           for (let q = g.start[cell]; q < g.start[cell + 1]; q++) { const i = g.items[q]; const d = (L.o.x[i] - mx) ** 2 + (L.o.y[i] - my) ** 2; if (d < bd && L.o.visible(i)) { bd = d; best = i; } }
         }
         return best;
+      };
+      // how many visible dots sit exactly where dot i does (i included)
+      L.here = i => {
+        const g = grid, X = L.o.x, Y = L.o.y, c = Math.floor((Y[i] - g.y0) / GC) * g.gw + Math.floor((X[i] - g.x0) / GC); let n = 0;
+        for (let q = g.start[c]; q < g.start[c + 1]; q++) { const j = g.items[q]; if (X[j] === X[i] && Y[j] === Y[i] && L.o.visible(j)) n++; }
+        return n;
       };
       onTheme(L.theme);
       return L;
