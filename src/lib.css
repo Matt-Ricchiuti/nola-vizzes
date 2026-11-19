@@ -80,13 +80,17 @@ svg text{fill:var(--muted);font-size:11px;font-family:inherit}
 /* maps on touch screens: one finger scrolls the page, two fingers move the map (NOLA.map / trees.js handle those) */
 .map>svg,.stage.mapstage .plot canvas{touch-action:pan-x pan-y}
 .nbpath{fill:var(--land);stroke:var(--landline);stroke-width:.8;vector-effect:non-scaling-stroke}
-.nbpath.hot:hover{stroke:var(--ink);stroke-width:1.6}
+.nbhover{fill:none;stroke:var(--ink);stroke-width:1.6;vector-effect:non-scaling-stroke}
 .streets{pointer-events:none}
 .st{fill:none;vector-effect:non-scaling-stroke;stroke-linecap:round;stroke-linejoin:round}
 .st3{stroke:var(--road);stroke-width:.5}
 .st2{stroke:var(--road-major);stroke-width:.9}
 .st1{stroke:var(--road-major);stroke-width:.8}
 .st0{stroke:var(--road-fwy);stroke-width:1.7}
+/* shaded maps (map.setFill): streets in the surface color show over every shade, light or dark */
+svg.shaded .st3{stroke:color-mix(in srgb,var(--surface) 45%,transparent)}
+svg.shaded .st2,svg.shaded .st1{stroke:color-mix(in srgb,var(--surface) 70%,transparent)}
+svg.shaded .st0{stroke:color-mix(in srgb,var(--surface) 85%,transparent)}
 .tip{position:fixed;pointer-events:none;background:var(--surface);color:var(--ink);border:1px solid var(--ring);box-shadow:0 6px 24px rgba(0,0,0,.14);border-radius:10px;padding:9px 11px;font-size:12.5px;max-width:300px;z-index:20;opacity:0;transition:opacity .08s}
 .tip b{font-size:13px}
 .tip .r{display:flex;justify-content:space-between;gap:14px;color:var(--ink2)}
@@ -148,7 +152,7 @@ tbody tr:hover td{background:var(--chip)}
 .eyebrow{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
 .fsec{display:flex;flex-direction:column;gap:6px}
 .fsec-h{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
-.linkbtn{background:none;border:0;padding:2px 0;color:var(--accent);font:500 12px inherit;font-family:inherit;cursor:pointer}
+.linkbtn{flex:none;white-space:nowrap;background:none;border:0;padding:2px 0;color:var(--accent);font:500 12px inherit;font-family:inherit;cursor:pointer}
 .flist{display:flex;flex-direction:column;gap:1px;margin:0;padding:0;list-style:none}
 .flist button{all:unset;box-sizing:border-box;width:100%;display:grid;grid-template-columns:12px minmax(0,1fr) auto;gap:9px;align-items:center;padding:5px 6px;border-radius:6px;cursor:pointer}
 .flist button:hover{background:var(--chip)}
@@ -167,7 +171,8 @@ tbody tr:hover td{background:var(--chip)}
 .flist.toggles button[aria-pressed="true"]{background:none;box-shadow:none}
 /* tabs at the top of a filter panel: switch one section between related charts */
 .ftabs{display:flex;gap:2px;padding:3px;background:var(--chip);border-radius:9px}
-.ftabs button{flex:1 1 0;font:inherit;font-size:12.5px;line-height:1.25;border:0;border-radius:7px;background:none;color:var(--ink2);padding:6px 8px;cursor:pointer}
+.ftabs button{flex:1 1 auto;font:inherit;font-size:12.5px;line-height:1.25;border:0;border-radius:7px;background:none;color:var(--ink2);padding:6px 8px;cursor:pointer}
+.ftabs.grid{display:grid;grid-template-columns:1fr 1fr}
 .ftabs button[aria-selected="true"]{background:var(--surface);color:var(--ink);font-weight:600;box-shadow:0 1px 3px rgb(0 0 0 / .12)}
 .ftabs button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .seg{display:flex;border:1px solid var(--ring);border-radius:8px;overflow:hidden;width:max-content;max-width:100%}
@@ -195,7 +200,8 @@ tbody tr:hover td{background:var(--chip)}
 .legend .steps span,.steps span{flex:1;display:flex;flex-direction:column;align-items:stretch;gap:3px;min-width:0}
 .steps i{width:auto!important;height:10px;border-radius:0!important}
 .steps span:first-child i{border-radius:3px 0 0 3px!important}
-.steps span:nth-child(7) i{border-radius:0 3px 3px 0!important}
+.steps span:nth-last-child(2) i{border-radius:0 3px 3px 0!important}
+.steps span:first-child:nth-last-child(2) i{border-radius:3px!important}
 .steps em{align-self:flex-start;font-style:normal;font-size:10.5px;color:var(--ink2);white-space:nowrap;font-variant-numeric:tabular-nums;transform:translateX(-50%)}
 .steps span:first-child em{transform:none}
 .steps .end{flex:0 0 0;padding-top:13px}
@@ -263,12 +269,11 @@ table.static tbody tr{cursor:auto}
 .cpc-days button[aria-pressed="true"]{background:var(--ink);color:var(--surface);border-color:var(--ink)}
 .cpc-days button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 
-/* ===================== 311 service requests page (src/311.js) ===================== */
+/* ---------- a key that isn't a filter (NOLA.kv): swatch, label, value; lines up with .flist rows ---------- */
+.kvl{display:flex;flex-direction:column;gap:5px;font-size:12.5px;color:var(--ink2);padding:0 6px}
+.kvl span{display:grid;grid-template-columns:12px minmax(0,1fr) auto;gap:9px;align-items:center}
+.kvl i{width:11px;height:11px;border-radius:3px}
+.kvl i.tick{width:2px;height:14px;border-radius:0;justify-self:center}
+.kvl b{font:400 12px "IBM Plex Mono",ui-monospace,monospace;color:var(--muted);font-variant-numeric:tabular-nums}
+/* small yearly bars inside a map's panel (311) */
 .srmini svg text{fill:var(--ink2)}
-.srages{display:flex;flex-direction:column;gap:5px;font-size:12.5px;color:var(--ink2)}
-.srages span{display:grid;grid-template-columns:12px 1fr auto;gap:8px;align-items:center}
-.srages i{width:11px;height:11px;border-radius:3px}
-.srages b{font:400 12px "IBM Plex Mono",ui-monospace,monospace;color:var(--muted)}
-/* ===================== short-term rentals page (src/str.js): uses the 311 page's .srages lists ===================== */
-/* ===================== blight and code enforcement page (src/blight.js); also uses .srages ===================== */
-.srages i.tickkey{width:2px;height:14px;border-radius:0;background:var(--ink);margin-left:4px}
