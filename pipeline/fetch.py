@@ -779,7 +779,7 @@ def build_cpc(api, nbp, today):
     openByType = [0] * 11
     dec = {'appr': 0, 'den': 0, 'wd': 0}
     nbRecent = [[0] * 11 for _ in range(72)]
-    up, pts = [], []
+    up, pts, ptsInfo = [], [], []
     for i, r in enumerate(rows):
         t = cpc_type(r.get('case_type'))
         desc = r.get('description') or ''
@@ -808,6 +808,7 @@ def build_cpc(api, nbp, today):
                 nbRecent[nb][t] += 1
             if win0 <= fd.date() <= today:
                 pts.append([(fd.date() - win0).days, t, x, y, nb, bits])
+                ptsInfo.append([(r.get('address') or '').split(',')[0].strip()[:40], (r.get('case_num') or '').strip(), int(r.get('open_closed') == 'Open')])
         nmd = parse_ts(r.get('next_meeting_date'))
         if nmd and nmd.date() >= today:
             up.append([nmd.strftime('%Y-%m-%dT%H:%M'), r.get('next_meeting') or '', r.get('case_num') or '', CPC_TYP[t],
@@ -815,6 +816,7 @@ def build_cpc(api, nbp, today):
     up.sort(key=lambda u: u[0])
     return {'TYP': CPC_TYP, 'TH': CPC_TH, 'typeY': dict(sorted(typeY.items())), 'themeY': dict(sorted(themeY.items())),
             'openByType': openByType, 'dec': dec, 'nbRecent': nbRecent, 'up': up, 'pts': pts,
+            'ptsInfo': ptsInfo,   # [address, case number, open (1) / closed (0)] per pts entry, same order
             'windowStart': win0.isoformat(), 'total': len(rows),
             'firstFiled': min((parse_ts(r.get('filing_date')) for r in rows if parse_ts(r.get('filing_date'))), default=None).strftime('%Y-%m-%d'),
             'lastFiled': max((parse_ts(r.get('filing_date')) for r in rows if parse_ts(r.get('filing_date'))), default=None).strftime('%Y-%m-%d')}
@@ -1282,6 +1284,42 @@ def ce_insp_group(t):
     return 3
 
 
+def blight_dots(rows, filed, nbs, grass, gfiled, gnb, ab, anb, today, win0):
+    """Dots for the blight map, from the rows build_blight already has. cases: every open case and every case filed
+    in the past 12 months (o 1 open; s stage index for open cases, -1 closed; i first inspection: 0 violation,
+    1 no violation, 2 not yet or other). grass: grass-cutting cases open or filed in the past 12 months. abate:
+    properties in abatement now (the rows fetched carry no dates)."""
+    sp = lambda r: dot_xy(*(sp_lonlat(fnum(r.get('xpos')), fnum(r.get('ypos'))) or (None, None)))
+    cases = []
+    for r, f, nb in zip(rows, filed, nbs):
+        is_open = r.get('o_c') == 'Open'
+        if f is None or nb < 0 or not (is_open or win0 <= f.date() <= today):
+            continue
+        p = sp(r)
+        if p is None:
+            continue
+        st = (r.get('stage') or '').strip()
+        res = (r.get('initinspresult') or '').lower()
+        cases.append({'day': f.date(), 'x': p[0], 'y': p[1], 'nb': nb, 'o': int(is_open),
+                      's': CE_STAGES.index(st) if is_open and st in CE_STAGES else -1,
+                      'i': 0 if res.startswith('violation') else 1 if res.startswith('no violation') else 2})
+    gr = []
+    for r, f, nb in zip(grass, gfiled, gnb):
+        is_open = r.get('o_c') == 'Open'
+        if f is None or nb < 0 or f.date() > today or not (is_open or f.date() >= win0):
+            continue
+        p = dot_xy(fnum(r.get('longitude')), fnum(r.get('latitude')))
+        if p:
+            gr.append({'day': f.date(), 'x': p[0], 'y': p[1], 'nb': nb, 'o': int(is_open)})
+    abate = []
+    for r, nb in zip(ab, anb):
+        if r.get('o_c') == 'Open' and nb >= 0:
+            p = sp(r)
+            if p:
+                abate.append({'day': None, 'x': p[0], 'y': p[1], 'nb': nb})
+    return {'cases': dot_pack(cases, ['o', 's', 'i']), 'grass': dot_pack(gr, ['o']), 'abate': dot_pack(abate, [])}
+
+
 def build_blight(api, nbp):
     for ds, cols, label in [(CE_CASES, ['casefiled', 'o_c', 'stage', 'xpos', 'ypos', 'initinspresult'], 'Code enforcement cases'),
                             (CE_VIOL, ['violationdate', 'violation'], 'Code enforcement violations'),
@@ -1381,7 +1419,9 @@ def build_blight(api, nbp):
     for r in insp:
         m = parse_ts(r['m'])
         imon[month_index(m, CE_START, 1)][ce_insp_group(r.get('inspectiontype'))] += int(r['n'])
+    dots = blight_dots(rows, filed, nbs, grass, gfiled, gnb, ab, anb, today, win0)
     return {
+        'dots': dots,
         'ds': [CE_CASES, CE_VIOL, CE_INSP, CE_HEAR, CE_GRASS, CE_ABATE], 'last': today.isoformat(), 'winStart': win0.isoformat(),
         'stages': CE_STAGES, 'ages': CE_AGES, 'openAge': openAge, 'new12': new12,
         'years': years, 'yr': yr,
@@ -1434,7 +1474,7 @@ def build_permits(api, nbp):
     nbs, xy = points_to_nb(nbp, [{'longitude': (r.get('location_1') or {}).get('longitude'), 'latitude': (r.get('location_1') or {}).get('latitude')} for r in rows])
     nbc = [Counter() for _ in range(72)]
     days = [[[] for _ in PERMIT_LU] for _ in PERMIT_CATS]
-    pts = []
+    pts, dots = [], []
     for r, nb, (x, y) in zip(rows, nbs, xy):
         c = PERMIT_CODES.get((r.get('code') or '').strip(), 8)
         lu = PERMIT_LU_MAP.get((r.get('landuse') or '').strip(), 4)
@@ -1446,6 +1486,11 @@ def build_permits(api, nbp):
             days[c][lu].append(d)
         if c in PERMIT_POINTS and nb >= 0:
             pts.append([x, y, c, nb, lu, (issued.date() - win0).days])
+        loc = r.get('location_1') or {}
+        p = dot_xy(fnum(loc.get('longitude')), fnum(loc.get('latitude'))) if nb >= 0 and issued else None
+        if p:   # dots: every located permit; tn the City's permit type, f days from filing to issue (-1 unknown)
+            dots.append({'day': issued.date(), 'x': p[0], 'y': p[1], 'nb': nb, 'c': c, 'lu': lu, 'f': -1 if d is None else int(d + 0.5),
+                         'tn': re.sub(r'\s+', ' ', (r.get('type') or '').strip()) or 'Not stated'})
     stat = lambda v: [len(v), median(v), p90(v)]
     return {
         'ds': PERMITS, 'last': today.isoformat(), 'winStart': win0.isoformat(),
@@ -1453,7 +1498,18 @@ def build_permits(api, nbp):
         'nbc': [[v for k in sorted(c) for v in (*k, c[k])] for c in nbc],   # [cat, landUse, n, ...] per nb, past 12 months
         'days': [[stat(v) for v in row] + [stat([d for v in row for d in v])] for row in days],  # [n, median, p90] per land use, then all
         'pts': sorted(pts), 'total': len(rows), 'noLoc': sum(nb < 0 for nb in nbs),
+        'dots': dot_typed(dots, ['c', 'lu', 't', 'f']),
     }
+
+
+def dot_typed(recs, cols):
+    """dot_pack, with each record's type name `tn` stored as an index `t` into the list `T`."""
+    T, ti = dot_dict([r['tn'] for r in recs])
+    for r, k in zip(recs, ti):
+        r['t'] = k
+    out = dot_pack(recs, cols)
+    out['T'] = T
+    return out
 
 
 # ---------------------------------------------------------------- new businesses (occupational licenses)
@@ -1532,6 +1588,7 @@ def build_biz(api, nbp):
     s2i = {c: k for k, c in enumerate(S2)}
     nnb, _ = points_to_nb(nbp, now)
     nowNb = [Counter() for _ in range(72)]
+    now_s = []
     for r, nb in zip(now, nnb):
         t = (r.get('businesstype') or '').strip()
         if re.match(r'(special events|mardi gras|flea market|artist-painting)', t, re.I):
@@ -1539,10 +1596,28 @@ def build_biz(api, nbp):
         else:
             c = t2s.get(biz_type_key(t))
             s = s2i.get(ranked(c)[0], s2i['Other sectors']) if c else len(S2) - 1
+        now_s.append(s)
         if nb >= 0:
             nowNb[nb][s] += 1
     sparse = lambda c: [v for key in sorted(c) for v in ((*key, c[key]) if isinstance(key, tuple) else (key, c[key]))]
+    # dots: every located application since BIZ_START (s sector, o outcome, h home-based 1 / not 0 / not stated -1,
+    # t business type), and every located business licensed now (day licensed since, s sector in S2, t type)
+    tn = lambda v: re.sub(r'\s+', ' ', (v or '').strip()) or 'Not stated'
+    da, dn = [], []
+    for r, f, c, nb in zip(apps, filed, cat, nbs):
+        p = dot_xy(fnum(r.get('longitude')), fnum(r.get('latitude'))) if nb >= 0 and f and BIZ_START <= f.year and f.date() <= today else None
+        if p:
+            h = (r.get('ishome') or '').strip()
+            da.append({'day': f.date(), 'x': p[0], 'y': p[1], 'nb': nb, 's': sector(c), 'o': biz_outcome(r.get('currentstatus')),
+                       'h': 1 if h == 'True' else 0 if h == 'False' else -1, 'tn': tn(r.get('businesstype'))})
+    for r, nb, s in zip(now, nnb, now_s):
+        p = dot_xy(fnum(r.get('longitude')), fnum(r.get('latitude'))) if nb >= 0 else None
+        if p:
+            sd = parse_ts(r.get('businessstartdate'))
+            dn.append({'day': sd.date() if sd and sd.year > 1900 else None,   # 1900-01-01 stands for 'not recorded'
+                       'x': p[0], 'y': p[1], 'nb': nb, 's': s, 'tn': tn(r.get('businesstype'))})
     return {
+        'dots': {'apps': dot_typed(da, ['s', 'o', 'h', 't']), 'now': dot_typed(dn, ['s', 't'])},
         'ds': [BIZ_APPS, BIZ_NOW], 'last': today.isoformat(), 'winStart': win0.isoformat(),
         'S': S, 'out': BIZ_OUT, 'years': years, 'yr': yr, 'yo': yo, 'home': home,
         'nby': [sparse(c) for c in nby],      # [yearIdx, sector, n, ...] per nb
@@ -1603,6 +1678,13 @@ def check_not_collapsed(label, new, old, floor=0.9):
         need(new >= old * floor, f'{label}: {new} now vs {old} in the last good build. Refusing to publish.')
 
 
+def dots_ok(label, d, least):
+    """A dots object: every column as long as the record count, and at least `least` records."""
+    cols = [k for k, v in d.items() if isinstance(v, list) and k not in ('R', 'T')]
+    need(all(len(d[k]) == d['n'] for k in cols), f'{label} dots: columns of different lengths')
+    need(d['n'] >= least, f'{label} dots: only {d["n"]} records')
+
+
 def validate(name, obj, prev, same_year=True):
     """Checks one rebuilt data file before it's written. prev is the last good version of the same file."""
     if name == 'geo.json':
@@ -1635,6 +1717,7 @@ def validate(name, obj, prev, same_year=True):
         need(obj['total'] > 100000 and obj['recent'] > 20000, '311: suspiciously few requests')
         need(obj['noLoc'] < 0.1 * obj['total'], '311: most requests failed to map to a neighborhood')
         check_not_collapsed('311 requests', obj['total'], prev and prev.get('total'))
+        dots_ok('311', obj['dots'], 20000)
     elif name == 'treereq.json':
         n = len(obj['x'])
         need(all(len(obj[k]) == n for k in ('y', 'r', 'd', 'c', 'nb')) and len(obj['R']) >= 2, 'tree requests: shape')
@@ -1651,17 +1734,22 @@ def validate(name, obj, prev, same_year=True):
         need(obj['open'] > 2000 and obj['total'] > 20000, 'blight: suspiciously few cases')
         need(obj['noLoc'] < 0.1 * obj['total'], 'blight: most cases failed to map to a neighborhood')
         check_not_collapsed('code enforcement cases', obj['total'], prev and prev.get('total'))
+        for k, lo in (('cases', 2000), ('grass', 200), ('abate', 200)):
+            dots_ok('blight ' + k, obj['dots'][k], lo)
     elif name == 'permits.json':
         need(len(obj['nbc']) == 72 and len(obj['yr']) == len(obj['years']) and len(obj['days']) == len(obj['cats']), 'permits: shape')
         need(obj['total'] > 5000, 'permits: suspiciously few permits in the past 12 months')
         need(obj['noLoc'] < 0.1 * obj['total'], 'permits: most permits failed to map to a neighborhood')
         check_not_collapsed('permits issued in the past 12 months', obj['total'], prev and prev.get('total'), floor=0.75)
+        dots_ok('permits', obj['dots'], 0.8 * (obj['total'] - obj['noLoc']))
     elif name == 'biz.json':
         need(len(obj['nby']) == 72 and len(obj['new12']) == 72 and len(obj['now']) == 72 and len(obj['yr']) == len(obj['years']), 'biz: shape')
         need(obj['total'] > 10000 and obj['nowTotal'] > 10000, 'biz: suspiciously few licenses')
         need(obj['noLoc'] < 0.1 * obj['total'], 'biz: most applications failed to map to a neighborhood')
         check_not_collapsed('business license applications', obj['total'], prev and prev.get('total'))
         check_not_collapsed('current business licenses', obj['nowTotal'], prev and prev.get('nowTotal'), floor=0.8)
+        dots_ok('business applications', obj['dots']['apps'], 0.8 * (obj['total'] - obj['noLoc']))
+        dots_ok('current business licenses', obj['dots']['now'], 0.8 * (obj['nowTotal'] - obj['nowNoLoc']))
 
 
 def central_date(iso_utc):
