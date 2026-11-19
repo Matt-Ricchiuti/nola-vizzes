@@ -4,6 +4,31 @@ The first snapshot in `data/` was pulled on **2026-11-18** with JavaScript in a 
 
 The front-end expects exactly the shapes documented below. If you change a shape, change the matching `src/*.js`.
 
+## Dots (`dots` in 311, blight, permits and biz)
+
+Every map's base layer is one dot per record (`NOLA.map().dots`, a canvas). The builders write them from rows they already download, so they cost no extra requests. One `dots` object:
+
+```
+{ "q": 4, "epoch": "2000-01-01", "n": records,
+  "x": [...], "y": [...],      # map units (the projection below) x q, so about 5 m
+  "nb": [...],                 # neighborhood index; records outside every neighborhood or without a location are left out
+  "d0": first day, "d": [...], # day of each record as days since epoch: d0, then deltas in date order (-1: no date; those come first)
+  ...columns, ...lookup lists }
+```
+
+Records are sorted by date (then x, y), so a new day's records only add to the end and the committed file changes little. `NOLA.dotData()` decodes one.
+
+| File | `dots` | Columns |
+|---|---|---|
+| 311.json | requests filed in the past 12 months, plus every request still open (any age) | `r` index into `R` ([type index, reason]: the page's `R` plus [type, "Other"] where needed), `c` days to close (-1 open, -2 closed without a close date) |
+| blight.json | `cases`: open, or filed in the past 12 months; `grass`: open, or filed in the past 12 months; `abate`: in abatement now (no dates) | cases: `o` open 1/0, `s` stage index (open cases; -1 closed), `i` first inspection (0 violation, 1 none, 2 not yet or other); grass: `o` |
+| permits.json | every permit issued in the past 12 months (day = issue date) | `c` type (`cats`), `lu` land use, `t` index into `T` (the City's permit type), `f` days from filing to issue (-1 unknown) |
+| biz.json | `apps`: every application since 2018 (day = filed); `now`: every business licensed now (day = business start date; 1900-01-01 counts as not recorded) | apps: `s` sector (`S`), `o` outcome (`out`), `h` home-based 1/0/-1, `t` business type (`T`); now: `s` sector (`S2`), `t` |
+
+`cpc.json` keeps its `pts` and adds `ptsInfo`: [address, case number, open 1/0] for each point, in the same order. Short-term rental `pts` carry their own address and license details.
+
+Checked against the API on 2026-11-19 (one `count(*)` each): 311 requests filed in the 30 days to Nov 18 with a location, 8,231 (8,229 dots; two fall outside every neighborhood); permits issued in those 30 days, 1,496 = 1,496; business license applications filed in them with a location, 171 = 171. Blight's new cases in the past 12 months match the page's existing count (6,477).
+
 API basics: `https://data.nola.gov/resource/<id>.json?$select=...&$where=...&$group=...&$limit=...` (SoQL). CSV is also available at `/resource/<id>.csv`. Metadata is at `/api/views/<id>.json`. A free Socrata app token (header `X-App-Token`) avoids throttling. Store it as a GitHub Actions secret.
 
 ---
