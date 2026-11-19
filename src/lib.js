@@ -303,28 +303,14 @@ const NOLA = (() => {
         for (let c = 0; c < buckets.length; c++) {
           const B = buckets[c]; if (!B.length) continue;
           const [col, alpha] = cols[c];
-          if (round) {
-            sctx.fillStyle = col; sctx.globalAlpha = alpha; sctx.beginPath();
-            for (let j = 0; j < B.length; j++) {
-              const i = B[j], px = X[i] * a + bx, py = Y[i] * a + by;
-              if (px < -pad || py < -pad || px > sw + pad || py > sh + pad) continue;
-              sctx.moveTo(px + r, py); sctx.arc(px, py, r, 0, 6.2832);
-            }
-            sctx.fill();
-            if (edge) { sctx.globalAlpha = Math.min(1, alpha + .2); sctx.strokeStyle = surf; sctx.lineWidth = lw; sctx.stroke(); }
-          } else { // tiny dots: squares (fillRect is the fastest way to draw many), outlined (heatmap on) by a slightly
-            // larger square of the page's color underneath
-            const e = edge ? lw : 0, rr = 2 * r, re = rr + 2 * e;
-            for (let pass = edge ? 0 : 1; pass < 2; pass++) {
-              sctx.fillStyle = pass ? col : surf; sctx.globalAlpha = pass ? alpha : Math.min(1, alpha + .2);
-              const o = pass ? r : r + e, w = pass ? rr : re;
-              for (let j = 0; j < B.length; j++) {
-                const i = B[j], px = X[i] * a + bx, py = Y[i] * a + by;
-                if (px < -pad || py < -pad || px > sw + pad || py > sh + pad) continue;
-                sctx.fillRect(px - o, py - o, w, w);
-              }
-            }
+          sctx.fillStyle = col; sctx.globalAlpha = alpha; sctx.beginPath();
+          for (let j = 0; j < B.length; j++) {
+            const i = B[j], px = X[i] * a + bx, py = Y[i] * a + by;
+            if (px < -pad || py < -pad || px > sw + pad || py > sh + pad) continue;
+            if (round) { sctx.moveTo(px + r, py); sctx.arc(px, py, r, 0, 6.2832); } else sctx.rect(px - r, py - r, 2 * r, 2 * r);
           }
+          sctx.fill();
+          if (edge) { sctx.globalAlpha = Math.min(1, alpha + .2); sctx.strokeStyle = surf; sctx.lineWidth = lw; sctx.stroke(); }
         }
         sctx.globalAlpha = 1;
         ctx.drawImage(snap, -m, -m);
