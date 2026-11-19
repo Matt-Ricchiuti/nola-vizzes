@@ -407,31 +407,59 @@ const NOLA = (() => {
   const seqVar = t => `var(${SEQ[Math.max(0, Math.min(6, Math.floor(t * 7)))]})`;
   // breaks = [low, high]; the top swatch gets a "+" only when values run past `high` (open = true)
   function seqLegend(el, breaks, fmtf, label, open = true) {
-    el.innerHTML = `<span>${label}</span>` + SEQ.map((s, i) => `<span><i style="background:var(${s})"></i>${i === 0 ? fmtf(breaks[0]) : i === 6 ? fmtf(breaks[1]) + (open ? '+' : '') : ''}</span>`).join('');
+    el.innerHTML = (label ? `<span>${label}</span>` : '') + `<span>${fmtf(breaks[0])}</span><span style="gap:0">` + SEQ.map(s => `<i style="background:var(${s});border-radius:0"></i>`).join('') + '</span>' + `<span>${fmtf(breaks[1])}${open ? '+' : ''}</span>`;
   }
   // Up to seven equal-count classes, so each color holds about the same number of areas and differences across most
-  // of the city stay visible even when a few places are far above the rest. classes(values) -> { color(v), edges, shades }
-  // Counts (whole numbers) get whole-number class edges: a class "starts at 9", never at 8.4. When many areas share a
-  // value (lots of zeros, say), classes that would hold nothing are dropped and the rest spread over the full ramp.
-  function classes(vals) {
+  // of the city stay visible even when a few places are far above the rest. classes(values, { even }) -> { color(v), edges, shades }
+  // Class edges are round numbers where that's possible without changing the picture: each edge moves to the roundest
+  // nearby number (…, 10, 20, 50, 100, …, or 0.5, 0.2, 0.1 steps) only if that moves at most one area to the next color
+  // (and stays well clear of the neighboring edges), so classes stay close to equal-count; otherwise it keeps a finer value. Counts (whole numbers) only get
+  // whole-number edges. Edges are what the colors use, so the legend is exact. Classes that would hold nothing are
+  // dropped and the rest spread over the full ramp. { even: true } uses evenly spaced round edges instead (d3 ticks).
+  const STEPS = d3.range(-3, 7).flatMap(e => [1, 2, 5].map(m => +(m * 10 ** e).toPrecision(1))).sort((a, b) => b - a); // 5e6 … 0.001
+  const roundTo = (t, s) => +(Math.round(t / s) * s).toPrecision(12);
+  function classes(vals, { even = false } = {}) {
     const v = vals.filter(x => x != null && isFinite(x)).sort(d3.ascending);
     if (!v.length) return { color: () => 'var(--none)', edges: [], shades: [] };
     const lo = v[0], hi = v[v.length - 1], int = v.every(Number.isInteger);
-    let th = d3.scaleQuantile().domain(v).range(d3.range(7)).quantiles();
-    if (int) th = th.map(Math.ceil); // for whole numbers, x >= t exactly when x >= ceil(t)
-    th = [...new Set(th)].filter(t => t > lo && t <= hi);
+    let th;
+    if (even) th = d3.ticks(lo, hi, 7).filter(t => t > lo && t <= hi);
+    else {
+      th = d3.scaleQuantile().domain(v).range(d3.range(7)).quantiles();
+      if (int) th = th.map(Math.ceil); // for whole numbers, x >= t exactly when x >= ceil(t)
+      th = [...new Set(th)].filter(t => t > lo && t <= hi);
+      // round each edge as far as it can go while at most one area changes color and it stays well inside its neighbors
+      const crossing = (a, b) => { const x0 = Math.min(a, b), x1 = Math.max(a, b); return d3.bisectLeft(v, x1) - d3.bisectLeft(v, x0); };
+      th = th.map((t, i) => {
+        const room = 0.5 * Math.min(t - (i ? th[i - 1] : lo), (i < th.length - 1 ? th[i + 1] : hi) - t);
+        const s = STEPS.find(s => { const r = roundTo(t, s); return (!int || s >= 1) && Math.abs(r - t) <= room && crossing(t, r) <= 1; });
+        return s ? roundTo(t, s) : t;
+      });
+    }
+    th = [...new Set(th)].filter(t => t > lo && t <= hi).sort(d3.ascending);
+    // drop an edge whose class would be empty (merge it into the class below)
+    for (let i = th.length - 1; i >= 0; i--) { const top = i < th.length - 1 ? th[i + 1] : Infinity; if (!v.some(x => x >= th[i] && x < top)) th.splice(i, 1); }
     const k = th.length + 1, shades = d3.range(k).map(i => SEQ[k === 1 ? 3 : Math.round(i * 6 / (k - 1))]);
-    return { color: x => x == null ? 'var(--none)' : `var(${shades[d3.bisectRight(th, x)]})`, edges: [lo, ...th, hi], shades };
+    // the legend's first label: the lowest value, or a round number just under it (nothing lies between the two)
+    const room0 = 0.3 * ((th[0] ?? hi) - lo), s0 = STEPS.find(s => (!int || s >= 1) && lo - Math.floor(lo / s) * s <= room0 && Math.floor(lo / s) * s >= 0);
+    const first = s0 ? +(Math.floor(lo / s0) * s0).toPrecision(12) : lo;
+    return { color: x => x == null ? 'var(--none)' : `var(${shades[d3.bisectRight(th, x)]})`, edges: [first, ...th, hi], shades };
   }
-  // legend for classes(): a stepped bar with the value where each color starts, and a swatch for areas with no value.
-  // cl is what classes() returned (an older caller may pass its seven-class edges array)
+  // legend for classes(): a stepped bar with the value where each color starts (the top one "and up"), and a swatch
+  // for areas with no value. cl is what classes() returned (an older caller may pass its seven-class edges array)
   function stepLegend(el, cl, fmtf, none) {
     const edges = Array.isArray(cl) ? cl : cl.edges, shades = Array.isArray(cl) ? SEQ : cl.shades, n = shades.length;
-    el.innerHTML = (n ? '<div class="steps">' + shades.map((s, i) => `<span><i style="background:var(${s})"></i><em>${fmtf(edges[i])}</em></span>`).join('')
-      + `<span class="end"><em>${fmtf(edges[n])}</em></span></div>` : '') + (none ? `<span class="nonekey"><i style="background:var(--none)"></i>${none}</span>` : '');
+    el.innerHTML = (n ? '<div class="steps">' + shades.map((s, i) => `<span><i style="background:var(${s})"></i><em>${fmtf(edges[i])}${i === n - 1 && n > 1 ? '+' : ''}</em></span>`).join('') + '</div>' : '')
+      + (none ? `<span class="nonekey"><i style="background:var(--none)"></i>${none}</span>` : '');
+    // labels that would run into each other (a narrow legend): show every other one, always the first and last
+    // (checked again once the web fonts have loaded, since they set the labels' widths)
+    const ems = [...el.querySelectorAll('.steps em')];
+    const thin = () => { const r = ems.map(e => e.getBoundingClientRect());
+      if (r.some((b, i) => i && b.width && b.left < r[i - 1].right + 3)) ems.forEach((e, i) => { if (i % 2 && i < ems.length - 1) e.style.visibility = 'hidden'; }); };
+    thin(); if (document.fonts && document.fonts.status !== 'loaded') document.fonts.ready.then(thin);
   }
-  // compact numbers for legends: 0, 3, 8.4, 950, 1.3k, 12k
-  const short = v => v >= 1000 ? d3.format('.2~s')(v).replace('G', 'B') : Number.isInteger(v) ? String(v) : fmtRate(v);
+  // compact numbers for legends, exact to the value given (class edges are already round): 0, 3, 8.4, 0.05, 950, 1.25k, 12k
+  const short = v => v >= 1000 ? d3.format('.3~s')(v).replace('G', 'B') : String(+(+v).toPrecision(4));
 
   // ---------- small chart helpers ----------
   function frame(el, { h = 260, m = { t: 12, r: 16, b: 28, l: 44 } } = {}) {

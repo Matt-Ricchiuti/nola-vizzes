@@ -205,15 +205,14 @@ tbody tr:hover td{background:var(--chip)}
 .stlab{font-weight:500;pointer-events:none;paint-order:stroke;stroke:var(--surface);stroke-linejoin:round}
 .stlab.major{font-weight:650}
 /* stepped legend for equal-count classes (NOLA.stepLegend): the value under each boundary is where that color starts */
-.legend .steps{flex:1 1 100%;display:flex;max-width:290px;padding:0 14px 0 0}
+.legend .steps{flex:1 1 100%;display:flex;max-width:290px;padding:0 22px 0 0}
 .legend .steps span,.steps span{flex:1;display:flex;flex-direction:column;align-items:stretch;gap:3px;min-width:0}
 .steps i{width:auto!important;height:10px;border-radius:0!important}
 .steps span:first-child i{border-radius:3px 0 0 3px!important}
-.steps span:nth-last-child(2) i{border-radius:0 3px 3px 0!important}
-.steps span:first-child:nth-last-child(2) i{border-radius:3px!important}
+.steps span:last-child i{border-radius:0 3px 3px 0!important}
+.steps span:only-child i{border-radius:3px!important}
 .steps em{align-self:flex-start;font-style:normal;font-size:10.5px;color:var(--ink2);white-space:nowrap;font-variant-numeric:tabular-nums;transform:translateX(-50%)}
 .steps span:first-child em{transform:none}
-.steps .end{flex:0 0 0;padding-top:13px}
 .nonekey{font-size:11.5px}
 .maplegend{display:none}
 @media(max-width:760px){

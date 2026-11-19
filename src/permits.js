@@ -58,7 +58,7 @@
     else {
       const cl = NOLA.classes(d3.range(72).map(val));
       m.setFill(i => cl.color(val(i)));
-      const none = d3.range(72).some(i => val(i) == null) ? `Under ${MIN_HU} homes` : null, lf = v => st.basis === 'hu' ? NOLA.fmtRate(v) : NOLA.short(v);
+      const none = d3.range(72).some(i => val(i) == null) ? `Under ${MIN_HU} homes` : null, lf = NOLA.short;
       NOLA.stepLegend(leg, cl, lf, none); NOLA.stepLegend(mlg, cl, lf, none);
       mlg.insertAdjacentHTML('afterbegin', `<div class="mlh">${keyLabel()}${st.lu >= 0 ? ' · ' + D.lu[st.lu] : ''}</div>`);
     }
