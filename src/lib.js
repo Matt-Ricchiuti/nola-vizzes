@@ -15,6 +15,7 @@ const NOLA = (() => {
       let x = ev.clientX + 14, y = ev.clientY + 14;
       if (x + w > innerWidth - 8) x = ev.clientX - w - 14;
       if (y + h > innerHeight - 8) y = ev.clientY - h - 14;
+      x = Math.max(8, x); y = Math.max(8, Math.min(y, innerHeight - h - 8)); // a tall tooltip stays on screen
       tipEl.style.left = x + 'px'; tipEl.style.top = y + 'px';
     },
     hide() { tipEl.style.opacity = 0; }
@@ -104,8 +105,10 @@ const NOLA = (() => {
       .attr('fill', 'none').attr('stroke', 'var(--ink2)').attr('stroke-width', 1.4).attr('vector-effect', 'non-scaling-stroke').attr('opacity', .55).style('pointer-events', 'none');
     const stLabG = root.append('g').attr('aria-hidden', 'true');
     const layer = root.append('g');
-    if (o.tip) nbSel.on('mousemove', (ev, f) => { tip.show(o.tip(f.idx), ev); if (hoverP.datum() !== f) hoverP.datum(f).attr('d', f.d); })
-      .on('mouseleave', () => { tip.hide(); hoverP.datum(null).attr('d', null); });
+    // o.tip(i) can return nothing (a map whose own marks carry the tooltips): then hovering a neighborhood shows nothing
+    const unhover = () => { tip.hide(); hoverP.datum(null).attr('d', null); };
+    if (o.tip) nbSel.on('mousemove', (ev, f) => { const h = o.tip(f.idx); if (!h) return unhover(); tip.show(h, ev); if (hoverP.datum() !== f) hoverP.datum(f).attr('d', f.d); })
+      .on('mouseleave', unhover);
 
     // ---- street names, placed after each zoom so they never overlap; longer streets first ----
     const SL = ST && ST.lab, q = ST ? ST.q : 1;
@@ -358,6 +361,17 @@ const NOLA = (() => {
     });
     panel.prepend(d); return d;
   }
+  // perToggle(plot, label, checked, onChange): a small checkbox on the map, bottom right just above the scale bar,
+  // for showing the shading per resident or per home ("Per 1k residents"). label null hides it (e.g. for a measure
+  // that can't be a rate). It's made once per map and keeps its place across redraws.
+  function perToggle(plot, label, checked, onChange) {
+    let el = plot.querySelector(':scope>.pertoggle');
+    if (!label) { if (el) el.hidden = true; plot.classList.remove('has-per'); return el; }
+    if (!el) { el = document.createElement('label'); el.className = 'pertoggle'; el.innerHTML = '<input type="checkbox"><span></span>'; plot.appendChild(el); }
+    plot.classList.add('has-per');
+    const cb = el.firstChild; el.lastChild.textContent = label; cb.checked = !!checked; cb.onchange = () => onChange(cb.checked); el.hidden = false;
+    return el;
+  }
   // a key that isn't a filter: rows of [label, color (a square swatch; null leaves the space), value] inside a panel
   // section. A color starting with '|' draws a tick mark in that color instead of a square.
   function kv(sec, rows) {
@@ -589,6 +603,6 @@ const NOLA = (() => {
   }
   const legendHTML = items => '<div class="legend">' + items.map(([c, l, round]) => `<span><i style="background:${c}${round ? ';border-radius:50%' : ''}"></i>${l}</span>`).join('') + '</div>';
 
-  return { css, S, fmt, pct, tip, row, setGeo, views, hashState, legendHTML, stage, fsec, flist, seg, ftabs, nbPick, kv, phoneToggle, popOf, perK, fmtRate, POP_NOTE, basisChips, shown, nbList, nbSelect, lonlat, get FULL() { return FULL; }, get GEO() { return GEO; }, map, mapButtons, panelInset, seqVar, seqLegend, classes, stepLegend, short, frame, yGrid, chips, months, monthsLong,
+  return { css, S, fmt, pct, tip, row, setGeo, views, hashState, legendHTML, stage, fsec, flist, seg, ftabs, nbPick, kv, perToggle, phoneToggle, popOf, perK, fmtRate, POP_NOTE, basisChips, shown, nbList, nbSelect, lonlat, get FULL() { return FULL; }, get GEO() { return GEO; }, map, mapButtons, panelInset, seqVar, seqLegend, classes, stepLegend, short, frame, yGrid, chips, months, monthsLong,
     setYear, get YEAR() { return YEAR; }, monthTicks, doyTime, doyDate, doyISO, doyMonth, monthStarts, isoDate, share, numWord, cap, setText, setHTML, title };
 })();

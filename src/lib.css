@@ -189,6 +189,12 @@ tbody tr:hover td{background:var(--chip)}
 .mapctl button:hover{background:var(--chip)}
 .scalebar{position:absolute;right:14px;bottom:12px;font-size:11px;color:var(--ink2);display:flex;flex-direction:column;align-items:flex-end;gap:3px;pointer-events:none;z-index:2}
 .scalebar i{display:block;height:5px;border:1.5px solid var(--ink2);border-top:0}
+/* per-resident / per-home switch on the map (NOLA.perToggle), just above the scale bar */
+.pertoggle{position:absolute;right:12px;bottom:42px;z-index:2;display:flex;align-items:center;gap:6px;padding:4px 9px 4px 7px;
+  background:var(--surface);border:1px solid var(--ring);border-radius:8px;font-size:12px;line-height:1.3;color:var(--ink);cursor:pointer;user-select:none;white-space:nowrap}
+.pertoggle input{margin:0;width:13px;height:13px;accent-color:var(--accent);cursor:pointer}
+.pertoggle:hover{background:var(--chip)}
+.pertoggle:has(input:focus-visible){outline:2px solid var(--accent);outline-offset:1px}
 .ftoggle{display:none}
 .maphint{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:3;pointer-events:none;opacity:0;transition:opacity .2s;
   background:rgb(11 11 11 / .78);color:#fff;font-size:13px;font-weight:500;padding:8px 14px;border-radius:999px;white-space:nowrap}
@@ -219,6 +225,7 @@ tbody tr:hover td{background:var(--chip)}
   .maplegend .nonekey{display:flex;align-items:center;gap:5px;margin-top:3px}
   .maplegend .nonekey i{width:10px;height:10px;border-radius:3px;display:inline-block}
   .mlh{margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .pertoggle{top:162px;bottom:auto} /* phones: the map's own legend fills the bottom left, so the switch sits under the map controls */
   .fpanel.collapsed{display:none}
 }
 

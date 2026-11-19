@@ -44,7 +44,6 @@
     let leg = null;
     if (dots()) NOLA.fsec(panel, keyLabel()).insertAdjacentHTML('beforeend', NOLA.legendHTML([[CCOL[st.cat], 'One permit', 1]]));
     else {
-      NOLA.seg(NOLA.fsec(panel, 'Count'), [['n', 'Total'], ['hu', 'Per 1,000 homes']], st.basis, v => set('basis', v));
       leg = document.createElement('div'); leg.className = 'legend'; NOLA.fsec(panel, keyLabel()).appendChild(leg);
     }
     if (first) {
@@ -54,6 +53,7 @@
       plot.insertAdjacentHTML('beforeend', '<div class="maplegend"></div>');
     }
     const mlg = ml || plot.querySelector('.maplegend');
+    NOLA.perToggle(plot, dots() ? null : 'Per 1k homes', st.basis === 'hu', on => set('basis', on ? 'hu' : 'n'));
     if (dots()) { m.setFill(() => null); mlg.innerHTML = `<div class="mlh">${keyLabel()}</div>` + NOLA.legendHTML([[CCOL[st.cat], 'One permit', 1]]).replace('class="legend"', 'class="legend" style="margin:0"'); }
     else {
       const cl = NOLA.classes(d3.range(72).map(val));

@@ -60,13 +60,13 @@
       const top = D.abEnd.slice(0, 6), rest = d3.sum(D.abEnd.slice(6), d => d[1]);
       NOLA.kv(NOLA.fsec(panel, 'How closed cases ended, citywide'), [...top.map(([k, n]) => [k === 'Not stated' ? 'No reason given' : sentence(k), null, fmt(n)]), ...(rest ? [['Other reasons', null, fmt(rest)]] : [])]);
     }
-    NOLA.seg(NOLA.fsec(panel, 'Count'), [['n', 'Total'], ['hu', 'Per 1,000 homes']], st.basis, v => set('basis', v));
     const leg = document.createElement('div'); leg.className = 'legend'; NOLA.fsec(panel, keyLabel()).appendChild(leg);
     if (first) {
       m = NOLA.map(plot, { panel, label: 'Map of code enforcement by neighborhood', tip: mapTip });
       m.lastNb = -1;
       plot.insertAdjacentHTML('beforeend', '<div class="maplegend"></div>');
     }
+    NOLA.perToggle(plot, 'Per 1k homes', st.basis === 'hu', on => set('basis', on ? 'hu' : 'n'));
     const cl = NOLA.classes(d3.range(72).map(val));
     m.setFill(i => cl.color(val(i)));
     const none = d3.range(72).some(i => val(i) == null) ? `Under ${MIN_HU} homes` : null, lf = v => st.basis === 'hu' ? NOLA.fmtRate(v) : NOLA.short(v);

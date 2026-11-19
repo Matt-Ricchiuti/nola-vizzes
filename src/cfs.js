@@ -142,7 +142,6 @@
     const ts = document.createElement('select'); ts.className = 'fsel'; ts.setAttribute('aria-label', 'Call type');
     ts.innerHTML = '<option value="">Or one call type…</option>' + C.TOP.map((t, k) => unmappable(k) ? '' : `<option value="t${k}">${tcase(t)}</option>`).join('');
     ts.value = st.metric.startsWith('t') ? st.metric : ''; ts.onchange = () => { st.metric = ts.value || 'res'; V.refresh(); }; ms.appendChild(ts);
-    if (!isTime()) NOLA.seg(NOLA.fsec(panel, 'Count'), [['n', 'Total'], ['pc', 'Per 1,000 residents']], st.basis, v => { st.basis = v; V.refresh(); });
     const ls = NOLA.fsec(panel, isTime() ? 'Legend · minutes' : 'Legend'), leg = document.createElement('div'); leg.className = 'legend'; ls.appendChild(leg);
     if (perRes()) ls.insertAdjacentHTML('beforeend', NOLA.POP_NOTE);
     return leg;
@@ -159,6 +158,7 @@
             + row('Median arrival, emergency', r[4] >= 30 ? r[2] + ' min' : 'too few calls') + row('Median arrival, non-emergency', r[3] == null ? '—' : r[3] + ' min'); } });
       m.lastNb = -1;
     }
+    NOLA.perToggle(plot, isTime() ? null : 'Per 1k residents', st.basis === 'pc', on => { st.basis = on ? 'pc' : 'n'; V.refresh(); });
     // seven equal-count classes: each shade holds about ten neighborhoods
     const cl = NOLA.classes(nb.map((r, i) => metricVal(i)));
     m.setFill(i => cl.color(metricVal(i)));

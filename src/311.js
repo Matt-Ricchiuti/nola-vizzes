@@ -55,13 +55,13 @@
         rs.map(k => ({ key: k, name: reasonName(k), color: tColor(st.type), count: d3.sum(nbs, nb => nbR[nb].get(k) || 0) })),
         { pressed: k => st.reason === k, onClick: toggle('reason') });
     }
-    NOLA.seg(NOLA.fsec(panel, 'Count'), [['n', 'Total'], ['pc', 'Per 1,000 residents']], st.basis, v => set('basis', v));
     const leg = document.createElement('div'); leg.className = 'legend'; NOLA.fsec(panel, keyLabel()).appendChild(leg);
     if (first) {
       m = NOLA.map(plot, { panel, label: 'Map of 311 requests by neighborhood', tip: mapTip });
       m.lastNb = -1;
       plot.insertAdjacentHTML('beforeend', '<div class="maplegend"></div>');
     }
+    NOLA.perToggle(plot, 'Per 1k residents', st.basis === 'pc', on => set('basis', on ? 'pc' : 'n'));
     const cl = NOLA.classes(d3.range(72).map(val));
     m.setFill(i => cl.color(val(i)));
     const none = d3.range(72).some(i => val(i) == null) ? 'Under 1,000 residents' : null;
