@@ -116,6 +116,8 @@
     pane.classList.add('cpc-stage'); // a wider panel on this page (lib.css)
     const filed = st.tab === 'filed';
     pane.parentElement.querySelector('.vsec-h h2').textContent = mapTitle();
+    // redrawing the panel empties it for a moment; keep the reader where they were (the panel's scroll, or the page's on phones)
+    const keep = [panel.scrollTop, scrollX, scrollY];
     [...panel.children].forEach(c => { if (!(filed && c === rangeSec)) c.remove(); });
     const nbSec = nbSection(panel);
     if (filed) {
@@ -141,6 +143,7 @@
     ud.style('display', filed ? 'none' : null); rg.style('display', filed ? null : 'none');
     if (filed) drawFiled(panel); else drawUpcoming(panel);
     NOLA.ftabs(panel, [['up', 'Upcoming hearings'], ['filed', 'Cases filed']], st.tab, v => set('tab', v));
+    if (!first) { panel.scrollTop = keep[0]; if (scrollY !== keep[2]) scrollTo(keep[1], keep[2]); }
   }
 
   function drawUpcoming(panel) {
