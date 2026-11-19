@@ -197,3 +197,5 @@ tbody tr:hover td{background:var(--chip)}
 .srages i{width:11px;height:11px;border-radius:3px}
 .srages b{font:400 12px "IBM Plex Mono",ui-monospace,monospace;color:var(--muted)}
 /* ===================== short-term rentals page (src/str.js): uses the 311 page's .srages lists ===================== */
+/* ===================== blight and code enforcement page (src/blight.js); also uses .srages ===================== */
+.srages i.tickkey{width:2px;height:14px;border-radius:0;background:var(--ink);margin-left:4px}

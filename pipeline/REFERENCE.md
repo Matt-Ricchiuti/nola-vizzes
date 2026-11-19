@@ -22,6 +22,7 @@ The workflow runs at 10:30 UTC. The City loads CPC Projects at about 06:00 UTC, 
 | `cpc.json` | `xxb5-5azv`'s `rowsUpdatedAt` or `geo.json` changed | "Today" for upcoming hearings and the 365-day window is the day the City loaded the data. |
 | `311.json` | `2jgv-pqrq`'s `rowsUpdatedAt` or `geo.json` changed | Incremental download (see below). "Today" is the newest request in the data. |
 | `str.json` | any of `ufdg-ajws`, `en36-xvxg`, `2ei9-wqw2` or `geo.json` changed | Three small whole downloads (about 8 requests, 9 MB). |
+| `blight.json` | any of the six code enforcement datasets or `geo.json` changed | The City reloads these every night (every row gets a new `:updated_at`), so incremental downloads don't help; most numbers are counted by the API instead (about 16 requests, 11 MB). |
 
 On the 1st of every month (and with `--full`, or the workflow's "full" checkbox) everything is downloaded and rebuilt regardless. Queries are ordered (`:id` as the tie-breaker), so the same City data always produces byte-identical files. Rebuilt files are written only when their content changed, and pages embed only the date their own data last changed, so a day without new City data changes nothing and the workflow commits and deploys nothing.
 
@@ -246,6 +247,44 @@ Three datasets, each downloaded whole (ordered by `:id`):
 - The page shades neighborhoods by license count or by licenses per 100 housing units (2020 Census `hu` in geo.json). Neighborhoods under 500 housing units get no rate.
 
 Checked against the API on 2026-11-19: license counts by type, status totals and non-commercial building types match `count(*)` queries; Marigny and Bywater match `within_polygon` counts for both license datasets.
+
+## `data/blight.json`: blight and code enforcement
+
+Six datasets. The City replaces each of them in full every night, so the builder downloads only what it must and lets the API count the rest:
+
+| Dataset | What's fetched |
+|---|---|
+| Code Enforcement All Cases `u6yx-v2tw` | rows with `o_c = 'Open' OR casefiled >= 2016-01-01` (about 47,000; 1 request): `casefiled, o_c, stage, xpos, ypos, initinspresult` |
+| Grass Cutting `xhih-vxs6` | all rows (about 23,500): `casefiled, o_c, longitude, latitude` |
+| Code Enforcement - Abatements `xv8z-gn8b` | all rows (about 7,200): `o_c, stage, xpos, ypos` |
+| Code Enforcement All Hearings `44ct-56tr` | API counts by year and `judgment` for hearings from 2016 through "today", and a count of hearings after it |
+| Code Enforcement All Violations `3ehi-je3s` | API counts by `violation` for the past 12 months and the 12 before |
+| Code Enforcement All Inspections `uh5a-f7uw` | API counts by month and `inspectiontype` from 2016 |
+
+"Today" is the newest `casefiled` date; the past 12 months are the 365 days ending then. Cases and abatements are located by state plane `xpos`/`ypos` (see `sp_lonlat`; -1 means none), grass cases by lon/lat.
+
+```
+{ "ds": [6 ids], "last", "winStart",
+  "stages": [6 open-case stages], "ages": [90, 365, 730, 1826],
+  "openAge": [[[n per age bucket] per stage] per nb, + whole city as row 72],   # open cases by days since filed
+  "new12": [[violation found, no violation, not inspected yet or other] per nb],  # filed in the past 12 months, by initinspresult
+  "years": [2016, ...], "yr": [[[still open, closed] per year filed] per nb, + whole city],
+  "gyears": [2021, ...], "gyr": same for grass-cutting cases, "g12": [grass cases filed in the past 12 months per nb],
+  "abOpen": [properties in abatement now per nb], "abEnd": [[how closed abatement cases ended, n], ...],
+  "hearGroups": ["Guilty", "Dismissed", "Reset", "Pending", "Other"], "hear": [[n per group] per year], "upcoming": n,
+  "viol": [[violation, past 12 months, 12 months before], ...top 25], "violTotal": [all violations, past 12, before],
+  "inspGroups": ["Inspection", "Reinspection", "Posting a notice", "Other"], "insp": [[n per group] per month from Jan 2016],
+  "open", "total", "noLoc" }
+```
+
+- **Why 2016.** About 76,000 cases and 59,000 hearings are dated 2009, when older records were moved into the City's system, and yearly volumes settle later. Grass-cutting cases start in earnest in 2021.
+- **Stages** are the City's `stage` values for open cases (Inspection, Title Research, Hearing, Judgment, In Compliance, Processing). An open case in a new stage fails the build (add it to `CE_STAGES`).
+- **Hearing results** (`ce_hearing_group`): judgments starting "Guilty" or "Found Guilty" → Guilty; "Dismissed…" → Dismissed; "Reset…"/"Rescheduled" → Reset; "Result Pending" → Pending; anything else → Other.
+- **Inspection types** (`ce_insp_group`): "Inspection" → Inspection; reinspections, compliance and follow-up inspections → Reinspection; any "Posting of …" → Posting a notice; the rest → Other.
+- **Abatements**: no property has entered abatement since 2019 in this dataset, so the page shows only properties still in abatement and how closed cases ended.
+- The map can show counts per 1,000 housing units (2020 Census); neighborhoods under 500 housing units get no rate.
+
+Checked against the API on 2026-11-19: open cases by stage, cases filed in 2025 and 2026, hearings in 2025, grass cases per year, weeds violations in the past 12 months, and the past-12-month totals of located new cases and grass cases all match `count(*)` queries. (These datasets have no usable point column for `within_polygon`, so neighborhood assignment uses the same point-in-polygon code that matched exactly on the 311 and short-term rental pages.)
 
 ## Page copy that mentions specific numbers
 

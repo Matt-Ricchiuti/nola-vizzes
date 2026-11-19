@@ -1087,10 +1087,152 @@ def build_str(api, nbp):
     }
 
 
+# ---------------------------------------------------------------- blight and code enforcement
+CE_CASES, CE_VIOL, CE_INSP, CE_HEAR, CE_GRASS, CE_ABATE = 'u6yx-v2tw', '3ehi-je3s', 'uh5a-f7uw', '44ct-56tr', 'xhih-vxs6', 'xv8z-gn8b'
+# The City moved older code enforcement records into this system in 2009 (about 76,000 cases and 59,000 hearings
+# are dated 2009), and filings settle into a steady pattern later, so yearly charts start here.
+CE_START = 2016
+CE_STAGES = ['1 - Inspection', '2 - Title Research', '3 - Hearing', '4 - Judgment', '5 - In Compliance', 'X - Processing']
+CE_AGES = [90, 365, 730, 1826]   # open for: under 90 days, 90 days-1 year, 1-2 years, 2-5 years, over 5 years
+CE_HEAR_GROUPS = ['Guilty', 'Dismissed', 'Reset', 'Pending', 'Other']
+CE_INSP_GROUPS = ['Inspection', 'Reinspection', 'Posting a notice', 'Other']
+
+
+def ce_hearing_group(j):
+    j = (j or '').strip().lower()
+    if j.startswith('guilty') or j.startswith('found guilty'):
+        return 0
+    if j.startswith('dismissed'):
+        return 1
+    if j.startswith('reset') or j.startswith('rescheduled'):
+        return 2
+    if j.startswith('result pending'):
+        return 3
+    return 4
+
+
+def ce_insp_group(t):
+    t = (t or '').strip().lower()
+    if t == 'inspection':
+        return 0
+    if 'reinspection' in t or 'compliance inspection' in t or 'follow-up' in t:
+        return 1
+    if 'posting' in t:
+        return 2
+    return 3
+
+
+def build_blight(api, nbp):
+    for ds, cols, label in [(CE_CASES, ['casefiled', 'o_c', 'stage', 'xpos', 'ypos', 'initinspresult'], 'Code enforcement cases'),
+                            (CE_VIOL, ['violationdate', 'violation'], 'Code enforcement violations'),
+                            (CE_INSP, ['inspectiondate', 'inspectiontype'], 'Code enforcement inspections'),
+                            (CE_HEAR, ['hearingdate', 'judgment'], 'Code enforcement hearings'),
+                            (CE_GRASS, ['casefiled', 'o_c', 'longitude', 'latitude'], 'Grass cutting'),
+                            (CE_ABATE, ['o_c', 'stage', 'xpos', 'ypos'], 'Abatements')]:
+        api.require_columns(ds, cols, label)
+    # cases: every open case, and every case filed since CE_START
+    rows = fetch_all(api, CE_CASES, 'casefiled,o_c,stage,xpos,ypos,initinspresult', where=f"o_c = 'Open' OR casefiled >= '{CE_START}-01-01'")
+    need(len(rows) > 20000, f'Code enforcement cases: only {len(rows)} rows')
+    filed = [parse_ts(r.get('casefiled')) for r in rows]
+    need(sum(f is None for f in filed) < 50, 'Code enforcement cases: unreadable casefiled dates')
+    nbs, _ = sp_points_to_nb(nbp, rows, 'xpos', 'ypos')
+    today = max(f for f in filed if f).date()          # "now" is the newest case in the data
+    win0 = today - dt.timedelta(days=364)
+    years = list(range(CE_START, today.year + 1))
+    NS, NA = len(CE_STAGES), len(CE_AGES) + 1
+    openAge = [[[0] * NA for _ in range(NS)] for _ in range(73)]   # row 72 = whole city
+    new12 = [[0, 0, 0] for _ in range(72)]    # by first inspection: violation found, no violation, not inspected yet / other
+    yr = [[[0, 0] for _ in years] for _ in range(73)]               # [open, closed] per year filed; row 72 = whole city
+    unknown_stage = Counter()
+    for r, f, nb in zip(rows, filed, nbs):
+        if f is None:
+            continue
+        is_open = r.get('o_c') == 'Open'
+        if is_open:
+            s = (r.get('stage') or '').strip()
+            if s not in CE_STAGES:
+                unknown_stage[s] += 1
+                continue
+            age = sum((today - f.date()).days >= a for a in CE_AGES)
+            for k in (72, nb) if nb >= 0 else (72,):
+                openAge[k][CE_STAGES.index(s)][age] += 1
+        if f.year >= CE_START:
+            for k in (72, nb) if nb >= 0 else (72,):
+                yr[k][f.year - CE_START][0 if is_open else 1] += 1
+        if nb >= 0 and f.date() >= win0:
+            res = (r.get('initinspresult') or '').lower()
+            new12[nb][0 if res.startswith('violation') else 1 if res.startswith('no violation') else 2] += 1
+    need(sum(unknown_stage.values()) < 50, f'Code enforcement cases: open cases in unknown stages {dict(unknown_stage)}. Add them to CE_STAGES.')
+    # overgrown lots (grass cutting cases), all rows
+    grass = fetch_all(api, CE_GRASS, 'casefiled,o_c,longitude,latitude')
+    need(len(grass) > 5000, f'Grass cutting: only {len(grass)} rows')
+    gnb, _ = points_to_nb(nbp, grass)
+    gfiled = [parse_ts(r.get('casefiled')) for r in grass]
+    gy0 = 2021   # the City's grass-cutting cases start in earnest in 2021 (a few dozen a year before)
+    gyears = list(range(gy0, today.year + 1))
+    gyr = [[[0, 0] for _ in gyears] for _ in range(73)]
+    g12 = [0] * 72
+    for r, f, nb in zip(grass, gfiled, gnb):
+        if f is None or f.year < gy0 or f.date() > today:
+            continue
+        for k in (72, nb) if nb >= 0 else (72,):
+            gyr[k][f.year - gy0][0 if r.get('o_c') == 'Open' else 1] += 1
+        if nb >= 0 and f.date() >= win0:
+            g12[nb] += 1
+    # properties in abatement now, and how closed abatement cases ended
+    ab = fetch_all(api, CE_ABATE, 'o_c,stage,xpos,ypos')
+    need(len(ab) > 1000, f'Abatements: only {len(ab)} rows')
+    anb, _ = sp_points_to_nb(nbp, ab, 'xpos', 'ypos')
+    abOpen = [0] * 72
+    abEnd = Counter()
+    for r, nb in zip(ab, anb):
+        if r.get('o_c') == 'Open':
+            if nb >= 0:
+                abOpen[nb] += 1
+        else:
+            abEnd[re.sub(r'^Closed:?\s*', '', (r.get('stage') or '').strip()) or 'Not stated'] += 1
+    # hearings, violations and inspections: counted by the API
+    hear = api.get(f'/resource/{CE_HEAR}.json', {'$select': 'date_extract_y(hearingdate) as y, judgment, count(*) as n',
+                                                 '$where': f"hearingdate >= '{CE_START}-01-01' AND hearingdate <= '{today.isoformat()}T23:59:59'",
+                                                 '$group': 'y, judgment', '$order': 'y, judgment', '$limit': 5000})
+    hyr = [[0] * len(CE_HEAR_GROUPS) for _ in years]
+    for r in hear:
+        hyr[int(r['y']) - CE_START][ce_hearing_group(r.get('judgment'))] += int(r['n'])
+    upcoming = int(api.get(f'/resource/{CE_HEAR}.json', {'$select': 'count(*) as n', '$where': f"hearingdate > '{today.isoformat()}T23:59:59'"})[0]['n'])
+    prev0 = win0 - dt.timedelta(days=365)
+    viol = {}
+    for k, (a, b) in enumerate([(win0, today), (prev0, win0 - dt.timedelta(days=1))]):
+        for r in api.get(f'/resource/{CE_VIOL}.json', {'$select': 'violation, count(*) as n', '$where': f"violationdate >= '{a}' AND violationdate <= '{b}T23:59:59'",
+                                                       '$group': 'violation', '$order': 'violation', '$limit': 5000}):
+            v = re.sub(r'\s+', ' ', (r.get('violation') or '').strip()) or 'Not stated'
+            viol.setdefault(v, [0, 0])[k] += int(r['n'])
+    V = sorted(viol.items(), key=lambda kv: (-kv[1][0], -kv[1][1], kv[0]))
+    insp = api.get(f'/resource/{CE_INSP}.json', {'$select': 'date_trunc_ym(inspectiondate) as m, inspectiontype, count(*) as n',
+                                                 '$where': f"inspectiondate >= '{CE_START}-01-01' AND inspectiondate <= '{today.isoformat()}T23:59:59'",
+                                                 '$group': 'm, inspectiontype', '$order': 'm, inspectiontype', '$limit': 50000})
+    imon = [[0] * len(CE_INSP_GROUPS) for _ in range(month_index(today, CE_START, 1) + 1)]
+    for r in insp:
+        m = parse_ts(r['m'])
+        imon[month_index(m, CE_START, 1)][ce_insp_group(r.get('inspectiontype'))] += int(r['n'])
+    return {
+        'ds': [CE_CASES, CE_VIOL, CE_INSP, CE_HEAR, CE_GRASS, CE_ABATE], 'last': today.isoformat(), 'winStart': win0.isoformat(),
+        'stages': CE_STAGES, 'ages': CE_AGES, 'openAge': openAge, 'new12': new12,
+        'years': years, 'yr': yr,
+        'gyears': gyears, 'gyr': gyr, 'g12': g12,
+        'abOpen': abOpen, 'abEnd': sorted(abEnd.items(), key=lambda kv: (-kv[1], kv[0])),
+        'hearGroups': CE_HEAR_GROUPS, 'hear': hyr, 'upcoming': upcoming,
+        'viol': [[k, *v] for k, v in V[:25]], 'violTotal': [sum(v[0] for _, v in V), sum(v[1] for _, v in V)],
+        'inspGroups': CE_INSP_GROUPS, 'insp': imon,
+        'open': sum(map(sum, openAge[72])), 'total': len(rows),
+        'noLoc': sum(nb < 0 for nb in nbs),
+    }
+
+
 # Data files of the pages added with the 311 / housing / business set, and when each counts as stale
 # (file, label, field holding its newest record date, days without a new record before warning).
-NEW_FILES = ['311.json', 'str.json']
-STALE = [('311.json', '311 calls', 'last', 7), ('str.json', 'Short-term rental permit applications', 'last', 14)]
+NEW_FILES = ['311.json', 'str.json', 'blight.json']
+STALE = [('311.json', '311 calls', 'last', 7), ('str.json', 'Short-term rental permit applications', 'last', 14),
+         ('blight.json', 'Code enforcement cases', 'last', 14)]
 
 
 # ---------------------------------------------------------------- sanity checks against the last good build
@@ -1145,6 +1287,12 @@ def validate(name, obj, prev, same_year=True):
         need(obj['total'] > 500 and len(obj['nc']['rows']) > 100, 'str: suspiciously few licenses')
         need(sum(p[3] < 0 for p in obj['pts']) < 0.1 * obj['total'], 'str: most licenses failed to map to a neighborhood')
         check_not_collapsed('STR permit applications', obj['apps'], prev and prev.get('apps'))
+    elif name == 'blight.json':
+        need(len(obj['openAge']) == 73 and len(obj['new12']) == 72 and len(obj['yr']) == 73 and len(obj['gyr']) == 73 and len(obj['abOpen']) == 72, 'blight: shape')
+        need(len(obj['hear']) == len(obj['years']) and len(obj['viol']) >= 10 and len(obj['insp']) > 100, 'blight: hearings/violations/inspections')
+        need(obj['open'] > 2000 and obj['total'] > 20000, 'blight: suspiciously few cases')
+        need(obj['noLoc'] < 0.1 * obj['total'], 'blight: most cases failed to map to a neighborhood')
+        check_not_collapsed('code enforcement cases', obj['total'], prev and prev.get('total'))
 
 
 def central_date(iso_utc):
@@ -1297,6 +1445,12 @@ def main():
             out['str.json'] = build_str(api, nbp)
     print('short-term rentals ...', flush=True)
     attempt(['str.json'], strs)
+
+    def blight():
+        if not unchanged('blight.json', '|'.join([api.version(d) for d in (CE_CASES, CE_VIOL, CE_INSP, CE_HEAR, CE_GRASS, CE_ABATE)] + [geo_key])):
+            out['blight.json'] = build_blight(api, nbp)
+    print('blight and code enforcement ...', flush=True)
+    attempt(['blight.json'], blight)
 
     for name in [n for n in out if n != 'geo.json']:
         same_year = (prev[name] or {}).get('year') == out[name].get('year') if name in ('drone.json', 'cfs.json') else True

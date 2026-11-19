@@ -29,6 +29,7 @@ PAGES = {'drone': ('NOPD drone flights', {'drone': 'drone.json'}),
          'cpc': ('Planning cases', {'cpc': 'cpc.json'}),
          '311': ('311 service requests', {'sr': '311.json'}),
          'str': ('Short-term rentals', {'str': 'str.json'}),
+         'blight': ('Blight and code enforcement', {'ce': 'blight.json'}),
          'trees': ('Street trees', {'trees': 'trees.json'})}
 EXTRA = {'about': 'About'}
 # Pages still built (so old links keep working and they can come back) but left out of the header and home-page
@@ -92,7 +93,7 @@ def menu():
     return f'<ul class="vlist">{pages}</ul><div class="vextra">{extra}</div>'
 TOKENS['{{MENU}}'] = menu()
 # last day each of the newer pages' data reaches (the file's 'last' field), e.g. {{SR_THRU}}
-for tok, f in [('SR', '311.json'), ('STR', 'str.json')]:
+for tok, f in [('SR', '311.json'), ('STR', 'str.json'), ('CE', 'blight.json')]:
     TOKENS['{{%s_THRU}}' % tok] = fdate(dt.date.fromisoformat(load(f)['last'][:10]))
 
 # Street centerlines are shared by every map, so they go in one file the browser caches across pages.

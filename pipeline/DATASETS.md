@@ -6,8 +6,8 @@ The site's rule is to chart only datasets with records added in the past year. T
 
 | Mark | Meaning | Count |
 |---|---|---|
-| ✅ | Already on the site | 22 |
-| ⭐ | Strong candidate for a new page | 11 |
+| ✅ | Already on the site | 28 |
+| ⭐ | Strong candidate for a new page | 5 |
 | 🔸 | Possible: smaller, harder, or best as part of another page | 21 |
 | 🗺️ | Map layer or supporting data (boundaries, population), not a page on its own | 40 |
 | · | Not a candidate (stale, archived, or superseded) | 116 |
@@ -130,11 +130,11 @@ Worth adding to every map: 2020 population by neighborhood (`2w4d-xaw2`), so cou
 |---|---|---|--:|---|
 | ✅ | [CPC Projects](https://data.nola.gov/d/xxb5-5azv) `xxb5-5azv` | 2026-11-17 | 15,671 | Planning cases page |
 | ✅ | [Active Short-Term Rental Licenses](https://data.nola.gov/d/ufdg-ajws) `ufdg-ajws` | 2026-11-17 | 4,308 | Short-term rentals page: active licenses map. |
-| ⭐ | [Code Enforcement All Cases](https://data.nola.gov/d/u6yx-v2tw) `u6yx-v2tw` | 2026-11-17 | 183,641 | Blight page: the core case table (join the others on case number). |
-| ⭐ | [Code Enforcement All Hearings](https://data.nola.gov/d/44ct-56tr) `44ct-56tr` | updated 2026-11-18 | 103,421 | Blight page: hearing outcomes. Includes scheduled future hearings. |
-| ⭐ | [Code Enforcement All Inspections](https://data.nola.gov/d/uh5a-f7uw) `uh5a-f7uw` | 2026-11-18 | 247,464 | Blight page: inspection activity. |
-| ⭐ | [Code Enforcement All Violations](https://data.nola.gov/d/3ehi-je3s) `3ehi-je3s` | 2026-11-17 | 274,076 | Blight page: what violations are cited, and where. |
-| ⭐ | [Grass Cutting (Lot Abatement/Chapter 66)](https://data.nola.gov/d/xhih-vxs6) `xhih-vxs6` | 2026-11-17 | 23,531 | Blight page: overgrown-lot cases and City cuts. |
+| ✅ | [Code Enforcement All Cases](https://data.nola.gov/d/u6yx-v2tw) `u6yx-v2tw` | 2026-11-17 | 183,641 | Blight and code enforcement page. |
+| ✅ | [Code Enforcement All Hearings](https://data.nola.gov/d/44ct-56tr) `44ct-56tr` | updated 2026-11-18 | 103,421 | Blight and code enforcement page. |
+| ✅ | [Code Enforcement All Inspections](https://data.nola.gov/d/uh5a-f7uw) `uh5a-f7uw` | 2026-11-18 | 247,464 | Blight and code enforcement page. |
+| ✅ | [Code Enforcement All Violations](https://data.nola.gov/d/3ehi-je3s) `3ehi-je3s` | 2026-11-17 | 274,076 | Blight and code enforcement page. |
+| ✅ | [Grass Cutting (Lot Abatement/Chapter 66)](https://data.nola.gov/d/xhih-vxs6) `xhih-vxs6` | 2026-11-17 | 23,531 | Blight and code enforcement page. |
 | ✅ | [Non-Commercial Short-Term Rental Licenses](https://data.nola.gov/d/2ei9-wqw2) `2ei9-wqw2` | 2026-10-27 | 1,231 | Short-term rentals page: non-commercial licenses by building type. |
 | ⭐ | [Permits](https://data.nola.gov/d/rcm3-fn58) `rcm3-fn58` | 2026-11-17 | 350,562 | Permits page: construction and renovation by neighborhood and type, processing times. |
 | ✅ | [Short-Term Rental Permit Applications](https://data.nola.gov/d/en36-xvxg) `en36-xvxg` | 2026-11-17 | 39,140 | Short-term rentals page: applications per year by outcome. |
@@ -273,7 +273,7 @@ Worth adding to every map: 2020 population by neighborhood (`2w4d-xaw2`), so cou
 | ✅ | [Centerline](https://data.nola.gov/d/22q2-dqpb) `22q2-dqpb` | updated 2026-11-17 | 28,526 | Street lines and names on the trees map |
 | ✅ | [NOPD Drone Flights](https://data.nola.gov/d/ay9z-ynxz) `ay9z-ynxz` | 2026-11-05 | 742 | Drone page |
 | ✅ | [Tree Location](https://data.nola.gov/d/3tyj-9x33) `3tyj-9x33` | updated 2025-04-17 | 106,820 | Street trees page (static export) |
-| ⭐ | [Code Enforcement - Abatements](https://data.nola.gov/d/xv8z-gn8b) `xv8z-gn8b` | 2026-11-11 | 7,240 | Blight page: abatements (City-forced cleanups/demolitions). |
+| ✅ | [Code Enforcement - Abatements](https://data.nola.gov/d/xv8z-gn8b) `xv8z-gn8b` | 2026-11-11 | 7,240 | Blight and code enforcement page: properties still in abatement (none entered since 2019). |
 | 🔸 | [Mardi Gras Port O Let Locations](https://data.nola.gov/d/ekd9-snag) `ekd9-snag` | updated 2026-02-28 | 72 | Seasonal Mardi Gras page (routes, port-o-lets, recycling) for Jan–Feb. |
 | 🔸 | [Mardi Gras Recycling Stations](https://data.nola.gov/d/955d-h748) `955d-h748` | updated 2026-02-28 | 8 | Seasonal Mardi Gras page (routes, port-o-lets, recycling) for Jan–Feb. |
 | 🔸 | [Public Land](https://data.nola.gov/d/bsqt-btyi) `bsqt-btyi` | updated 2025-11-10 | 2,149 | Publicly owned land (2,149 parcels). Map panel for the NORA/blight pages. |
