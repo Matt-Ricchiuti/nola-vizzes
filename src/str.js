@@ -33,7 +33,9 @@
   const pts = D.pts.map(p => ({ x: p[0], y: p[1], cat: p[2], nb: p[3], beds: p[4], addr: p[5] || '', lic: p[6] || '', issued: p[7] || '', expires: p[8] || '' }));
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const at = d3.group(pts, p => p.x + ',' + p.y);
-  const DOT_R = () => (matchMedia('(pointer: coarse)').matches ? 5 : 3.2); // bigger dots to tap on touch screens
+  // the dots (NOLA.map's dot layer): a little bigger than the busier maps' (there are fewer), bigger still to tap on touch screens
+  const PX = Float32Array.from(pts, p => p.x), PY = Float32Array.from(pts, p => p.y), PN = pts.length;
+  const DOT_R = k => Math.max(2, Math.min(8, (matchMedia('(pointer: coarse)').matches ? 4.4 : 3.2) * Math.sqrt(k)));
   function licTip(p) {
     const here = at.get(p.x + ',' + p.y).filter(q => catOn(q.cat)).sort((a, b) => a.addr.localeCompare(b.addr, undefined, { numeric: true }) || a.lic.localeCompare(b.lic));
     const date = s => s ? NOLA.isoDate(s) : '—';
@@ -51,7 +53,7 @@
   const val = i => st.basis === 'hu' ? perHU(cnt(i), i) : cnt(i);
   const inNb = p => st.nb < 0 || p.nb === st.nb;
   const keyLabel = () => 'Licenses shown' + (st.basis === 'hu' ? ' per 100 homes' : '') + ', by neighborhood';
-  let m, dotG;
+  let m;
   function drawMap(pane, first) {
     const { panel, plot } = staged(pane, first, true);
     panel.innerHTML = '';
@@ -65,8 +67,7 @@
     NOLA.seg(NOLA.fsec(panel, 'Bedroom limit'), [[-1, 'Any'], [1, '1'], [2, '2'], [3, '3 or more']], st.bd, v => set('bd', v));
     if (first) {
       m = NOLA.map(plot, { panel, label: 'Map of short-term rental licenses', tip: mapTip });
-      dotG = m.layer.append('g'); m.lastNb = -1;
-      m.onZoom(k => dotG.selectAll('circle').attr('r', DOT_R() / Math.sqrt(k)).attr('stroke-width', .8 / Math.sqrt(k)));
+      m.lastNb = -1;
       plot.insertAdjacentHTML('beforeend', '<div class="maplegend"></div>');
     }
     NOLA.heatToggle(plot, st.heat, on => set('heat', on), { label: 'Per 100 homes', checked: st.basis === 'hu', onChange: on => set('basis', on ? 'hu' : 'n') });
@@ -77,11 +78,9 @@
       const ml = plot.querySelector('.maplegend'); ml.hidden = false;
       ml.innerHTML = '<div class="legend" style="margin:0">' + CAT.filter((c, k) => catOn(k)).map(c => `<span><i style="background:${c.c};border-radius:50%"></i>${c.n}</span>`).join('') + '</div>';
     }
-    const k = m.k();
-    dotG.selectAll('circle').data(mine.filter(p => catOn(p.cat))).join('circle')
-      .attr('cx', p => p.x).attr('cy', p => p.y).attr('r', DOT_R() / Math.sqrt(k)).attr('fill', p => CAT[p.cat].c).attr('fill-opacity', .85)
-      .attr('stroke', 'var(--surface)').attr('stroke-width', .8 / Math.sqrt(k))
-      .on('mousemove click', (ev, p) => tip.show(licTip(p), ev)).on('mouseleave', tip.hide); // click: a tap on a phone
+    // licenses at one address share a point; the tooltip lists them all (so no "more at this spot" line)
+    m.dots({ x: PX, y: PY, n: PN, colors: CAT.map(c => [c.c, .85]), color: i => pts[i].cat, r: DOT_R, tip: i => licTip(pts[i]), stack: false,
+      visible: i => { const p = pts[i]; return p.nb >= 0 && catOn(p.cat) && inNb(p) && bedsOk(p); } });
     if (m.lastNb !== st.nb) { m.focus(st.nb, first ? 0 : 450); m.lastNb = st.nb; }
   }
   function mapTip(i) {

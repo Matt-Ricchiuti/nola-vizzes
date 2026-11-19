@@ -201,7 +201,15 @@
 
   // ---------- canvas map ----------
   let ctx, panelEl, W = 0, H = 0, DPR = 1, view = { s: 1, tx: 0, ty: 0 }, C = {}, raf = 0, hoverHood = -1, hoverTree = -1, hoverGS = -1, hoverReq = -1, scaleEl = null, modeEl = null;
-  const req = () => { if (cv && !raf) raf = requestAnimationFrame(draw); };
+  // Drawing. A full draw (render) paints the map, plus a margin around it, onto an offscreen canvas (snap); what's
+  // shown is that picture, placed for the current view, with the hover outlines on top. So hovering only re-places the
+  // picture, and while the map is being dragged or zoomed each frame just moves and scales it, with a full draw once the
+  // map has been still for a moment (or has moved past the margin, or been zoomed half again in or out).
+  const snap = document.createElement('canvas'), MARGIN = 140; let sctx = null, snapV = null, want = 0, still = 0;
+  const frame = () => { raf = 0; const w = want; want = 0; if (w === 2 || !present()) draw(); };
+  const ask = w => { want = Math.max(want, w); if (cv && !raf) raf = requestAnimationFrame(frame); };
+  const req = () => ask(2), reqHover = () => ask(1);
+  const reqMove = () => { if (snapV) { ask(1); clearTimeout(still); still = setTimeout(req, 140); } else ask(2); };
   const insetL = () => NOLA.panelInset(panelEl, W);
   function fitBox([x0, y0, x1, y1], padPx) {
     const L = insetL(), w = W - L - 2 * padPx, h = H - 2 * padPx, s = Math.min(w / (x1 - x0), h / (y1 - y0));
@@ -217,7 +225,37 @@
     groups.forEach(g => { if (g.colorVar) g.color = cs.getPropertyValue(g.colorVar).trim(); });
   }
   function draw() {
-    raf = 0; const s = view.s;
+    raf = 0; want = 0; clearTimeout(still); if (!cv) return;
+    const m = MARGIN, w = Math.round((W + 2 * m) * DPR), h = Math.round((H + 2 * m) * DPR);
+    if (!sctx) sctx = snap.getContext('2d');
+    if (snap.width !== w || snap.height !== h) { snap.width = w; snap.height = h; }
+    const keep = [ctx, W, H, view.tx, view.ty];
+    ctx = sctx; W += 2 * m; H += 2 * m; view.tx += m; view.ty += m;
+    try { render(); } finally { [ctx, W, H, view.tx, view.ty] = keep; }
+    snapV = { s: view.s, tx: view.tx, ty: view.ty, w, h, DPR };
+    present();
+  }
+  // the last full draw, placed for the current view, then the hover outlines and rings (false: it doesn't fit any more)
+  function present() {
+    const S = snapV; if (!S || S.DPR !== DPR || S.w !== Math.round((W + 2 * MARGIN) * DPR) || S.h !== Math.round((H + 2 * MARGIN) * DPR)) return false;
+    const s = view.s, f = s / S.s, dx = view.tx - S.tx * f, dy = view.ty - S.ty * f;
+    const x0 = MARGIN - dx / f, y0 = MARGIN - dy / f; // where the view's corners fall in the last full draw
+    if (f > 1.5 || x0 < 0 || y0 < 0 || x0 + W / f > W + 2 * MARGIN || y0 + H / f > H + 2 * MARGIN) return false; // too blurry, or past what was drawn
+    ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = C.water; ctx.fillRect(0, 0, cv.width, cv.height);
+    ctx.setTransform(f, 0, 0, f, DPR * (view.tx - (S.tx + MARGIN) * f), DPR * (view.ty - (S.ty + MARGIN) * f)); ctx.drawImage(snap, 0, 0);
+    ctx.setTransform(DPR * s, 0, 0, DPR * s, DPR * view.tx, DPR * view.ty);
+    if (hoverGS >= 0) { ctx.strokeStyle = C['t-park-ink']; ctx.lineWidth = 2 / s; ctx.stroke(GS[hoverGS].path); }
+    // hover is an outline only, so streets and shading underneath stay visible
+    if (hoverHood >= 0) { ctx.strokeStyle = C.ink; ctx.lineWidth = 1.5 / s; ctx.stroke(hoods[hoverHood].path); }
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    if (mode === 'req' && hoverReq >= 0) { const px = rx[hoverReq] * s + view.tx, py = ry[hoverReq] * s + view.ty; ctx.strokeStyle = C.ink; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(px, py, reqR(s) + 3, 0, 6.2832); ctx.stroke(); }
+    if (mode === 'trees' && hoverTree >= 0) { const px = wx[hoverTree] * s + view.tx, py = wy[hoverTree] * s + view.ty, r = Math.max(0.75, Math.min(5, s * 0.000045)); ctx.strokeStyle = C.ink; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(px, py, Math.max(r, 2) + 3, 0, 6.2832); ctx.stroke(); }
+    drawScale();
+    return true;
+  }
+  // everything but the hover marks, for the current view (draw() points it at the offscreen canvas)
+  function render() {
+    const s = view.s;
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0); ctx.fillStyle = C.water; ctx.fillRect(0, 0, W, H);
     ctx.setTransform(DPR * s, 0, 0, DPR * s, DPR * view.tx, DPR * view.ty);
     ctx.fillStyle = C['t-land']; ctx.fill(landPath, 'evenodd');
@@ -232,9 +270,6 @@
       ctx.strokeStyle = C['road-major']; ctx.lineWidth = Math.max(0.7, base * 1.6) / s; ctx.stroke(roadPaths[3]); ctx.stroke(roadPaths[1]);
       ctx.strokeStyle = C['road-fwy']; ctx.lineWidth = Math.max(1.2, base * 2.4) / s; ctx.stroke(roadPaths[0]); }
     ctx.strokeStyle = C.landline; ctx.lineWidth = 1 / s; hoods.forEach(h => ctx.stroke(h.path));
-    if (hoverGS >= 0) { ctx.strokeStyle = C['t-park-ink']; ctx.lineWidth = 2 / s; ctx.stroke(GS[hoverGS].path); }
-    // hover is an outline only, so streets and shading underneath stay visible
-    if (hoverHood >= 0) { ctx.strokeStyle = C.ink; ctx.lineWidth = 1.5 / s; ctx.stroke(hoods[hoverHood].path); }
     if (selNb >= 0) { ctx.strokeStyle = C.ink; ctx.lineWidth = 2.4 / s; ctx.stroke(hoods[selNb].path); }
     // trees
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
@@ -259,9 +294,6 @@
       for (const gi of drawOrder) { const g = groups[gi]; if (g.on) plot(g.idx, g.color, filtering ? pass : null); }
     }
     drawLabels(s);
-    if (mode === 'req' && hoverReq >= 0) { const px = rx[hoverReq] * s + view.tx, py = ry[hoverReq] * s + view.ty; ctx.strokeStyle = C.ink; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(px, py, reqR(s) + 3, 0, 6.2832); ctx.stroke(); }
-    if (mode === 'trees' && hoverTree >= 0) { const px = wx[hoverTree] * s + view.tx, py = wy[hoverTree] * s + view.ty; ctx.strokeStyle = C.ink; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(px, py, Math.max(r, 2) + 3, 0, 6.2832); ctx.stroke(); }
-    drawScale();
   }
   // requests: a dot each, colored by reason; open ones solid, closed ones faded; outside a chosen neighborhood, gray
   const reqR = s => Math.max(2, Math.min(7, s * 0.00011));
@@ -354,7 +386,7 @@
       if (wxp < g.bb[0] || wxp > g.bb[2] || wyp < g.bb[1] || wyp > g.bb[3]) continue; if (ctx.isPointInPath(g.path, x, y)) { gh = k; break; } }
     let hh = -1; for (let k = 0; k < hoods.length; k++) if (ctx.isPointInPath(hoods[k].path, x, y)) { hh = k; break; }
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    if (t !== hoverTree || hh !== hoverHood || gh !== hoverGS || q !== hoverReq) { hoverTree = t; hoverHood = hh; hoverGS = gh; hoverReq = q; req(); }
+    if (t !== hoverTree || hh !== hoverHood || gh !== hoverGS || q !== hoverReq) { hoverTree = t; hoverHood = hh; hoverGS = gh; hoverReq = q; reqHover(); }
     if (q >= 0) tip.show(reqTip(q), ev);
     else if (t >= 0) {
       const sp = D.species[D.s[t]], st = D.near[t] >= 0 ? D.roadNames[D.near[t]] : '', gk = D.tg[t];
@@ -392,7 +424,7 @@
       modeEl.addEventListener('keydown', e => { if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); mode = mode === 'req' ? 'trees' : 'req'; refresh(); modeEl.querySelector(`[data-m="${mode}"]`).focus(); } });
       plot.appendChild(modeEl);
     }
-    const zoomAt = (f, x, y) => { const ns = Math.max(700, Math.min(600000, view.s * f)); f = ns / view.s; view.tx = x - (x - view.tx) * f; view.ty = y - (y - view.ty) * f; view.s = ns; userView = true; req(); };
+    const zoomAt = (f, x, y) => { const ns = Math.max(700, Math.min(600000, view.s * f)); f = ns / view.s; view.tx = x - (x - view.tx) * f; view.ty = y - (y - view.ty) * f; view.s = ns; userView = true; reqMove(); };
     // the shared map controls (full screen, zoom, reset); entering or leaving full screen resizes the canvas, and fit() follows
     NOLA.mapButtons(plot, { zoomIn: () => zoomAt(1.8, (insetL() + W) / 2, H / 2), zoomOut: () => zoomAt(1 / 1.8, (insetL() + W) / 2, H / 2),
       reset: () => zoomToHood(), onFull: () => fit() });
@@ -423,12 +455,12 @@
       const dx = e.offsetX - last.x, dy = e.offsetY - last.y; if (Math.abs(dx) + Math.abs(dy) > 2) moved = true;
       last = { x: e.offsetX, y: e.offsetY };
       if (isTouch(e) && !twoFinger && !cv.closest('.mapfs')) return; // one finger: the browser scrolls the page (or it's a tap); in full screen it moves the map
-      view.tx += dx; view.ty += dy; userView = true; tip.hide(); req(); });
+      view.tx += dx; view.ty += dy; userView = true; tip.hide(); reqMove(); });
     const endPtr = e => { pointers.delete(e.pointerId); if (pointers.size < 2) pinch = null; if (!pointers.size) { cv.classList.remove('drag'); twoFinger = false; }
       if (pointers.size === 1) { const p = [...pointers.values()][0]; last = { x: p.x, y: p.y }; }
       if (!moved && e.type === 'pointerup') { if (e.button === 0) clickHood(e.offsetX, e.offsetY); hover(e, e.offsetX, e.offsetY, true); } };
     cv.addEventListener('pointerup', endPtr); cv.addEventListener('pointercancel', endPtr);
-    cv.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse') { tip.hide(); if (hoverHood >= 0 || hoverTree >= 0 || hoverGS >= 0 || hoverReq >= 0) { hoverHood = hoverTree = hoverGS = hoverReq = -1; req(); } } });
+    cv.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse') { tip.hide(); if (hoverHood >= 0 || hoverTree >= 0 || hoverGS >= 0 || hoverReq >= 0) { hoverHood = hoverTree = hoverGS = hoverReq = -1; reqHover(); } } });
     cv.addEventListener('dblclick', e => zoomAt(2, e.offsetX, e.offsetY));
     // follow the canvas's box (window resizes, the page's scrollbar appearing, rotating a phone): an untouched map is
     // refitted; one the reader has moved keeps its center and scale. Redrawn at once, since resizing clears the canvas.

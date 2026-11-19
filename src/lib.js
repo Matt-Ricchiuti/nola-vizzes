@@ -179,7 +179,7 @@ const NOLA = (() => {
       .filter(ev => ev.type.startsWith('touch') ? ev.touches.length >= 2 || !!el.closest('.mapfs') : (!ev.ctrlKey || ev.type === 'wheel') && !ev.button)
       .on('zoom', ev => {
         if (ev.sourceEvent) moved = true; // the reader moved the map, so a resize keeps their view instead of refitting
-        root.attr('transform', ev.transform); troot.attr('transform', ev.transform); k = ev.transform.k; streetZoom(k); drawScale(); if (DL) DL.req(); placeRing();
+        root.attr('transform', ev.transform); troot.attr('transform', ev.transform); k = ev.transform.k; streetZoom(k); drawScale(); if (DL) DL.req(true); placeRing();
         stLabG.selectAll('text').style('font-size', d => (d.fs / k) + 'px').style('stroke-width', (3 / k) + 'px');
         listeners.forEach(f => f(k)); clearTimeout(lt); lt = setTimeout(layoutLabels, 90);
       });
@@ -258,28 +258,77 @@ const NOLA = (() => {
         if (hot >= 0 && !(o2.visible(hot))) setHot(-1);
         draw();
       };
-      L.req = () => { if (!raf) raf = requestAnimationFrame(draw); };
+      // Drawing. A full draw renders every dot in view, plus a margin around it, into an offscreen canvas (snap) and copies
+      // that to the map's canvas. While the map is moving (a drag, the wheel, a zoom animation) each frame only moves and
+      // scales the last full draw, and a full draw follows once the map has been still for a moment (or has moved past the
+      // margin, or been zoomed half again in or out), so panning and zooming stay smooth however many dots are shown.
+      const snap = document.createElement('canvas'), sctx = snap.getContext('2d');
+      let want = 0, snapAt = null, still = 0; // want: 1 a move-only frame, 2 a full draw
+      const MARGIN = 140; // CSS px of dots drawn beyond each edge, so a pan shows them before the next full draw
+      const frame = () => { raf = 0; const w = want; want = 0; if (w === 2 || !blit()) draw(); };
+      L.req = moving => {
+        if (moving && snapAt) { want = Math.max(want, 1); clearTimeout(still); still = setTimeout(() => L.req(), 140); }
+        else want = 2;
+        if (!raf) raf = requestAnimationFrame(frame);
+      };
+      // where the map's transform puts map units on the canvas, in device pixels
+      const place = () => { const DPR = Math.min(devicePixelRatio || 1, 2), cw = el.clientWidth, ch = el.clientHeight, t = d3.zoomTransform(svg.node()), s = cw / W;
+        return { DPR, cw, ch, pw: Math.round(cw * DPR), ph: Math.round(ch * DPR), k: t.k, a: t.k * s * DPR, bx: t.x * s * DPR, by: t.y * s * DPR }; };
+      function blit() {
+        const p = place(), S = snapAt; if (!S || !L.o || p.pw !== cv.width || p.ph !== cv.height) return false;
+        const f = p.a / S.a, m = S.m, dx = p.bx - S.bx * f, dy = p.by - S.by * f;
+        const x0 = m - dx / f, y0 = m - dy / f; // where the view's corners fall in the last full draw
+        if (f > 1.5 || x0 < 0 || y0 < 0 || x0 + p.pw / f > snap.width || y0 + p.ph / f > snap.height) return false; // too blurry, or past what was drawn
+        ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, p.pw, p.ph);
+        ctx.setTransform(f, 0, 0, f, p.bx - (S.bx + m) * f, p.by - (S.by + m) * f); ctx.drawImage(snap, 0, 0);
+        ctx.setTransform(1, 0, 0, 1, 0, 0); return true;
+      }
       function draw() {
-        raf = 0; if (!L.o) return;
-        const DPR = Math.min(devicePixelRatio || 1, 2), cw = el.clientWidth, ch = el.clientHeight, pw = Math.round(cw * DPR), ph = Math.round(ch * DPR);
-        if (cv.width !== pw || cv.height !== ph) { cv.width = pw; cv.height = ph; }
-        ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, pw, ph);
-        const t = d3.zoomTransform(svg.node()), s = cw / W, a = t.k * s * DPR, bx = t.x * s * DPR, by = t.y * s * DPR;
-        const r = L.o.r(t.k) * DPR, pad = r + 2, X = L.o.x, Y = L.o.y, round = r >= 1.6 * DPR;
+        raf = 0; want = 0; clearTimeout(still);
+        const p = place();
+        if (cv.width !== p.pw || cv.height !== p.ph) { cv.width = p.pw; cv.height = p.ph; }
+        ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, p.pw, p.ph);
+        if (!L.o) { snapAt = null; return; }
+        const m = Math.round(MARGIN * p.DPR), sw = p.pw + 2 * m, sh = p.ph + 2 * m;
+        if (snap.width !== sw || snap.height !== sh) { snap.width = sw; snap.height = sh; } else sctx.clearRect(0, 0, sw, sh);
+        const a = p.a, bx = p.bx + m, by = p.by + m, DPR = p.DPR;
+        const r = L.o.r(p.k) * DPR, pad = r + 2, X = L.o.x, Y = L.o.y;
+        // round dots once they're big enough to look round, unless tens of thousands are in view: arcs that many take the
+        // browser a long time to paint, and at that density (dots a few pixels across) squares look the same
+        let inView = 0;
+        if (r >= 1.6 * DPR) for (const B of buckets) for (let j = 0; j < B.length && inView <= 20000; j++) { const i = B[j], px = X[i] * a + bx, py = Y[i] * a + by; if (px >= -pad && py >= -pad && px <= sw + pad && py <= sh + pad) inView++; }
+        const round = r >= 1.6 * DPR && inView <= 20000;
         // an outline in the page's color keeps dots apart when they're big, and off the heatmap's shades of the same hue
-        const edge = r >= 3.2 * DPR || svg.classed('shaded');
+        const edge = r >= 3.2 * DPR || svg.classed('shaded'), lw = DPR * (r >= 3.2 * DPR ? .8 : .6);
         for (let c = 0; c < buckets.length; c++) {
           const B = buckets[c]; if (!B.length) continue;
-          ctx.fillStyle = cols[c][0]; ctx.globalAlpha = cols[c][1]; ctx.beginPath();
-          for (let j = 0; j < B.length; j++) {
-            const i = B[j], px = X[i] * a + bx, py = Y[i] * a + by;
-            if (px < -pad || py < -pad || px > pw + pad || py > ph + pad) continue;
-            if (round) { ctx.moveTo(px + r, py); ctx.arc(px, py, r, 0, 6.2832); } else ctx.rect(px - r, py - r, 2 * r, 2 * r);
+          const [col, alpha] = cols[c];
+          if (round) {
+            sctx.fillStyle = col; sctx.globalAlpha = alpha; sctx.beginPath();
+            for (let j = 0; j < B.length; j++) {
+              const i = B[j], px = X[i] * a + bx, py = Y[i] * a + by;
+              if (px < -pad || py < -pad || px > sw + pad || py > sh + pad) continue;
+              sctx.moveTo(px + r, py); sctx.arc(px, py, r, 0, 6.2832);
+            }
+            sctx.fill();
+            if (edge) { sctx.globalAlpha = Math.min(1, alpha + .2); sctx.strokeStyle = surf; sctx.lineWidth = lw; sctx.stroke(); }
+          } else { // tiny dots: squares (fillRect is the fastest way to draw many), outlined (heatmap on) by a slightly
+            // larger square of the page's color underneath
+            const e = edge ? lw : 0, rr = 2 * r, re = rr + 2 * e;
+            for (let pass = edge ? 0 : 1; pass < 2; pass++) {
+              sctx.fillStyle = pass ? col : surf; sctx.globalAlpha = pass ? alpha : Math.min(1, alpha + .2);
+              const o = pass ? r : r + e, w = pass ? rr : re;
+              for (let j = 0; j < B.length; j++) {
+                const i = B[j], px = X[i] * a + bx, py = Y[i] * a + by;
+                if (px < -pad || py < -pad || px > sw + pad || py > sh + pad) continue;
+                sctx.fillRect(px - o, py - o, w, w);
+              }
+            }
           }
-          ctx.fill();
-          if (edge) { ctx.globalAlpha = Math.min(1, cols[c][1] + .2); ctx.strokeStyle = surf; ctx.lineWidth = DPR * (r >= 3.2 * DPR ? .8 : .6); ctx.stroke(); }
         }
-        ctx.globalAlpha = 1;
+        sctx.globalAlpha = 1;
+        ctx.drawImage(snap, -m, -m);
+        snapAt = { a, bx: p.bx, by: p.by, m };
       }
       let surf = css('--surface');
       L.theme = () => { surf = css('--surface'); if (L.o) { L.resolve(); draw(); } };
