@@ -308,7 +308,6 @@ table.static tbody tr{cursor:auto}
 .vmenu summary::-webkit-details-marker{display:none}
 .vmenu summary:hover{border-color:var(--axis);box-shadow:0 4px 14px rgb(0 0 0 / .08)}
 .vmenu summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-.vmenu summary .ct{font:500 11px "IBM Plex Mono",ui-monospace,monospace;color:var(--muted);background:var(--chip);border-radius:999px;padding:2px 8px}
 .vmenu summary svg{transition:transform .2s;color:var(--muted)}
 .vmenu[open] summary{border-color:var(--accent)}
 .vmenu[open] summary svg{transform:rotate(180deg)}
@@ -335,7 +334,7 @@ table.static tbody tr{cursor:auto}
 <div class="hero">
 <h1>NOLA Vizzes<span>Visualized Data from data.nola.gov</span></h1>
 <details class="vmenu" id="vmenu">
-<summary>Choose a visualization <span class="ct" id="vct"></span><svg width="14" height="9" viewBox="0 0 12 8" aria-hidden="true"><path d="M1 1.5l5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></summary>
+<summary>Visualizations<svg width="14" height="9" viewBox="0 0 12 8" aria-hidden="true"><path d="M1 1.5l5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></summary>
 <nav class="vpanel" aria-label="Visualizations"><ul class="vlist"><li><a href="cpc.html">City Planning Cases</a></li><li><a href="311.html">311 Requests</a></li><li><a href="str.html">Short-Term Rentals (STRs)</a></li><li><a href="blight.html">Blight/Code-enforcement</a></li><li><a href="permits.html">Permits</a></li><li><a href="trees.html">Trees</a></li><li><a href="biz.html">New Businesses</a></li></ul><div class="vextra"><a href="about.html">About</a></div></nav>
 </details>
 </div>
@@ -345,7 +344,6 @@ table.static tbody tr{cursor:auto}
 (() => {
   const d = document.getElementById('vmenu'), sum = d.querySelector('summary');
   const links = () => [...d.querySelectorAll('.vpanel a')];
-  document.getElementById('vct').textContent = d.querySelectorAll('.vlist a').length;
   const close = (refocus) => { if (!d.open) return; d.open = false; if (refocus) sum.focus(); };
   sum.addEventListener('keydown', e => {
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
