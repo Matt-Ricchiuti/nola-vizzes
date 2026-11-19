@@ -62,8 +62,6 @@ const NOLA = (() => {
     el.innerHTML = `<option value="-1">${label}</option>` + nbList().map(f => `<option value="${f.idx}">${f.name}</option>`).join('');
     el.value = sel; el.onchange = () => onSel(+el.value);
   }
-  // projected map units -> [lon, lat] (for CSV downloads)
-  const lonlat = (x, y) => [+(x / 4830 - 90.14).toFixed(5), +(30.20 - y / 5550).toFixed(5)];
 
   // map(el, opts) -> {svg, layer, zoomTo, setFill, focus, k()}
   // The map fills el. It keeps clear of an on-map filter panel (o.panel) when fitting, and carries its own
@@ -443,8 +441,10 @@ const NOLA = (() => {
     kv.forEach(p => { const [k, v] = p.split('='); if (k) o[k] = decodeURIComponent(v || ''); });
     return o;
   }
-  // views(list, { state, ds }) -- list: [{ id, label, tab, cls, keep, draw(el, first), csv() -> rows, file() -> CSV name (default id), ds: [id, name] }]
+  // views(list, { state, ds }) -- list: [{ id, label, tab, cls, keep, draw(el, first), ds: [id, name] or () => [id, name] }]
   // A bar at the top of #chart holds a tab per chart (`tab`, or `label`) and Copy link / Download CSV for the open one.
+  // Download CSV links to the open chart's City dataset on data.nola.gov (its export is there): the view's `ds`, which
+  // can be a function of the filters when one chart switches between datasets, else the page's `opts.ds`.
   // Below it, each chart is its own section (heading `label`, then the chart); only the open one shows.
   // With a single chart there are no tabs: its heading takes their place in the bar.
   // Filters are shared page state: refresh() redraws the open chart, and the others redraw when next opened.
@@ -466,14 +466,16 @@ const NOLA = (() => {
     const bar = document.createElement('div'); bar.className = 'vbar';
     const tabRow = document.createElement('div'); tabRow.className = 'vtabs'; tabRow.setAttribute('role', 'tablist'); tabRow.setAttribute('aria-label', 'Charts');
     const tools = document.createElement('div'); tools.className = 'tools';
-    const linkB = btn('Copy link'), csvB = btn('Download CSV');
+    const linkB = btn('Copy link'), csvB = document.createElement('a');
+    csvB.className = 'btn'; csvB.textContent = 'Download CSV'; csvB.target = '_blank'; csvB.rel = 'noopener';
+    const dsOf = v => (typeof v.ds === 'function' ? v.ds() : v.ds) || opts.ds;
+    const setDs = () => { const d = dsOf(cur); csvB.href = 'https://data.nola.gov/d/' + d[0]; csvB.title = `Open the ${d[1]} dataset on data.nola.gov`; };
     linkB.onclick = async () => {
       writeHash(); const url = linkFor();
       try { await navigator.clipboard.writeText(url); linkB.textContent = 'Link copied'; }
       catch (e) { prompt('Copy this link:', url); }
       setTimeout(() => linkB.textContent = 'Copy link', 1600);
     };
-    csvB.onclick = () => downloadCSV(cur);
     tools.append(linkB, csvB);
     // a page with a single chart has no tabs: the bar holds that chart's heading instead
     const one = list.length === 1;
@@ -498,11 +500,11 @@ const NOLA = (() => {
     if (dataLink && ds) { dataLink.href = 'https://data.nola.gov/d/' + ds[0]; dataLink.textContent = ds[1] + ' on data.nola.gov'; }
     // charts are drawn only while shown (hidden ones have no size); a hidden chart whose filters changed redraws when opened
     const drawOne = v => { v.draw(panes[v.id], !drawn.has(v.id)); drawn.add(v.id); stale.delete(v.id); };
-    const draw = () => { tip.hide(); list.forEach(v => { if (v !== cur && drawn.has(v.id)) stale.add(v.id); }); drawOne(cur); writeHash(); setSbw(); };
+    const draw = () => { tip.hide(); list.forEach(v => { if (v !== cur && drawn.has(v.id)) stale.add(v.id); }); drawOne(cur); writeHash(); setDs(); setSbw(); };
     function show(v) {
       cur = v;
       list.forEach(x => { secs[x.id].hidden = x !== v; tabs[x.id].setAttribute('aria-selected', x === v); tabs[x.id].tabIndex = x === v ? 0 : -1; });
-      csvB.hidden = !v.csv;
+      setDs();
       if (!drawn.has(v.id) || stale.has(v.id)) drawOne(v);
       // on phones the tab row scrolls sideways: bring the open tab into view
       const r = tabRow.getBoundingClientRect(), t = tabs[v.id].getBoundingClientRect();
@@ -533,21 +535,11 @@ const NOLA = (() => {
       if (innerWidth === lastW) return; lastW = innerWidth; // phones fire resize on scroll (address bar); only width matters
       list.forEach(v => { if (!v.keep && drawn.has(v.id)) { if (v === cur) drawOne(v); else stale.add(v.id); } });
     }, 150); });
-    function downloadCSV(v) {
-      const rows = v.csv && v.csv(); if (!rows || !rows.length) return;
-      const keys = Object.keys(rows[0]);
-      const cell = x => { x = x == null ? '' : String(x); return /[",\n]/.test(x) ? '"' + x.replace(/"/g, '""') + '"' : x; };
-      const text = [keys.map(cell).join(','), ...rows.map(r => keys.map(k => cell(r[k])).join(','))].join('\n');
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(new Blob(['\ufeff' + text], { type: 'text/csv;charset=utf-8' }));
-      a.download = `${location.pathname.split('/').pop().replace('.html', '') || 'index'}-${v.file ? v.file() : v.id}.csv`;
-      document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-    }
     show(cur); writeHash();
     return { refresh: draw, open, get id() { return cur.id; } };
   }
   const legendHTML = items => '<div class="legend">' + items.map(([c, l, round]) => `<span><i style="background:${c}${round ? ';border-radius:50%' : ''}"></i>${l}</span>`).join('') + '</div>';
 
-  return { css, S, fmt, pct, tip, row, setGeo, views, hashState, legendHTML, stage, fsec, flist, seg, ftabs, nbPick, phoneToggle, popOf, perK, fmtRate, POP_NOTE, basisChips, shown, nbList, nbSelect, lonlat, get FULL() { return FULL; }, get GEO() { return GEO; }, map, mapButtons, panelInset, seqVar, seqLegend, classes, stepLegend, short, frame, yGrid, chips, months, monthsLong,
+  return { css, S, fmt, pct, tip, row, setGeo, views, hashState, legendHTML, stage, fsec, flist, seg, ftabs, nbPick, phoneToggle, popOf, perK, fmtRate, POP_NOTE, basisChips, shown, nbList, nbSelect, get FULL() { return FULL; }, get GEO() { return GEO; }, map, mapButtons, panelInset, seqVar, seqLegend, classes, stepLegend, short, frame, yGrid, chips, months, monthsLong,
     setYear, get YEAR() { return YEAR; }, monthTicks, doyTime, doyDate, doyISO, doyMonth, monthStarts, isoDate, share, numWord, cap, setText, setHTML, title };
 })();

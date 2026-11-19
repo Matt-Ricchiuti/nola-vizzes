@@ -266,17 +266,10 @@
     });
   }
 
-  // ---------- CSV downloads ----------
-  const csvUp = () => upF().map(u => ({ hearing: u.when.replace('T', ' '), body: u.body, case_number: u.cnum, type: u.type, address: u.addr, neighborhood: nbName(u.nb), description: u.desc }));
-  const csvFiled = () => matching().filter(okNb).map(p => { const [lon, lat] = p[2] || p[3] ? NOLA.lonlat(p[2], p[3]) : ['', ''];
-    return { filed: isoOf(p[0]), type: P.TYP[p[1]], neighborhood: nbName(p[4]), topics: P.TH.filter((t, i) => (p[5] >> i) & 1).join('; '), lon, lat }; });
-  const csvYears = () => Object.keys(P.typeY).sort().map(y => Object.assign({ year: y }, ...P.TYP.map((t, i) => ({ [t]: P.typeY[y][i] }))));
-  const csvTopics = () => Object.keys(P.themeY).sort().map(y => Object.assign({ year: y }, ...P.TH.map((t, i) => ({ [t]: P.themeY[y][i] }))));
-
   const V = NOLA.views([
-    { id: 'map', label: mapTitle(), tab: 'Map of cases', keep: true, draw: drawMap, csv: () => st.tab === 'up' ? csvUp() : csvFiled() },
-    { id: 'years', label: 'Cases filed per year, by type', draw: drawYears, csv: csvYears },
-    { id: 'topics', label: 'Cases per year mentioning each topic', draw: drawTopics, csv: csvTopics },
+    { id: 'map', label: mapTitle(), tab: 'Map of cases', keep: true, draw: drawMap },
+    { id: 'years', label: 'Cases filed per year, by type', draw: drawYears },
+    { id: 'topics', label: 'Cases per year mentioning each topic', draw: drawTopics },
   ], { ds: ['xxb5-5azv', 'CPC Projects'],
        state: () => ({ tab: st.tab === 'filed' ? 'filed' : null, date: st.day !== NEXT ? st.day : null, from: st.from !== DEF_FROM ? isoOf(st.from) : null, to: st.to !== LAST ? isoOf(st.to) : null,
          fold: st.fold >= 0 ? st.fold : null, theme: st.theme >= 0 ? st.theme : null, nb: st.nb >= 0 ? st.nb : null }) });

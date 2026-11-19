@@ -195,23 +195,12 @@
     });
   }
 
-  // ---------- CSV downloads ----------
-  const hrsLab = h => String(h).padStart(2, '0') + ':00';
-  const csvTrend = () => { const o = []; Object.keys(HIST).sort().forEach(y => HIST[y].forEach((v, m) => { if (!(+y === YEAR && m >= cutMonth)) o.push({ month: `${y}-${String(m + 1).padStart(2, '0')}`, from_public: v[0], started_by_officers: v[1] }); })); return o; };
-  const csvDaily = () => C.daily.map((d, i) => ({ date: NOLA.doyISO(i), from_public: d[0], started_by_officers: d[1] }));
-  const csvHeat = () => { const names = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'], o = []; C.heat.forEach((r, d) => r.forEach((v, h) => o.push({ weekday: names[d], hour: hrsLab(h), calls_from_public: v }))); return o; };
-  const csvTypes = () => rows.map(r => ({ call_type: r.name, calls: r.n, pct_started_by_officers: Math.round(100 * r.selfP), median_arrival_public_calls_min: r.med == null ? '' : r.med, pct_gone_on_arrival: Math.round(100 * r.goaP), pct_report_filed: Math.round(100 * r.rtfP) }));
-  const csvMap = () => NOLA.nbList().map(f => { const r = nb[f.idx], pop = NOLA.popOf(f.idx);
-    return Object.assign({ neighborhood: f.name, residents_2020: pop, from_public: r[0], started_by_officers: r[1], public_per_1000_residents: NOLA.perK(r[0], pop) == null ? '' : +NOLA.perK(r[0], pop).toFixed(1),
-      median_arrival_emergency_min: r[4] >= 30 ? r[2] : '', median_arrival_nonemergency_min: r[3] == null ? '' : r[3] }, ...C.TOP.map((t, k) => unmappable(k) ? {} : { [tcase(t)]: r[5][k] })); });
-  const csvDist = () => C.pd.map(d => ({ district: d[0], from_public: d[1], started_by_officers: d[2], emergency_median_min: d[3], emergency_90th_pct_min: d[4], nonemergency_median_min: d[5] }));
-
   const V = NOLA.views([
-    { id: 'map', label: 'Calls by neighborhood', keep: true, draw: drawMap, csv: csvMap },
-    { id: 'trend', label: 'Calls over time', draw: drawTime, csv: () => st.per === 'day' ? csvDaily() : csvTrend(), file: () => st.per === 'day' ? 'daily' : 'trend' },
-    { id: 'heat', label: 'Calls by weekday and hour', draw: drawHeat, csv: csvHeat },
-    { id: 'types', label: 'Call types', draw: drawTypes, csv: csvTypes },
-    { id: 'dist', label: 'Officer arrival time by police district', draw: drawDist, csv: csvDist },
+    { id: 'map', label: 'Calls by neighborhood', keep: true, draw: drawMap },
+    { id: 'trend', label: 'Calls over time', draw: drawTime },
+    { id: 'heat', label: 'Calls by weekday and hour', draw: drawHeat },
+    { id: 'types', label: 'Call types', draw: drawTypes },
+    { id: 'dist', label: 'Officer arrival time by police district', draw: drawDist },
   ], { ds: [C.ds || 'es9j-6y5d', `Calls for Service ${YEAR}`],
        state: () => ({ show: st.show !== 'both' ? st.show : null, per: st.per !== 'month' ? st.per : null, metric: st.metric !== 'res' ? st.metric : null, basis: st.basis !== 'n' ? st.basis : null, nb: st.nb >= 0 ? st.nb : null }) });
 })();
