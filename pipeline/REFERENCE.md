@@ -227,13 +227,13 @@ Checked against the API on 2026-11-19: past-12-month total, open total, October 
 
 Three datasets, each downloaded whole (ordered by `:id`):
 
-- **Active Short-Term Rental Licenses** (`ufdg-ajws`, about 4,300 rows): `license_type, residential_subtype, bedroom_limit, issue_date, longitude, latitude`. Licenses of type "Short Term Rental Operator" are permits for the person running a rental, not a place, so they're counted separately (`operators`, by subtype) and left off the map. The other three types (`cat`) are mapped: 0 "Short Term Rental Commercial Owner", 1 "Non-Commercial Short Term Rental", 2 "Lodging Exempt from STR Regulation". A new type fails the build (add it to `STR_CAT`).
+- **Active Short-Term Rental Licenses** (`ufdg-ajws`, about 4,300 rows): `license_type, residential_subtype, bedroom_limit, issue_date, longitude, latitude, license_number, address, expiration_date` (the license's public details for the map's tooltips; operator and holder names and contacts are not kept). Licenses of type "Short Term Rental Operator" are permits for the person running a rental, not a place, so they're counted separately (`operators`, by subtype) and left off the map. The other three types (`cat`) are mapped: 0 "Short Term Rental Commercial Owner", 1 "Non-Commercial Short Term Rental", 2 "Lodging Exempt from STR Regulation". A new type fails the build (add it to `STR_CAT`).
 - **Non-Commercial Short-Term Rental Licenses** (`2ei9-wqw2`, about 1,200 rows): `type_of_building, partial_whole, operator_type, bedrooms_rented, current_status, location`.
 - **Short-Term Rental Permit Applications** (`en36-xvxg`, about 39,000 rows since 2017): `application_date, license_type, residential_subtype, current_status, x, y`. This dataset has no lon/lat columns, only Louisiana South state plane x/y in US feet (EPSG:3452), converted with `sp_lonlat` (an inverse Lambert conformal conic; it matches the City's own lon/lat in the other STR datasets to 1e-7°). x/y of -1 means no location.
 
 ```
 { "ds": [ids], "last": newest application_date,
-  "cat": [3 license types], "pts": [[x, y, cat, nb, bedroomLimit], ...]   # sorted, so the file only changes with the data
+  "cat": [3 license types], "pts": [[x, y, cat, nb, bedroomLimit, address, licenseNumber, issueDate, expirationDate], ...]   # sorted; dates YYYY-MM-DD or ""
   "operators": [[subtype, n], ...],
   "nc": { "B": [building types], "OP": [operator types], "ST": [statuses],
           "rows": [[nb, building, whole(1)/partial(0)/not stated(2), bedrooms, operatorType, status], ...] },

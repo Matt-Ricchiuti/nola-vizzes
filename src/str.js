@@ -27,7 +27,22 @@
   const toggleCat = c => set('cats', catOn(c) ? (st.cats.length > 1 ? st.cats.filter(x => x !== c) : st.cats) : [...st.cats, c].sort());
 
   // ---------- active licenses ----------
-  const pts = D.pts.map(p => ({ x: p[0], y: p[1], cat: p[2], nb: p[3], beds: p[4] }));
+  // each license: where it is, its type and bedroom limit, and (from the license itself, which is public) its address,
+  // number and dates. Licenses at the same address share a point, so a dot's tooltip lists every license there.
+  const pts = D.pts.map(p => ({ x: p[0], y: p[1], cat: p[2], nb: p[3], beds: p[4], addr: p[5] || '', lic: p[6] || '', issued: p[7] || '', expires: p[8] || '' }));
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const at = d3.group(pts, p => p.x + ',' + p.y);
+  const DOT_R = () => (matchMedia('(pointer: coarse)').matches ? 5 : 3.2); // bigger dots to tap on touch screens
+  function licTip(p) {
+    const here = at.get(p.x + ',' + p.y).filter(q => catOn(q.cat)).sort((a, b) => a.addr.localeCompare(b.addr, undefined, { numeric: true }) || a.lic.localeCompare(b.lic));
+    const date = s => s ? NOLA.isoDate(s) : '—';
+    const one = q => row(sw(CAT[q.cat].c) + CAT[q.cat].n, esc(q.lic || '—'))
+      + `<div style="color:var(--ink2);margin:0 0 4px 14px;font-size:11.5px">${q.addr && here.length > 1 ? esc(q.addr) + ' · ' : ''}${q.beds ? q.beds + ' bedroom' + (q.beds === 1 ? '' : 's') + ' · ' : ''}issued ${date(q.issued)}${q.expires ? ' · expires ' + date(q.expires) : ''}</div>`;
+    const addrs = [...new Set(here.map(q => q.addr).filter(Boolean))];
+    return `<b>${esc(addrs.length === 1 ? addrs[0] : addrs.length ? addrs.length + ' addresses at this spot' : 'Address not listed')}</b>`
+      + `<div style="color:var(--ink2);margin-bottom:6px">${here.length === 1 ? 'Active short-term rental license' : here.length + ' active short-term rental licenses'} · ${nbName(p.nb)}</div>`
+      + here.slice(0, 6).map(one).join('') + (here.length > 6 ? `<div style="color:var(--ink2)">and ${here.length - 6} more</div>` : '');
+  }
   const byNb = d3.range(72).map(() => [0, 0, 0]), bedsNb = d3.range(72).map(() => [0, 0, 0]);
   pts.forEach(p => { if (p.nb >= 0) { byNb[p.nb][p.cat]++; bedsNb[p.nb][p.cat] += p.beds; } });
   const cnt = i => d3.sum(st.cats, c => byNb[i][c]);
@@ -44,16 +59,16 @@
       CAT.map((c, k) => ({ key: k, name: c.n, sub: c.sub, color: c.c, count: pts.filter(p => p.cat === k && p.nb >= 0 && inNb(p)).length })), { pressed: catOn, onClick: toggleCat, mode: 'toggle' });
     let leg = null;
     if (st.view === 'shade') {
-      NOLA.seg(NOLA.fsec(panel, 'Count'), [['n', 'Total'], ['hu', 'Per 100 homes']], st.basis, v => set('basis', v));
       leg = document.createElement('div'); leg.className = 'legend'; NOLA.fsec(panel, keyLabel()).appendChild(leg);
     }
     if (first) {
       m = NOLA.map(plot, { panel, label: 'Map of short-term rental licenses', tip: mapTip });
       dotG = m.layer.append('g'); m.lastNb = -1;
-      m.onZoom(k => dotG.selectAll('circle').attr('r', 3.2 / Math.sqrt(k)).attr('stroke-width', .8 / Math.sqrt(k)));
+      m.onZoom(k => dotG.selectAll('circle').attr('r', DOT_R() / Math.sqrt(k)).attr('stroke-width', .8 / Math.sqrt(k)));
       plot.insertAdjacentHTML('beforeend', '<div class="maplegend"></div>');
     }
     const ml = plot.querySelector('.maplegend');
+    NOLA.perToggle(plot, st.view === 'shade' ? 'Per 100 homes' : null, st.basis === 'hu', on => set('basis', on ? 'hu' : 'n'));
     if (st.view === 'shade') {
       const cl = NOLA.classes(d3.range(72).map(val));
       m.setFill(i => cl.color(val(i)));
@@ -64,12 +79,13 @@
     } else { m.setFill(() => null); ml.innerHTML = '<div class="legend" style="margin:0">' + CAT.filter((c, k) => catOn(k)).map(c => `<span><i style="background:${c.c};border-radius:50%"></i>${c.n}</span>`).join('') + '</div>'; ml.hidden = false; }
     const k = m.k();
     dotG.selectAll('circle').data(st.view === 'dots' ? pts.filter(p => catOn(p.cat) && p.nb >= 0 && inNb(p)) : []).join('circle')
-      .attr('cx', p => p.x).attr('cy', p => p.y).attr('r', 3.2 / Math.sqrt(k)).attr('fill', p => CAT[p.cat].c).attr('fill-opacity', .85)
+      .attr('cx', p => p.x).attr('cy', p => p.y).attr('r', DOT_R() / Math.sqrt(k)).attr('fill', p => CAT[p.cat].c).attr('fill-opacity', .85)
       .attr('stroke', 'var(--surface)').attr('stroke-width', .8 / Math.sqrt(k))
-      .on('mousemove', (ev, p) => tip.show(`<b>${CAT[p.cat].n} license</b>` + row('Bedroom limit', p.beds || '—') + row('Neighborhood', nbName(p.nb)), ev)).on('mouseleave', tip.hide);
+      .on('mousemove click', (ev, p) => tip.show(licTip(p), ev)).on('mouseleave', tip.hide); // click: a tap on a phone
     if (m.lastNb !== st.nb) { m.focus(st.nb, first ? 0 : 450); m.lastNb = st.nb; }
   }
   function mapTip(i) {
+    if (st.view === 'dots') return null; // on the license map only the dots have tooltips
     const n = byNb[i], r = perHU(cnt(i), i);
     return `<b>${GEO.nb[i].name}</b>` + CAT.map((c, k) => row(sw(c.c) + c.n, fmt(n[k]))).join('') + row('Bedrooms licensed', fmt(d3.sum(st.cats, c => bedsNb[i][c])))
       + row('Housing units (2020)', fmt(HU[i] || 0)) + (r != null ? row((st.cats.length < 3 ? 'Shown licenses' : 'Licenses') + ' per 100 homes', NOLA.fmtRate(r)) : '');

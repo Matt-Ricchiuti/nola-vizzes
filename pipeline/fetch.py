@@ -1022,7 +1022,8 @@ def fetch_all(api, ds, select, order=':id', where=None, page=50000):
 
 def build_str(api, nbp):
     # active licenses
-    cols = ['license_type', 'residential_subtype', 'bedroom_limit', 'issue_date', 'longitude', 'latitude']
+    # license number, address and dates are public on the license; operator and holder names are left out
+    cols = ['license_type', 'residential_subtype', 'bedroom_limit', 'issue_date', 'longitude', 'latitude', 'license_number', 'address', 'expiration_date']
     api.require_columns(STR_ACTIVE, cols, 'Active STR licenses')
     act = fetch_all(api, STR_ACTIVE, ','.join(cols))
     need(len(act) > 500, f'Active STR licenses: only {len(act)} rows')
@@ -1033,7 +1034,8 @@ def build_str(api, nbp):
         if lt == 'Short Term Rental Operator':
             operators[(r.get('residential_subtype') or '').strip() or 'N/A'] += 1
         elif lt in STR_CAT:
-            pts.append([x, y, STR_CAT.index(lt), nb, int(fnum(r.get('bedroom_limit')) or 0)])
+            pts.append([x, y, STR_CAT.index(lt), nb, int(fnum(r.get('bedroom_limit')) or 0), re.sub(r'\s+', ' ', (r.get('address') or '').strip()),
+                        (r.get('license_number') or '').strip(), (r.get('issue_date') or '')[:10], (r.get('expiration_date') or '')[:10]])
         else:
             other += 1
     need(not other, f'Active STR licenses: {other} rows of an unknown license type. Add it to STR_CAT.')
@@ -1440,7 +1442,7 @@ def validate(name, obj, prev, same_year=True):
         need(obj['noLoc'] < 0.1 * obj['total'], '311: most requests failed to map to a neighborhood')
         check_not_collapsed('311 requests', obj['total'], prev and prev.get('total'))
     elif name == 'str.json':
-        need(len(obj['nby']) == 72 and len(obj['yr']) == len(obj['years']) and all(len(p) == 5 for p in obj['pts']), 'str: shape')
+        need(len(obj['nby']) == 72 and len(obj['yr']) == len(obj['years']) and all(len(p) == 9 for p in obj['pts']), 'str: shape')
         need(obj['total'] > 500 and len(obj['nc']['rows']) > 100, 'str: suspiciously few licenses')
         need(sum(p[3] < 0 for p in obj['pts']) < 0.1 * obj['total'], 'str: most licenses failed to map to a neighborhood')
         check_not_collapsed('STR permit applications', obj['apps'], prev and prev.get('apps'))
