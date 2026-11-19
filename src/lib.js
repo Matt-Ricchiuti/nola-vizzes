@@ -68,10 +68,16 @@ const NOLA = (() => {
   // map(el, opts) -> {svg, layer, zoomTo, setFill, focus, k()}
   // The map fills el. It keeps clear of an on-map filter panel (o.panel) when fitting, and carries its own
   // zoom controls, scale bar and street-name labels.
+  // Input: the mouse wheel (or trackpad pinch) zooms and dragging pans; the page never scrolls under the map.
+  // On touch screens one finger scrolls the page and two fingers move and zoom the map (see stage()).
+  // The map follows its box when the page is resized: one unit is one CSS pixel once the map is over 1000px wide
+  // (narrower maps scale down, as before), so text and dots keep their size on wide screens.
   let mapN = 0;
   function map(el, o) {
     el.classList.add('map');
-    const W = 1000, H = Math.round(W * (el.clientHeight > 50 ? el.clientHeight / Math.max(1, el.clientWidth) : (o.height || 640) / 1000));
+    const dims = () => { const cw = el.clientWidth, ch = el.clientHeight, w = Math.max(1000, Math.round(cw));
+      return [w, Math.round(w * (ch > 50 && cw > 0 ? ch / cw : (o.height || 640) / 1000))]; };
+    let [W, H] = dims();
     const svg = d3.select(el).append('svg').attr('viewBox', `0 0 ${W} ${H}`).attr('role', 'img').attr('aria-label', o.label || 'Map of New Orleans');
     const root = svg.append('g');
     const base = root.append('g');
@@ -127,7 +133,7 @@ const NOLA = (() => {
     }
 
     // ---- zoom, controls, scale bar ----
-    let k = 1, lt = 0; const listeners = [];
+    let k = 1, lt = 0, moved = false, target = null; const listeners = [];
     const scaleEl = document.createElement('div'); scaleEl.className = 'scalebar'; scaleEl.innerHTML = '<span></span><i></i>'; el.appendChild(scaleEl);
     function drawScale() {
       const pxPerMile = 80.47 * k * (el.clientWidth || W) / W, opts = [0.05, 0.1, 0.25, 0.5, 1, 2, 5]; let m = opts[0];
@@ -136,16 +142,30 @@ const NOLA = (() => {
       scaleEl.firstChild.textContent = m < 1 ? (m * 5280 >= 1000 ? m + ' mi' : Math.round(m * 5280) + ' ft') : m + ' mi';
     }
     // the opening view is about k = 0.45; allow zooming out far enough to see the whole parish, east marsh included
-    const zoom = d3.zoom().scaleExtent([0.25, 40]).on('zoom', ev => {
-      root.attr('transform', ev.transform); k = ev.transform.k; streetZoom(k); drawScale();
-      stLabG.selectAll('text').style('font-size', d => (d.fs / k) + 'px').style('stroke-width', (3 / k) + 'px');
-      listeners.forEach(f => f(k)); clearTimeout(lt); lt = setTimeout(layoutLabels, 90);
-    });
+    const zoom = d3.zoom().scaleExtent([0.25, 40])
+      // touch: only two-finger gestures move the map, so one finger still scrolls the page (touch-action in lib.css)
+      .filter(ev => ev.type.startsWith('touch') ? ev.touches.length >= 2 : (!ev.ctrlKey || ev.type === 'wheel') && !ev.button)
+      .on('zoom', ev => {
+        if (ev.sourceEvent) moved = true; // the reader moved the map, so a resize keeps their view instead of refitting
+        root.attr('transform', ev.transform); k = ev.transform.k; streetZoom(k); drawScale();
+        stLabG.selectAll('text').style('font-size', d => (d.fs / k) + 'px').style('stroke-width', (3 / k) + 'px');
+        listeners.forEach(f => f(k)); clearTimeout(lt); lt = setTimeout(layoutLabels, 90);
+      });
     svg.call(zoom).on('dblclick.zoom', null);
+    // Safari's trackpad pinch arrives as gesture events rather than ctrl+wheel; zoom the map instead of the page
+    // (on iPhone/iPad the same events come with two-finger touches, which d3 already handles)
+    let gk = 1, touching = false;
+    el.addEventListener('touchstart', e => { touching = true; }, { passive: true });
+    const untouch = e => { touching = e.touches.length > 0; };
+    el.addEventListener('touchend', untouch, { passive: true }); el.addEventListener('touchcancel', untouch, { passive: true });
+    el.addEventListener('gesturestart', e => { e.preventDefault(); gk = k; });
+    el.addEventListener('gesturechange', e => { e.preventDefault(); if (touching) return; moved = true;
+      const r = svg.node().getBoundingClientRect(); svg.call(zoom.scaleTo, gk * e.scale, [(e.clientX - r.left) * W / r.width, (e.clientY - r.top) * H / r.height]); });
     // fit an extent into the part of the map the filter panel doesn't cover
     const inset = () => { if (!o.panel || getComputedStyle(o.panel).position !== 'absolute' || !o.panel.childElementCount) return 0;
       return (o.panel.offsetWidth + 24) * W / Math.max(1, el.clientWidth); };
-    function zoomTo([x0, y0, x1, y1], dur = 0) {
+    function zoomTo(ext, dur = 0) {
+      const [x0, y0, x1, y1] = ext; target = ext; moved = false;
       const L = inset(), s = Math.min((W - L) / (x1 - x0), H / (y1 - y0)) * 0.96;
       const tr = d3.zoomIdentity.translate(L + (W - L) / 2, H / 2).scale(s).translate(-(x0 + x1) / 2, -(y0 + y1) / 2);
       (dur ? svg.transition().duration(dur) : svg).call(zoom.transform, tr);
@@ -153,10 +173,24 @@ const NOLA = (() => {
     const home = o.extent || FULL;
     let focused = -1;
     const ctl = document.createElement('div'); ctl.className = 'mapctl';
-    [['+', 'Zoom in', () => svg.transition().duration(250).call(zoom.scaleBy, 1.7)], ['−', 'Zoom out', () => svg.transition().duration(250).call(zoom.scaleBy, 1 / 1.7)],
+    const by = f => () => { moved = true; svg.transition().duration(250).call(zoom.scaleBy, f); };
+    [['+', 'Zoom in', by(1.7)], ['−', 'Zoom out', by(1 / 1.7)],
      ['⤢', 'Reset view', () => api.focus(focused)]].forEach(([t, l, fn]) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = t; b.title = l; b.setAttribute('aria-label', l); b.onclick = fn; ctl.appendChild(b); });
     el.appendChild(ctl);
     zoomTo(home); drawScale(); layoutLabels();
+    // follow the map's box (window resizes, the page's scrollbar appearing, rotating a phone): an untouched map is
+    // refitted to what it was showing; one the reader has moved keeps its center and scale
+    const fit = () => {
+      if (!el.clientWidth || !el.clientHeight) return;
+      const [nw, nh] = dims(); if (nw === W && nh === H) return;
+      const t = d3.zoomTransform(svg.node()), c = t.invert([W / 2, H / 2]);
+      W = nw; H = nh; svg.interrupt().attr('viewBox', `0 0 ${W} ${H}`);
+      if (!moved && target) zoomTo(target);
+      else svg.call(zoom.transform, d3.zoomIdentity.translate(W / 2, H / 2).scale(t.k).translate(-c[0], -c[1]));
+      drawScale();
+    };
+    if (window.ResizeObserver) new ResizeObserver(fit).observe(el);
+    addEventListener('resize', fit);
     const api = {
       svg, layer, nbSel, zoomTo, k: () => k, onZoom: f => listeners.push(f), home,
       setFill(fn) { nbSel.attr('fill', f => fn(f.idx) || null).style('fill', f => fn(f.idx) || null); },
@@ -173,19 +207,50 @@ const NOLA = (() => {
   function mapButtons() {}
 
   // ---------- filters on the chart ----------
-  // stage(el, { map }) turns a view's pane into a filter panel + plot area. On maps the panel floats over the map.
+  // stage(el, { map }) turns a view's pane into a filter panel + plot area. On maps the panel floats over the map,
+  // and the section holding the map spans the window (see .vsec.wide in lib.css).
   function stage(el, { map: isMap = false, open = false } = {}) {
     el.classList.add('stage', isMap ? 'mapstage' : 'chartstage');
     el.innerHTML = '<div class="fpanel"></div><div class="plot"></div>';
-    const panel = el.firstChild;
+    const panel = el.firstChild, plot = el.lastChild;
     if (isMap) { // on phones the map's filters fold away behind a button, so the map shows first
       const b = document.createElement('button'); b.type = 'button'; b.className = 'btn ftoggle'; b.textContent = 'Filters';
       if (open) b.textContent = 'Hide filters'; else panel.classList.add('collapsed');
       b.onclick = () => { panel.classList.toggle('collapsed'); b.textContent = panel.classList.contains('collapsed') ? 'Filters' : 'Hide filters'; };
       el.insertBefore(b, panel);
+      const sec = el.closest('.vsec'); if (sec) sec.classList.add('wide');
+      lockInput(panel, plot);
     }
-    return { panel, plot: el.lastChild };
+    return { panel, plot };
   }
+  // Keep input over a map in the map. The wheel over the map belongs to the map (each map zooms on it), even at the
+  // zoom limits, where it would otherwise fall through and scroll the page. The floating filter panel scrolls itself
+  // and stops at its ends instead of handing the scroll on to the page. On touch screens one finger scrolls the page
+  // and two fingers move the map (each map does the moving); a one-finger swipe over the map shows a short hint.
+  function lockInput(panel, plot) {
+    plot.addEventListener('wheel', e => e.preventDefault(), { passive: false });
+    panel.addEventListener('wheel', e => {
+      if (e.ctrlKey || getComputedStyle(panel).position !== 'absolute') return; // page zoom; phones: the panel is part of the page
+      for (let n = e.target; n && n !== panel.parentNode; n = n.parentNode) {
+        if (n.nodeType !== 1 || n.scrollHeight <= n.clientHeight + 1 || !/auto|scroll/.test(getComputedStyle(n).overflowY)) continue;
+        if (e.deltaY < 0 ? n.scrollTop > 0 : n.scrollTop + n.clientHeight < n.scrollHeight - 1) return; // this box can still scroll
+      }
+      e.preventDefault();
+    }, { passive: false });
+    let y0 = null, two = false, ht = 0;
+    plot.addEventListener('touchstart', e => { two = e.touches.length > 1; y0 = two ? null : [e.touches[0].clientX, e.touches[0].clientY]; }, { passive: true });
+    plot.addEventListener('touchmove', e => {
+      if (two || !y0 || e.touches.length !== 1) return;
+      const t = e.touches[0]; if (Math.hypot(t.clientX - y0[0], t.clientY - y0[1]) < 12) return; y0 = null;
+      let h = plot.querySelector(':scope>.maphint');
+      if (!h) { h = document.createElement('div'); h.className = 'maphint'; h.setAttribute('aria-hidden', 'true'); h.textContent = 'Use two fingers to move the map'; plot.appendChild(h); }
+      h.classList.add('on'); clearTimeout(ht); ht = setTimeout(() => h.classList.remove('on'), 1400);
+    }, { passive: true });
+  }
+  // the page's scrollbar width, so full-width sections (lib.css) span the window without a sideways scroll
+  const setSbw = () => document.documentElement.style.setProperty('--sbw', Math.max(0, innerWidth - document.documentElement.clientWidth) + 'px');
+  if (window.ResizeObserver) new ResizeObserver(setSbw).observe(document.documentElement);
+  addEventListener('resize', setSbw); setSbw();
   // panel section with a small heading and an optional link-style action ("Show all")
   function fsec(panel, title, action) {
     const sec = document.createElement('div'); sec.className = 'fsec';
@@ -353,7 +418,7 @@ const NOLA = (() => {
     const dataLink = document.getElementById('dataLink'), ds = opts.ds || (list.find(v => v.ds) || {}).ds;
     if (dataLink && ds) { dataLink.href = 'https://data.nola.gov/d/' + ds[0]; dataLink.textContent = ds[1] + ' on data.nola.gov'; }
     const drawOne = v => { v.draw(panes[v.id], !drawn.has(v.id)); drawn.add(v.id); };
-    const draw = () => { tip.hide(); list.forEach(drawOne); writeHash(); };
+    const draw = () => { tip.hide(); list.forEach(drawOne); writeHash(); setSbw(); };
     const go = (id, smooth) => {
       const v = list.find(x => x.id === id); if (!v) return;
       cur = v; secs[id].scrollIntoView({ behavior: smooth ? 'smooth' : 'auto', block: 'start' });

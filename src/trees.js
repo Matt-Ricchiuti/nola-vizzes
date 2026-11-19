@@ -183,7 +183,8 @@
     const L = insetL(), w = W - L - 2 * padPx, h = H - 2 * padPx, s = Math.min(w / (x1 - x0), h / (y1 - y0));
     view.s = s; view.tx = L + padPx + (w - (x1 - x0) * s) / 2 - x0 * s; view.ty = padPx + (h - (y1 - y0) * s) / 2 - y0 * s;
   }
-  function zoomToHood() { if (selNb < 0) fitBox(home, 16); else fitBox(hoods[selNb].bbox, 40); req(); }
+  let userView = false; // the reader has moved the map since it was last fitted (a resize then keeps their view)
+  function zoomToHood() { if (selNb < 0) fitBox(home, 16); else fitBox(hoods[selNb].bbox, 40); userView = false; req(); }
   function resize() { DPR = Math.min(devicePixelRatio || 1, 2); W = cv.clientWidth; H = cv.clientHeight; cv.width = W * DPR; cv.height = H * DPR; }
   function readColors() {
     const cs = getComputedStyle(document.documentElement);
@@ -329,29 +330,54 @@
   function initMap(plot) {
     plot.innerHTML = '<canvas class="tmap" aria-label="Map of street trees in New Orleans, colored by species"></canvas><div class="scalebar"><span></span><i></i></div><div class="mapctl"></div>';
     cv = plot.querySelector('canvas'); ctx = cv.getContext('2d'); scaleEl = plot.querySelector('.scalebar');
-    const zoomAt = (f, x, y) => { const ns = Math.max(700, Math.min(600000, view.s * f)); f = ns / view.s; view.tx = x - (x - view.tx) * f; view.ty = y - (y - view.ty) * f; view.s = ns; req(); };
+    const zoomAt = (f, x, y) => { const ns = Math.max(700, Math.min(600000, view.s * f)); f = ns / view.s; view.tx = x - (x - view.tx) * f; view.ty = y - (y - view.ty) * f; view.s = ns; userView = true; req(); };
     const ctl = plot.querySelector('.mapctl');
     [['+', 'Zoom in', () => zoomAt(1.8, (insetL() + W) / 2, H / 2)], ['−', 'Zoom out', () => zoomAt(1 / 1.8, (insetL() + W) / 2, H / 2)], ['⤢', 'Reset view', () => zoomToHood()]].forEach(([t, l, fn]) => {
       const b = document.createElement('button'); b.type = 'button'; b.textContent = t; b.title = l; b.setAttribute('aria-label', l); b.onclick = fn; ctl.appendChild(b); });
-    const pointers = new Map(); let last = null, pinch = null, moved = false;
-    cv.addEventListener('wheel', e => { e.preventDefault(); zoomAt(Math.exp(-e.deltaY * 0.0015), e.offsetX, e.offsetY); }, { passive: false });
-    cv.addEventListener('pointerdown', e => { cv.setPointerCapture(e.pointerId); pointers.set(e.pointerId, { x: e.offsetX, y: e.offsetY }); moved = false;
-      if (pointers.size === 2) { const [a, b] = [...pointers.values()]; pinch = { d: Math.hypot(a.x - b.x, a.y - b.y), cx: (a.x + b.x) / 2, cy: (a.y + b.y) / 2 }; }
-      last = { x: e.offsetX, y: e.offsetY }; cv.classList.add('drag'); });
+    // Input, as on the other maps: the wheel (or a trackpad pinch) zooms, dragging pans, and the page never scrolls
+    // under the map (NOLA.stage also stops the wheel on the zoom buttons). On touch screens one finger scrolls the
+    // page (touch-action in lib.css) and two fingers pan and pinch; once two are down, the gesture stays the map's
+    // until every finger lifts. A tap still picks a neighborhood.
+    const pointers = new Map(); let last = null, pinch = null, moved = false, twoFinger = false;
+    const isTouch = e => e.pointerType === 'touch';
+    cv.addEventListener('wheel', e => { e.preventDefault(); zoomAt(Math.exp(-e.deltaY * (e.deltaMode === 1 ? 0.05 : e.deltaMode === 2 ? 1 : 0.0015)), e.offsetX, e.offsetY); }, { passive: false });
+    // keep the browser from scrolling or zooming the page while two fingers are on the map
+    cv.addEventListener('touchstart', e => { if (e.touches.length > 1) twoFinger = true; }, { passive: true });
+    cv.addEventListener('touchmove', e => { if (twoFinger && e.cancelable) e.preventDefault(); }, { passive: false });
+    const touchEnd = e => { if (!e.touches.length) twoFinger = false; };
+    cv.addEventListener('touchend', touchEnd, { passive: true }); cv.addEventListener('touchcancel', touchEnd, { passive: true });
+    // Safari's trackpad pinch comes as gesture events (iPhone/iPad send them alongside touches, handled above)
+    let gLast = 1;
+    cv.addEventListener('gesturestart', e => { e.preventDefault(); gLast = 1; });
+    cv.addEventListener('gesturechange', e => { e.preventDefault(); if (twoFinger || pointers.size) return; const r = cv.getBoundingClientRect(); zoomAt(e.scale / gLast, e.clientX - r.left, e.clientY - r.top); gLast = e.scale; });
+    cv.addEventListener('pointerdown', e => { if (!isTouch(e)) cv.setPointerCapture(e.pointerId); pointers.set(e.pointerId, { x: e.offsetX, y: e.offsetY }); moved = false;
+      if (pointers.size === 2) { const [a, b] = [...pointers.values()]; pinch = { d: Math.hypot(a.x - b.x, a.y - b.y), cx: (a.x + b.x) / 2, cy: (a.y + b.y) / 2 }; twoFinger = twoFinger || isTouch(e); }
+      last = { x: e.offsetX, y: e.offsetY }; if (!isTouch(e)) cv.classList.add('drag'); });
     cv.addEventListener('pointermove', e => {
       if (!pointers.has(e.pointerId)) { hover(e, e.offsetX, e.offsetY); return; }
       pointers.set(e.pointerId, { x: e.offsetX, y: e.offsetY });
       if (pointers.size === 2 && pinch) { const [a, b] = [...pointers.values()]; const d = Math.hypot(a.x - b.x, a.y - b.y), cx = (a.x + b.x) / 2, cy = (a.y + b.y) / 2;
         view.tx += cx - pinch.cx; view.ty += cy - pinch.cy; zoomAt(d / pinch.d, cx, cy); pinch = { d, cx, cy }; moved = true; return; }
       const dx = e.offsetX - last.x, dy = e.offsetY - last.y; if (Math.abs(dx) + Math.abs(dy) > 2) moved = true;
-      view.tx += dx; view.ty += dy; last = { x: e.offsetX, y: e.offsetY }; tip.hide(); req(); });
-    const endPtr = e => { pointers.delete(e.pointerId); if (pointers.size < 2) pinch = null; if (!pointers.size) cv.classList.remove('drag');
+      last = { x: e.offsetX, y: e.offsetY };
+      if (isTouch(e) && !twoFinger) return; // one finger: the browser scrolls the page (or it's a tap)
+      view.tx += dx; view.ty += dy; userView = true; tip.hide(); req(); });
+    const endPtr = e => { pointers.delete(e.pointerId); if (pointers.size < 2) pinch = null; if (!pointers.size) { cv.classList.remove('drag'); twoFinger = false; }
       if (pointers.size === 1) { const p = [...pointers.values()][0]; last = { x: p.x, y: p.y }; }
       if (!moved && e.type === 'pointerup') { if (e.button === 0) clickHood(e.offsetX, e.offsetY); hover(e, e.offsetX, e.offsetY, true); } };
     cv.addEventListener('pointerup', endPtr); cv.addEventListener('pointercancel', endPtr);
     cv.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse') { tip.hide(); if (hoverHood >= 0 || hoverTree >= 0 || hoverGS >= 0) { hoverHood = hoverTree = hoverGS = -1; req(); } } });
     cv.addEventListener('dblclick', e => zoomAt(2, e.offsetX, e.offsetY));
-    addEventListener('resize', () => { if (!cv.offsetParent) return; const ow = W, oh = H; resize(); view.tx += (W - ow) / 2; view.ty += (H - oh) / 2; req(); });
+    // follow the canvas's box (window resizes, the page's scrollbar appearing, rotating a phone): an untouched map is
+    // refitted; one the reader has moved keeps its center and scale. Redrawn at once, since resizing clears the canvas.
+    const fit = () => {
+      if (!cv.clientWidth || !cv.clientHeight || (cv.clientWidth === W && cv.clientHeight === H)) return;
+      const ow = W, oh = H; resize();
+      if (userView) { view.tx += (W - ow) / 2; view.ty += (H - oh) / 2; } else zoomToHood();
+      draw();
+    };
+    if (window.ResizeObserver) new ResizeObserver(fit).observe(cv);
+    addEventListener('resize', fit);
     const reTheme = () => { readColors(); refresh(); };
     matchMedia('(prefers-color-scheme: dark)').addEventListener('change', reTheme);
     new MutationObserver(reTheme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
