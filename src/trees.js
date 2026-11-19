@@ -111,6 +111,10 @@
   // ---------- state (kept in the link) ----------
   const H0 = NOLA.hashState();
   let selSp = H0.sp != null ? +H0.sp : -1, selNb = H0.nb != null ? +H0.nb : -1, setF = H0.set != null ? +H0.set : -1, dens = H0.dens === '1';
+  // by: which count the bar-chart section shows (species: most common species, hoods: trees by neighborhood)
+  let by = H0.by === 'hoods' ? 'hoods' : 'species';
+  // links from before the two bar charts were merged: #hoods is now the "By neighborhood" tab of #species
+  if (H0.view === 'hoods') { by = 'hoods'; history.replaceState(null, '', location.hash.replace(/^#hoods/, '#species')); }
   const inNb = i => selNb < 0 || D.h[i] === selNb;
   const setOk = i => setF < 0 || tset[i] === setF;
   const isVisible = i => valid[i] && inNb(i) && setOk(i) && (selSp >= 0 ? D.s[i] === selSp : groups[spGroup[D.s[i]]].on);
@@ -384,23 +388,29 @@
       .on('mousemove', (ev, d) => tip.show(`<b>${esc(d.name)}</b>` + (d.sub ? `<div style="color:var(--ink2)"><i>${esc(d.sub)}</i></div>` : '') + row(label, fmt(d.v)) + (d.extra || ''), ev)).on('mouseleave', tip.hide)
       .on('click', (ev, d) => { if (d.onClick) { tip.hide(); d.onClick(); } });
   }
-  function drawSpecies(pane, first) {
+  // one section, two counts of the same trees (tabs). Clicking a bar drills across: a species shows where it grows,
+  // a neighborhood shows what grows there.
+  function drawCounts(pane, first) {
     const { panel, plot } = staged(pane, first);
-    panel.innerHTML = ''; nbSection(panel); settingSection(panel);
+    panel.innerHTML = '';
+    (by === 'hoods' ? drawHoods : drawSpecies)(panel, plot);
+    NOLA.ftabs(panel, [['species', 'By species'], ['hoods', 'By neighborhood']], by, v => { by = v; refresh(); });
+  }
+  function drawSpecies(panel, plot) {
+    nbSection(panel); settingSection(panel);
     const cnt = new Map(); let tot = 0;
     for (let i = 0; i < N; i++) if (valid[i] && inNb(i) && setOk(i)) { cnt.set(D.s[i], (cnt.get(D.s[i]) || 0) + 1); tot++; }
     const items = [...cnt].map(([i, v]) => ({ name: D.species[i][0], sub: D.species[i][1], v, i })).sort((a, b) => b.v - a.v).slice(0, 30)
-      .map(d => ({ ...d, color: groups[spGroup[d.i]].color, extra: row('Share', (100 * d.v / tot).toFixed(1) + '%'), onClick: () => { selSp = d.i; location.hash = 'map'; } }));
+      .map(d => ({ ...d, color: groups[spGroup[d.i]].color, extra: row('Share', (100 * d.v / tot).toFixed(1) + '%'), onClick: () => { selSp = d.i; by = 'hoods'; refresh(); } }));
     hbars(plot, items);
   }
-  function drawHoods(pane, first) {
-    const { panel, plot } = staged(pane, first);
-    panel.innerHTML = ''; findSection(panel); settingSection(panel);
+  function drawHoods(panel, plot) {
+    findSection(panel); settingSection(panel);
     NOLA.seg(NOLA.fsec(panel, 'Count'), [[0, 'Trees'], [1, 'Trees per sq. mi.']], dens ? 1 : 0, v => { dens = !!v; refresh(); });
     const cnt = hoods.map(() => 0); for (let i = 0; i < N; i++) if (valid[i] && setOk(i) && (selSp < 0 || D.s[i] === selSp)) cnt[D.h[i]]++;
     const items = hoodList.map(([h, hi]) => { const n = cnt[hi], v = dens ? Math.round(n / h.sqmi) : n;
       return { name: h.name, v, color: hi === selNb ? 'var(--ink)' : null, extra: (dens ? row('Trees', fmt(n)) : row('Per sq. mi.', fmt(Math.round(n / h.sqmi)))) + row('All trees here', fmt(h.n)),
-        onClick: () => { selNb = hi; location.hash = 'map'; } }; }).filter(d => d.v > 0).sort((a, b) => b.v - a.v);
+        onClick: () => { selNb = hi; by = 'species'; refresh(); } }; }).filter(d => d.v > 0).sort((a, b) => b.v - a.v);
     const col = selSp >= 0 ? (spGroup[selSp] < 9 ? groups[spGroup[selSp]].color : TOP_COLORS[0]) : 'var(--s3)';
     const what = (selSp >= 0 ? D.species[selSp][0] : 'Trees') + (dens ? ' per sq. mi.' : '');
     hbars(plot, items, { color: col, label: what, caption: what + (setF >= 0 ? ' · ' + SETTINGS[setF].name.toLowerCase() : '') });
@@ -412,13 +422,14 @@
     o.push({ species: sp[0], botanical_name: sp[1], neighborhood: hoods[D.h[i]].name, setting: SETTINGS[tset[i]].name, green_space: gk >= 0 ? GS[gk].nm : '', near_street: D.near[i] >= 0 ? D.roadNames[D.near[i]] : '', lon, lat }); } return o; };
   const csvSpecies = () => { const cnt = new Map(); for (let i = 0; i < N; i++) if (valid[i] && inNb(i) && setOk(i)) cnt.set(D.s[i], (cnt.get(D.s[i]) || 0) + 1);
     return [...cnt].sort((a, b) => b[1] - a[1]).map(([i, v]) => ({ species: D.species[i][0], botanical_name: D.species[i][1], trees: v })); };
-  const csvHoods = () => hoodList.map(([h]) => ({ neighborhood: h.name, trees: h.n, sq_mi: +h.sqmi.toFixed(2), trees_per_sq_mi: Math.round(h.n / h.sqmi), species_count: h.sp.size }));
+  // with the chart's species and setting filters, like the bars
+  const csvHoods = () => { const cnt = hoods.map(() => 0); for (let i = 0; i < N; i++) if (valid[i] && setOk(i) && (selSp < 0 || D.s[i] === selSp)) cnt[D.h[i]]++;
+    return hoodList.map(([h, hi]) => ({ neighborhood: h.name, trees: cnt[hi], sq_mi: +h.sqmi.toFixed(2), trees_per_sq_mi: Math.round(cnt[hi] / h.sqmi), all_trees: h.n, species_count: h.sp.size })); };
 
   readColors();
   const V = NOLA.views([
     { id: 'map', label: 'Map of every tree', keep: true, draw: drawMap, csv: csvMap },
-    { id: 'species', label: 'Most common species', draw: drawSpecies, csv: csvSpecies },
-    { id: 'hoods', label: 'Trees by neighborhood', draw: drawHoods, csv: csvHoods },
+    { id: 'species', label: 'Trees by species and neighborhood', draw: drawCounts, csv: () => by === 'hoods' ? csvHoods() : csvSpecies(), file: () => by },
   ], { ds: ['3tyj-9x33', 'Tree Location'],
-       state: () => ({ sp: selSp >= 0 ? selSp : null, nb: selNb >= 0 ? selNb : null, set: setF >= 0 ? setF : null, dens: dens ? 1 : null }) });
+       state: () => ({ sp: selSp >= 0 ? selSp : null, nb: selNb >= 0 ? selNb : null, set: setF >= 0 ? setF : null, dens: dens ? 1 : null, by: by !== 'species' ? by : null }) });
 })();

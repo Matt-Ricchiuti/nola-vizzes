@@ -315,7 +315,7 @@ const NOLA = (() => {
     kv.forEach(p => { const [k, v] = p.split('='); if (k) o[k] = decodeURIComponent(v || ''); });
     return o;
   }
-  // views(list, { state, ds }) -- list: [{ id, label, cls, keep, draw(el, first), csv() -> rows, ds: [id, name] }]
+  // views(list, { state, ds }) -- list: [{ id, label, cls, keep, draw(el, first), csv() -> rows, file() -> CSV name (default id), ds: [id, name] }]
   // Each chart gets its own full-width section in #chart: a heading (label), its Copy link / Download CSV, then the chart.
   // Filters are shared page state, so refresh() redraws every chart. state() returns the filters that differ from
   // their defaults; they're written into the link. A page can jump to a chart with location.hash = 'chartId'.
@@ -378,10 +378,11 @@ const NOLA = (() => {
       const text = [keys.map(cell).join(','), ...rows.map(r => keys.map(k => cell(r[k])).join(','))].join('\n');
       const a = document.createElement('a');
       a.href = URL.createObjectURL(new Blob(['\ufeff' + text], { type: 'text/csv;charset=utf-8' }));
-      a.download = `${location.pathname.split('/').pop().replace('.html', '') || 'index'}-${v.id}.csv`;
+      a.download = `${location.pathname.split('/').pop().replace('.html', '') || 'index'}-${v.file ? v.file() : v.id}.csv`;
       document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
     }
     const h0 = hashState().view;
+    cur = list.find(v => v.id === h0) || null; // keep the linked chart's id in the address bar
     draw();
     if (list.some(v => v.id === h0)) requestAnimationFrame(() => go(h0, false));
     return { refresh: draw, get id() { return cur ? cur.id : list[0].id; } };
