@@ -188,24 +188,11 @@
     });
   }
 
-  // ---------- CSV downloads ----------
-  const csvMap = () => NOLA.nbList().map(f => { const i = f.idx, pop = NOLA.popOf(i);
-    return Object.assign({ neighborhood: f.name, residents_2020: pop, requests_past_12_months: madeOf(i, -1, -1), open_now: openOf(i, -1) },
-      st.type >= 0 || st.reason >= 0 ? { filter: st.reason >= 0 ? reasonName(st.reason) : D.T[st.type], filtered_requests_past_12_months: madeOf(i), filtered_open_now: openOf(i) } : {},
-      ...D.T.map((t, k) => ({ [t + ' (past 12 months)']: madeOf(i, k, -1) }))); });
-  const csvMonthly = () => mon.map(d => Object.assign({ month: `${d.y}-${String(d.mo + 1).padStart(2, '0')}`, total: d3.sum(d.a) }, ...D.T.map((t, k) => ({ [t]: d.a[k] }))));
-  const csvClose = () => st.nb >= 0
-    ? D.T.map((t, k) => ({ neighborhood: nbName(st.nb), request_type: t, closed_past_12_months: D.closeNb[st.nb][k][0], median_days: D.closeNb[st.nb][k][1] ?? '' }))
-    : D.T.map((t, k) => ({ request_type: t, reason: '(all)', closed_past_12_months: D.closeT[k][0], median_days: D.closeT[k][1] ?? '', slowest_10pct_days: D.closeT[k][2] ?? '' }))
-      .concat(D.R.map((r, k) => ({ request_type: D.T[r[0]], reason: reasonName(k), closed_past_12_months: D.closeR[k][0], median_days: D.closeR[k][1] ?? '', slowest_10pct_days: D.closeR[k][2] ?? '' })));
-  const csvOpen = () => { const A = D.openAge[st.nb >= 0 ? st.nb : 72];
-    return D.T.map((t, k) => Object.assign({ area: st.nb >= 0 ? nbName(st.nb) : 'New Orleans', request_type: t, open: d3.sum(A[k]) }, ...AGE_L.map((l, a) => ({ [l]: A[k][a] })))); };
-
   const V = NOLA.views([
-    { id: 'map', label: 'Requests by neighborhood', keep: true, draw: drawMap, csv: csvMap },
-    { id: 'monthly', label: 'Requests per month', draw: drawMonthly, csv: csvMonthly },
-    { id: 'close', label: 'Time to close, requests closed in the past 12 months', tab: 'Time to Close', draw: drawClose, csv: csvClose },
-    { id: 'open', label: 'Open requests, by how long they have been open', tab: 'Open Requests', draw: drawOpen, csv: csvOpen },
+    { id: 'map', label: 'Requests by neighborhood', keep: true, draw: drawMap },
+    { id: 'monthly', label: 'Requests per month', draw: drawMonthly },
+    { id: 'close', label: 'Time to close, requests closed in the past 12 months', tab: 'Time to Close', draw: drawClose },
+    { id: 'open', label: 'Open requests, by how long they have been open', tab: 'Open Requests', draw: drawOpen },
   ], { ds: [D.ds, '311 OPCD Calls'],
        state: () => ({ measure: st.measure !== 'made' ? st.measure : null, type: st.type >= 0 ? st.type : null, reason: st.reason >= 0 ? st.reason : null,
                        basis: st.basis !== 'n' ? st.basis : null, nb: st.nb >= 0 ? st.nb : null }) });

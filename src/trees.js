@@ -389,14 +389,9 @@
     set(); addEventListener('resize', set); if (document.fonts) document.fonts.ready.then(set);
   }
 
-  // ---------- CSV downloads ----------
-  const ll = i => [+(D.x[i] * 1e-5 + D.lon0).toFixed(6), +(D.y[i] * 1e-5 + D.lat0).toFixed(6)];
-  const csvMap = () => { const o = []; for (let i = 0; i < N; i++) if (isVisible(i)) { const [lon, lat] = ll(i), sp = D.species[D.s[i]], gk = D.tg[i];
-    o.push({ species: sp[0], botanical_name: sp[1], neighborhood: hoods[D.h[i]].name, setting: SETTINGS[tset[i]].name, green_space: gk >= 0 ? GS[gk].nm : '', near_street: D.near[i] >= 0 ? D.roadNames[D.near[i]] : '', lon, lat }); } return o; };
-
   readColors();
   const V = NOLA.views([
-    { id: 'map', label: 'Map of every tree', keep: true, draw: drawMap, csv: csvMap },
+    { id: 'map', label: 'Map of every tree', keep: true, draw: drawMap },
   ], { ds: ['3tyj-9x33', 'Tree Location'],
        state: () => ({ sp: selSp >= 0 ? selSp : null, nb: selNb >= 0 ? selNb : null, set: setF >= 0 ? setF : null }) });
 })();
