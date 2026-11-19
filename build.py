@@ -10,7 +10,7 @@ Templates can use these placeholders, filled in at build time:
     {{CFS_YEAR}} {{CFS_DS}} {{CFS_PREV}}   year, dataset id and previous year of the Calls for Service page
     {{DRONE_YEAR}}  year covered by the drone page
     {{DRONE_THRU}} {{CFS_THRU}} {{CPC_THRU}}   last day each page's data reaches, e.g. "Nov 5, 2026"
-    {{MENU}}        home-page menu of every view on every page, read from each page's NOLA.views([...]) list
+    {{MENU}}        home-page menu of the four pages
 """
 import json, sys, os, re, html, datetime as dt
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -61,49 +61,29 @@ TOKENS = {'{{PULLED}}': fdate(pulled),
           '{{DRONE_YEAR}}': str(drone_year),
           '{{FOOT}}': '<div class="foot">Data: <a id="dataLink" href="https://data.nola.gov">data.nola.gov</a> · Not affiliated with the City of New Orleans · <a href="about.html">About</a></div>'}
 
-# Header: the site name, then one "Visualizations" menu. It opens downward to the four pages; each page opens to the
-# right with its views (read from src/<page>.js, like the home-page menu). Hover, keyboard (Tab / Escape) and tap all work.
+# Header: the site name, then one "Visualizations" menu that opens downward to the four pages.
+# Hover, keyboard (Tab / Escape) and tap all work.
 NAV_JS = ('<script>(()=>{const dd=document.currentScript.closest(".site").querySelector(".dd"),b=dd.querySelector(".ddbtn");'
           'const set=o=>{dd.classList.toggle("open",o);b.setAttribute("aria-expanded",o)};'
           'b.onclick=e=>{e.stopPropagation();set(!dd.classList.contains("open"))};'
-          'dd.querySelectorAll(".sub>a").forEach(a=>a.addEventListener("click",e=>{if(!matchMedia("(hover:hover)").matches){const li=a.parentNode;'
-          'if(!li.classList.contains("open")){e.preventDefault();dd.querySelectorAll(".sub").forEach(x=>x.classList.toggle("open",x===li))}}}));'
           'document.addEventListener("click",e=>{if(!dd.contains(e.target))set(false)});'
-          'dd.addEventListener("keydown",e=>{if(e.key==="Escape"){set(false);b.focus()}});addEventListener("hashchange",()=>set(false))})()</script>')
+          'dd.addEventListener("keydown",e=>{if(e.key==="Escape"){set(false);b.focus()}})})()</script>')
 def nav(key):
     e = html.escape
-    pages = ''.join(
-        f'<li class="sub{" on" if k == key else ""}"><a href="{k}.html" aria-haspopup="true">{e(l)}<span aria-hidden="true">›</span></a>'
-        f'<ul class="dd2">' + ''.join(f'<li><a href="{k}.html#{i}">{e(t)}</a></li>' for i, t in page_views(k)) + '</ul></li>'
-        for k, (l, _) in PAGES.items())
+    cur = ' class="on" aria-current="page"'
+    pages = ''.join(f'<li><a href="{k}.html"{cur if k == key else ""}>{e(l)}</a></li>' for k, (l, _) in PAGES.items())
     extra = ''.join(f'<a class="xlink{" on" if k == key else ""}" href="{k}.html">{e(l)}</a>' for k, l in EXTRA.items())
     return ('<div class="site"><b><a href="index.html" style="color:inherit;text-decoration:none">Nola Vizzes</a></b>'
             '<nav class="topnav" aria-label="Site"><div class="dd">'
             f'<button type="button" class="ddbtn{" on" if key in PAGES else ""}" aria-haspopup="true" aria-expanded="false">Visualizations<span aria-hidden="true">▾</span></button>'
             f'<ul class="dd1">{pages}</ul></div>{extra}</nav>' + NAV_JS + '</div>')
 
-# The home-page menu lists every view of every page. It is read straight from the NOLA.views([...]) call in
-# src/<page>.js (one `{ id: '...', label: '...', ... },` per line), so a new view shows up in the menu by itself.
-VIEW_YEAR = {'cfs': cfs_year, 'drone': drone_year, 'cpc': pulled.year, 'trees': pulled.year}
-def page_views(key):
-    lines = open(P('src', f'{key}.js'), encoding='utf-8').read().split('NOLA.views([', 1)[1].split('\n')[1:]
-    out = []
-    for ln in lines:
-        if not ln.strip().startswith('{'): break
-        m = re.match(r"\s*\{\s*id:\s*'([\w-]+)',\s*label:\s*(['`])(.*?)\2", ln)
-        if not m: sys.exit(f'build.py: cannot read the view on this line of src/{key}.js:\n{ln}')
-        label = m[3].replace('${YEAR}', str(VIEW_YEAR[key]))
-        if '${' in label: sys.exit(f'build.py: unknown placeholder in view label {label!r} (src/{key}.js)')
-        out.append((m[1], label))
-    if not out: sys.exit(f'build.py: no views found in src/{key}.js')
-    return out
+# The home-page menu lists the four pages; each page stacks all of its charts.
 def menu():
     e = html.escape
-    groups = ''.join(f'<section class="vgrp"><h2 class="eyebrow" id="vg-{k}">{e(l)}</h2><ul aria-labelledby="vg-{k}">'
-                     + ''.join(f'<li><a href="{k}.html#{i}">{e(t)}</a></li>' for i, t in page_views(k)) + '</ul></section>'
-                     for k, (l, _) in PAGES.items())
+    pages = ''.join(f'<li><a href="{k}.html">{e(l)}</a></li>' for k, (l, _) in PAGES.items())
     extra = ''.join(f'<a href="{k}.html">{e(l)}</a>' for k, l in EXTRA.items())
-    return f'<div class="vgrid">{groups}</div><div class="vextra">{extra}</div>'
+    return f'<ul class="vlist">{pages}</ul><div class="vextra">{extra}</div>'
 TOKENS['{{MENU}}'] = menu()
 
 # Street centerlines are shared by every map, so they go in one file the browser caches across pages.

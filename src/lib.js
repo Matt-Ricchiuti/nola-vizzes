@@ -213,6 +213,16 @@ const NOLA = (() => {
     opts.forEach(([v, l]) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = l; b.setAttribute('aria-pressed', v === value); b.onclick = () => onChange(v); d.appendChild(b); });
     sec.appendChild(d); return d;
   }
+  // ftabs(panel, [[value, label], ...], value, onChange): a tab row at the very top of a filter panel, for one chart
+  // section that switches between closely related charts of the same data (e.g. two maps). Returns the row.
+  function ftabs(panel, opts, value, onChange) {
+    const d = document.createElement('div'); d.className = 'ftabs'; d.setAttribute('role', 'tablist');
+    opts.forEach(([v, l]) => {
+      const b = document.createElement('button'); b.type = 'button'; b.textContent = l; b.setAttribute('role', 'tab');
+      b.setAttribute('aria-selected', v === value); b.onclick = () => { if (v !== value) onChange(v); }; d.appendChild(b);
+    });
+    panel.prepend(d); return d;
+  }
   // neighborhood picker inside a panel section
   function nbPick(sec, value, onSel, label = 'All neighborhoods') {
     const s = document.createElement('select'); s.className = 'fsel'; s.setAttribute('aria-label', 'Neighborhood'); sec.appendChild(s);
@@ -297,75 +307,87 @@ const NOLA = (() => {
   const setText = (id, s) => { const el = document.getElementById(id); if (el) el.textContent = s; };
   const setHTML = (id, s) => { const el = document.getElementById(id); if (el) el.innerHTML = s; };
 
-  // ---------- one chart per page ----------
-  // views([{ id, label, cls, draw(el, first) }]): the #view dropdown picks a chart, drawn into its own pane in #chart.
-  // Filter controls carry data-for="viewId viewId ..." and only show for those charts.
-  // The chosen chart is kept in the URL hash, so a link can open a specific chart.
-  // The URL hash holds the chart and its filters: #view&key=value&... so a link opens exactly what you see.
+  // ---------- one subject per page: every chart stacked down the page ----------
+  // The URL hash holds the chart last used and the page's filters: #chartId&key=value&... so a link opens
+  // the page scrolled to that chart with exactly those filters.
   function hashState() {
     const [view, ...kv] = location.hash.slice(1).split('&'), o = { view };
     kv.forEach(p => { const [k, v] = p.split('='); if (k) o[k] = decodeURIComponent(v || ''); });
     return o;
   }
   // views(list, { state, ds }) -- list: [{ id, label, cls, keep, draw(el, first), csv() -> rows, ds: [id, name] }]
-  // state() returns the page's filters that differ from their defaults; they're written into the link.
+  // Each chart gets its own full-width section in #chart: a heading (label), its Copy link / Download CSV, then the chart.
+  // Filters are shared page state, so refresh() redraws every chart. state() returns the filters that differ from
+  // their defaults; they're written into the link. A page can jump to a chart with location.hash = 'chartId'.
   function views(list, opts = {}) {
-    const sel = document.getElementById('view'), host = document.getElementById('chart');
-    const bar = sel.parentNode;
-    const tools = document.createElement('div'); tools.className = 'tools';
-    const linkB = document.createElement('button'); linkB.className = 'btn'; linkB.type = 'button'; linkB.textContent = 'Copy link';
-    const csvB = document.createElement('button'); csvB.className = 'btn'; csvB.type = 'button'; csvB.textContent = 'Download CSV';
-    tools.append(linkB, csvB); (document.querySelector('.src') || bar).after(tools);
-    const panes = {}, drawn = new Set(); let cur = null;
-    list.forEach(v => {
-      const o = document.createElement('option'); o.value = v.id; o.textContent = v.label; sel.appendChild(o);
-      const p = document.createElement('div'); p.className = 'pane ' + (v.cls || 'card'); p.hidden = true; host.appendChild(p); panes[v.id] = p;
-    });
-    const writeHash = () => {
+    const host = document.getElementById('chart');
+    const panes = {}, secs = {}, drawn = new Set(); let cur = null;
+    const stateKV = () => {
       const st = opts.state ? opts.state() : {};
-      const kv = Object.entries(st).filter(([, v]) => v != null && v !== '').map(([k, v]) => `&${k}=${encodeURIComponent(v)}`).join('');
-      history.replaceState(null, '', '#' + cur.id + kv);
+      return Object.entries(st).filter(([, v]) => v != null && v !== '').map(([k, v]) => `&${k}=${encodeURIComponent(v)}`).join('');
     };
-    // footer "Data:" link goes to the City dataset behind the chart on screen
-    const dataLink = document.getElementById('dataLink');
-    const setDataLink = () => { const ds = cur.ds || opts.ds; if (!dataLink || !ds) return; dataLink.href = 'https://data.nola.gov/d/' + ds[0]; dataLink.textContent = ds[1] + ' on data.nola.gov'; };
-    const draw = () => { cur.draw(panes[cur.id], !drawn.has(cur.id)); drawn.add(cur.id); csvB.hidden = !cur.csv; setDataLink(); writeHash(); };
-    function show(id) {
-      cur = list.find(v => v.id === id) || list[0]; sel.value = cur.id;
-      Object.entries(panes).forEach(([k, p]) => p.hidden = k !== cur.id);
-      document.querySelectorAll('[data-for]').forEach(el => el.hidden = !el.dataset.for.split(' ').includes(cur.id));
-      tip.hide(); draw();
-    }
-    sel.onchange = () => show(sel.value);
+    const linkFor = id => location.href.split('#')[0] + '#' + id + stateKV();
+    const writeHash = () => { const kv = stateKV(); if (cur || kv) history.replaceState(null, '', '#' + (cur ? cur.id : '') + kv); };
+    const btn = t => { const b = document.createElement('button'); b.className = 'btn'; b.type = 'button'; b.textContent = t; return b; };
+    list.forEach(v => {
+      const sec = document.createElement('section'); sec.className = 'vsec'; sec.id = 'v-' + v.id;
+      const head = document.createElement('div'); head.className = 'vsec-h';
+      const h = document.createElement('h2'); h.textContent = v.label;
+      const tools = document.createElement('div'); tools.className = 'tools';
+      const linkB = btn('Copy link');
+      linkB.onclick = async () => {
+        cur = v; writeHash(); const url = linkFor(v.id);
+        try { await navigator.clipboard.writeText(url); linkB.textContent = 'Link copied'; }
+        catch (e) { prompt('Copy this link:', url); }
+        setTimeout(() => linkB.textContent = 'Copy link', 1600);
+      };
+      tools.appendChild(linkB);
+      if (v.csv) { const csvB = btn('Download CSV'); csvB.onclick = () => downloadCSV(v); tools.appendChild(csvB); }
+      head.append(h, tools);
+      const p = document.createElement('div'); p.className = 'pane ' + (v.cls || 'card');
+      sec.append(head, p); host.appendChild(sec); panes[v.id] = p; secs[v.id] = sec;
+      // the chart last touched is the one a copied link (and the address bar) points to
+      sec.addEventListener('pointerdown', () => { if (cur !== v) { cur = v; writeHash(); } });
+    });
+    // footer "Data:" link goes to the page's City dataset
+    const dataLink = document.getElementById('dataLink'), ds = opts.ds || (list.find(v => v.ds) || {}).ds;
+    if (dataLink && ds) { dataLink.href = 'https://data.nola.gov/d/' + ds[0]; dataLink.textContent = ds[1] + ' on data.nola.gov'; }
+    const drawOne = v => { v.draw(panes[v.id], !drawn.has(v.id)); drawn.add(v.id); };
+    const draw = () => { tip.hide(); list.forEach(drawOne); writeHash(); };
+    const go = (id, smooth) => {
+      const v = list.find(x => x.id === id); if (!v) return;
+      cur = v; secs[id].scrollIntoView({ behavior: smooth ? 'smooth' : 'auto', block: 'start' });
+    };
     // a link with filters opened on this same page (only the hash changes) reloads, so its filters apply;
-    // the pages' own jumps between views set a bare view id and keep the current filters
+    // the pages' own jumps to a chart set a bare chart id and keep the current filters
     addEventListener('hashchange', () => {
       const h = hashState(), st = opts.state ? opts.state() : {};
       const want = Object.entries(h).filter(([k]) => k !== 'view'), have = Object.entries(st).filter(([, v]) => v != null && v !== '');
       if (want.length && (want.length !== have.length || want.some(([k, v]) => String(st[k]) !== v))) return location.reload();
-      show(h.view);
+      draw(); go(h.view, true);
     });
-    let rt; addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => { if (!cur.keep) draw(); }, 150); });
-    linkB.onclick = async () => {
-      try { await navigator.clipboard.writeText(location.href); linkB.textContent = 'Link copied'; }
-      catch (e) { prompt('Copy this link:', location.href); }
-      setTimeout(() => linkB.textContent = 'Copy link', 1600);
-    };
-    csvB.onclick = () => {
-      const rows = cur.csv(); if (!rows || !rows.length) return;
+    let rt, lastW = innerWidth;
+    addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => {
+      if (innerWidth === lastW) return; lastW = innerWidth; // phones fire resize on scroll (address bar); only width matters
+      list.forEach(v => { if (!v.keep) drawOne(v); });
+    }, 150); });
+    function downloadCSV(v) {
+      const rows = v.csv(); if (!rows || !rows.length) return;
       const keys = Object.keys(rows[0]);
-      const cell = v => { v = v == null ? '' : String(v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
+      const cell = x => { x = x == null ? '' : String(x); return /[",\n]/.test(x) ? '"' + x.replace(/"/g, '""') + '"' : x; };
       const text = [keys.map(cell).join(','), ...rows.map(r => keys.map(k => cell(r[k])).join(','))].join('\n');
       const a = document.createElement('a');
       a.href = URL.createObjectURL(new Blob(['\ufeff' + text], { type: 'text/csv;charset=utf-8' }));
-      a.download = `${location.pathname.split('/').pop().replace('.html', '') || 'index'}-${cur.id}.csv`;
+      a.download = `${location.pathname.split('/').pop().replace('.html', '') || 'index'}-${v.id}.csv`;
       document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-    };
-    show(hashState().view);
-    return { refresh: draw, get id() { return cur.id; } };
+    }
+    const h0 = hashState().view;
+    draw();
+    if (list.some(v => v.id === h0)) requestAnimationFrame(() => go(h0, false));
+    return { refresh: draw, get id() { return cur ? cur.id : list[0].id; } };
   }
   const legendHTML = items => '<div class="legend">' + items.map(([c, l, round]) => `<span><i style="background:${c}${round ? ';border-radius:50%' : ''}"></i>${l}</span>`).join('') + '</div>';
 
-  return { css, S, fmt, pct, tip, row, setGeo, views, hashState, legendHTML, stage, fsec, flist, seg, nbPick, phoneToggle, popOf, perK, fmtRate, POP_NOTE, basisChips, shown, nbList, nbSelect, lonlat, get FULL() { return FULL; }, get GEO() { return GEO; }, map, mapButtons, seqVar, seqLegend, classes, stepLegend, short, frame, yGrid, chips, months, monthsLong,
+  return { css, S, fmt, pct, tip, row, setGeo, views, hashState, legendHTML, stage, fsec, flist, seg, ftabs, nbPick, phoneToggle, popOf, perK, fmtRate, POP_NOTE, basisChips, shown, nbList, nbSelect, lonlat, get FULL() { return FULL; }, get GEO() { return GEO; }, map, mapButtons, seqVar, seqLegend, classes, stepLegend, short, frame, yGrid, chips, months, monthsLong,
     setYear, get YEAR() { return YEAR; }, monthTicks, doyTime, doyDate, doyISO, doyMonth, monthStarts, isoDate, share, numWord, cap, setText, setHTML, title };
 })();

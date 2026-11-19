@@ -24,7 +24,7 @@
 }
 *{box-sizing:border-box}
 html,body{margin:0;background:var(--page);color:var(--ink);font-family:"Public Sans",system-ui,-apple-system,"Segoe UI",sans-serif;font-size:15px;line-height:1.5}
-h1,.viewsel,.cards h2{font-family:"Young Serif",Georgia,"Times New Roman",serif;font-weight:400}
+h1,.vsec-h h2,.cards h2{font-family:"Young Serif",Georgia,"Times New Roman",serif;font-weight:400}
 .eyebrow,.flist .ct,.scalebar,.src,.tip .r span:last-child{font-family:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace}
 a{color:var(--accent)}
 .wrap{max-width:1120px;margin:0 auto;padding:28px 24px 64px}
@@ -39,38 +39,26 @@ a{color:var(--accent)}
 .ddbtn.on,.dd:hover .ddbtn,.dd.open .ddbtn{color:var(--ink)}
 .ddbtn span{font-size:10px;transition:transform .15s}
 .dd:hover .ddbtn span,.dd.open .ddbtn span{transform:rotate(180deg)}
-.dd1,.dd2{list-style:none;margin:0;padding:6px;background:var(--surface);border:1px solid var(--ring);border-radius:10px;box-shadow:0 10px 30px rgb(0 0 0 / .14);display:none}
+.dd1{list-style:none;margin:0;padding:6px;background:var(--surface);border:1px solid var(--ring);border-radius:10px;box-shadow:0 10px 30px rgb(0 0 0 / .14);display:none}
 .dd1{position:absolute;top:100%;left:-10px;min-width:230px;margin-top:6px}
 .dd1::before{content:"";position:absolute;left:0;right:0;top:-10px;height:10px} /* hover bridge */
 .dd:hover .dd1,.dd:focus-within .dd1,.dd.open .dd1{display:block}
 .dd1 li{position:relative}
 .dd1 a{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:7px 10px;border-radius:7px;color:var(--ink);text-decoration:none;white-space:nowrap}
-.dd1 a:hover,.dd1 a:focus-visible,.dd1 .sub:hover>a,.dd1 .sub:focus-within>a{background:var(--chip);outline:none}
-.dd1 .sub>a span{color:var(--muted)}
-.dd1 .sub.on>a{font-weight:600}
-.dd2{position:absolute;top:-7px;left:100%;margin-left:6px;min-width:250px}
-.dd2::before{content:"";position:absolute;top:0;bottom:0;left:-10px;width:10px} /* hover bridge */
-.dd1 .sub:hover>.dd2,.dd1 .sub:focus-within>.dd2,.dd1 .sub.open>.dd2{display:block}
-.dd2 a{color:var(--ink2)}
-.dd2 a:hover,.dd2 a:focus-visible{color:var(--ink)}
+.dd1 a.on{font-weight:600}
+.dd1 a:hover,.dd1 a:focus-visible{background:var(--chip);outline:none}
 @media(max-width:640px){
   .site{flex-wrap:wrap;gap:8px 18px}
   .dd{position:static}
   .dd1{left:0;right:0;top:100%;min-width:0;max-height:75vh;overflow:auto}
-  .dd2{position:static;margin:2px 0 6px 10px;box-shadow:none;border:0;border-left:2px solid var(--grid);border-radius:0;padding:0 0 0 6px;min-width:0}
-  .dd2 a{white-space:normal}
 }
 h1{font-size:30px;line-height:1.15;margin:0 0 6px;letter-spacing:0}
 h2{font-size:19px;margin:0 0 4px}
 .src{font-size:11.5px;color:var(--muted);margin:0 0 22px}
 .src a{color:var(--ink2)}
 .card{background:var(--surface);border:1px solid var(--ring);border-radius:12px;padding:18px}
-.viewbar{margin:0 0 12px;display:flex;flex-wrap:wrap;align-items:center;gap:10px}
-.viewbar .tools{margin-left:auto;display:flex;gap:6px}
 .nbfocus{fill:none;stroke:var(--ink);stroke-width:2.4;vector-effect:non-scaling-stroke}
 .nbsel{font-size:13px}
-.viewsel{font-size:19px;padding:7px 38px 7px 12px;border-radius:10px;max-width:100%;cursor:pointer;
-  appearance:none;-webkit-appearance:none;background:var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%23898781' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 13px center}
 [hidden]{display:none!important}
 .pane.mapp{padding:6px}
 .popnote{color:var(--muted);font-size:12px}
@@ -120,7 +108,11 @@ tbody tr:hover td{background:var(--chip)}
 .halo{paint-order:stroke;stroke:var(--surface);stroke-width:5px;stroke-linejoin:round}
 .maplab{font-weight:600;letter-spacing:.02em}
 /* ---------- filters live on the chart: a panel of legend-style rows (see NOLA.stage / fsec / flist) ---------- */
-.tools{display:flex;gap:6px;margin:-12px 0 18px}
+/* one section per chart, stacked down the page */
+.vsec{margin:0 0 44px;scroll-margin-top:16px}
+.vsec-h{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 14px;margin:0 0 10px}
+.vsec-h h2{font-size:21px;margin:0;flex:1 1 auto}
+.tools{display:flex;gap:6px}
 .stage{position:relative}
 .stage.chartstage{display:grid;grid-template-columns:260px minmax(0,1fr);gap:18px;align-items:start}
 .stage.chartstage>.fpanel{position:sticky;top:12px}
@@ -154,6 +146,11 @@ tbody tr:hover td{background:var(--chip)}
 .flist.toggles button[aria-pressed="false"]{opacity:.45}
 .flist.toggles button[aria-pressed="false"] .sw{background:transparent!important;box-shadow:inset 0 0 0 1.5px var(--muted)}
 .flist.toggles button[aria-pressed="true"]{background:none;box-shadow:none}
+/* tabs at the top of a filter panel: switch one section between related charts */
+.ftabs{display:flex;gap:2px;padding:3px;background:var(--chip);border-radius:9px}
+.ftabs button{flex:1 1 0;font:inherit;font-size:12.5px;line-height:1.25;border:0;border-radius:7px;background:none;color:var(--ink2);padding:6px 8px;cursor:pointer}
+.ftabs button[aria-selected="true"]{background:var(--surface);color:var(--ink);font-weight:600;box-shadow:0 1px 3px rgb(0 0 0 / .12)}
+.ftabs button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .seg{display:flex;border:1px solid var(--ring);border-radius:8px;overflow:hidden;width:max-content;max-width:100%}
 .seg button{font:inherit;font-size:12px;border:0;background:var(--surface);color:var(--ink2);padding:5px 10px;cursor:pointer}
 .seg button+button{border-left:1px solid var(--ring)}
@@ -194,7 +191,6 @@ tbody tr:hover td{background:var(--chip)}
   .maplegend .nonekey i{width:10px;height:10px;border-radius:3px;display:inline-block}
   .mlh{margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .fpanel.collapsed{display:none}
-  .viewsel{font-size:16px;width:100%}
 }
 
 :root{--water:#c7d6dd;--t-land:#e6e8e1;--t-hood:#f5f6f1;--t-dim:#c9cfc8;--t-other:#aab3ad;--t-stump:#7d837f;
@@ -206,10 +202,9 @@ tbody tr:hover td{background:var(--chip)}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script><script src="streets.js"></script>
 </head><body><div class="wrap">
-<div class="site"><b><a href="index.html" style="color:inherit;text-decoration:none">Nola Vizzes</a></b><nav class="topnav" aria-label="Site"><div class="dd"><button type="button" class="ddbtn on" aria-haspopup="true" aria-expanded="false">Visualizations<span aria-hidden="true">▾</span></button><ul class="dd1"><li class="sub"><a href="drone.html" aria-haspopup="true">NOPD drone flights<span aria-hidden="true">›</span></a><ul class="dd2"><li><a href="drone.html#week">Flights per week, by purpose</a></li><li><a href="drone.html#map">Launch points</a></li><li><a href="drone.html#purpose">Flights by purpose</a></li><li><a href="drone.html#hour">Takeoffs by hour (Central time)</a></li><li><a href="drone.html#fleet">Flights by drone</a></li></ul></li><li class="sub"><a href="cfs.html" aria-haspopup="true">Calls for service<span aria-hidden="true">›</span></a><ul class="dd2"><li><a href="cfs.html#trend">Calls per month since 2014</a></li><li><a href="cfs.html#daily">Calls per day, 2026</a></li><li><a href="cfs.html#heat">Calls by weekday and hour</a></li><li><a href="cfs.html#types">Call types</a></li><li><a href="cfs.html#map">Calls by neighborhood</a></li><li><a href="cfs.html#dist">Officer arrival time by police district</a></li></ul></li><li class="sub"><a href="cpc.html" aria-haspopup="true">Planning cases<span aria-hidden="true">›</span></a><ul class="dd2"><li><a href="cpc.html#upcoming">Upcoming hearings</a></li><li><a href="cpc.html#recent">Cases filed in the past 12 months</a></li><li><a href="cpc.html#years">Cases filed per year, by type</a></li><li><a href="cpc.html#topics">Cases per year mentioning each topic</a></li></ul></li><li class="sub on"><a href="trees.html" aria-haspopup="true">Street trees<span aria-hidden="true">›</span></a><ul class="dd2"><li><a href="trees.html#map">Map of every tree</a></li><li><a href="trees.html#species">Most common species</a></li><li><a href="trees.html#hoods">Trees by neighborhood</a></li></ul></li></ul></div><a class="xlink" href="about.html">About</a></nav><script>(()=>{const dd=document.currentScript.closest(".site").querySelector(".dd"),b=dd.querySelector(".ddbtn");const set=o=>{dd.classList.toggle("open",o);b.setAttribute("aria-expanded",o)};b.onclick=e=>{e.stopPropagation();set(!dd.classList.contains("open"))};dd.querySelectorAll(".sub>a").forEach(a=>a.addEventListener("click",e=>{if(!matchMedia("(hover:hover)").matches){const li=a.parentNode;if(!li.classList.contains("open")){e.preventDefault();dd.querySelectorAll(".sub").forEach(x=>x.classList.toggle("open",x===li))}}}));document.addEventListener("click",e=>{if(!dd.contains(e.target))set(false)});dd.addEventListener("keydown",e=>{if(e.key==="Escape"){set(false);b.focus()}});addEventListener("hashchange",()=>set(false))})()</script></div>
+<div class="site"><b><a href="index.html" style="color:inherit;text-decoration:none">Nola Vizzes</a></b><nav class="topnav" aria-label="Site"><div class="dd"><button type="button" class="ddbtn on" aria-haspopup="true" aria-expanded="false">Visualizations<span aria-hidden="true">▾</span></button><ul class="dd1"><li><a href="drone.html">NOPD drone flights</a></li><li><a href="cfs.html">Calls for service</a></li><li><a href="cpc.html">Planning cases</a></li><li><a href="trees.html" class="on" aria-current="page">Street trees</a></li></ul></div><a class="xlink" href="about.html">About</a></nav><script>(()=>{const dd=document.currentScript.closest(".site").querySelector(".dd"),b=dd.querySelector(".ddbtn");const set=o=>{dd.classList.toggle("open",o);b.setAttribute("aria-expanded",o)};b.onclick=e=>{e.stopPropagation();set(!dd.classList.contains("open"))};document.addEventListener("click",e=>{if(!dd.contains(e.target))set(false)});dd.addEventListener("keydown",e=>{if(e.key==="Escape"){set(false);b.focus()}})})()</script></div>
 <h1>Street trees</h1>
 <div class="src"><a href="https://data.nola.gov/d/3tyj-9x33">Tree Location</a> · data.nola.gov · City data as of Apr 17, 2025 · Not refreshed daily</div>
-<div class="viewbar"><select id="view" class="viewsel" aria-label="Chart"></select></div>
 <div id="chart"></div>
 <div class="foot">Data: <a id="dataLink" href="https://data.nola.gov">data.nola.gov</a> · Not affiliated with the City of New Orleans · <a href="about.html">About</a></div>
 </div>
@@ -429,6 +424,16 @@ const NOLA = (() => {
     opts.forEach(([v, l]) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = l; b.setAttribute('aria-pressed', v === value); b.onclick = () => onChange(v); d.appendChild(b); });
     sec.appendChild(d); return d;
   }
+  // ftabs(panel, [[value, label], ...], value, onChange): a tab row at the very top of a filter panel, for one chart
+  // section that switches between closely related charts of the same data (e.g. two maps). Returns the row.
+  function ftabs(panel, opts, value, onChange) {
+    const d = document.createElement('div'); d.className = 'ftabs'; d.setAttribute('role', 'tablist');
+    opts.forEach(([v, l]) => {
+      const b = document.createElement('button'); b.type = 'button'; b.textContent = l; b.setAttribute('role', 'tab');
+      b.setAttribute('aria-selected', v === value); b.onclick = () => { if (v !== value) onChange(v); }; d.appendChild(b);
+    });
+    panel.prepend(d); return d;
+  }
   // neighborhood picker inside a panel section
   function nbPick(sec, value, onSel, label = 'All neighborhoods') {
     const s = document.createElement('select'); s.className = 'fsel'; s.setAttribute('aria-label', 'Neighborhood'); sec.appendChild(s);
@@ -513,76 +518,88 @@ const NOLA = (() => {
   const setText = (id, s) => { const el = document.getElementById(id); if (el) el.textContent = s; };
   const setHTML = (id, s) => { const el = document.getElementById(id); if (el) el.innerHTML = s; };
 
-  // ---------- one chart per page ----------
-  // views([{ id, label, cls, draw(el, first) }]): the #view dropdown picks a chart, drawn into its own pane in #chart.
-  // Filter controls carry data-for="viewId viewId ..." and only show for those charts.
-  // The chosen chart is kept in the URL hash, so a link can open a specific chart.
-  // The URL hash holds the chart and its filters: #view&key=value&... so a link opens exactly what you see.
+  // ---------- one subject per page: every chart stacked down the page ----------
+  // The URL hash holds the chart last used and the page's filters: #chartId&key=value&... so a link opens
+  // the page scrolled to that chart with exactly those filters.
   function hashState() {
     const [view, ...kv] = location.hash.slice(1).split('&'), o = { view };
     kv.forEach(p => { const [k, v] = p.split('='); if (k) o[k] = decodeURIComponent(v || ''); });
     return o;
   }
   // views(list, { state, ds }) -- list: [{ id, label, cls, keep, draw(el, first), csv() -> rows, ds: [id, name] }]
-  // state() returns the page's filters that differ from their defaults; they're written into the link.
+  // Each chart gets its own full-width section in #chart: a heading (label), its Copy link / Download CSV, then the chart.
+  // Filters are shared page state, so refresh() redraws every chart. state() returns the filters that differ from
+  // their defaults; they're written into the link. A page can jump to a chart with location.hash = 'chartId'.
   function views(list, opts = {}) {
-    const sel = document.getElementById('view'), host = document.getElementById('chart');
-    const bar = sel.parentNode;
-    const tools = document.createElement('div'); tools.className = 'tools';
-    const linkB = document.createElement('button'); linkB.className = 'btn'; linkB.type = 'button'; linkB.textContent = 'Copy link';
-    const csvB = document.createElement('button'); csvB.className = 'btn'; csvB.type = 'button'; csvB.textContent = 'Download CSV';
-    tools.append(linkB, csvB); (document.querySelector('.src') || bar).after(tools);
-    const panes = {}, drawn = new Set(); let cur = null;
-    list.forEach(v => {
-      const o = document.createElement('option'); o.value = v.id; o.textContent = v.label; sel.appendChild(o);
-      const p = document.createElement('div'); p.className = 'pane ' + (v.cls || 'card'); p.hidden = true; host.appendChild(p); panes[v.id] = p;
-    });
-    const writeHash = () => {
+    const host = document.getElementById('chart');
+    const panes = {}, secs = {}, drawn = new Set(); let cur = null;
+    const stateKV = () => {
       const st = opts.state ? opts.state() : {};
-      const kv = Object.entries(st).filter(([, v]) => v != null && v !== '').map(([k, v]) => `&${k}=${encodeURIComponent(v)}`).join('');
-      history.replaceState(null, '', '#' + cur.id + kv);
+      return Object.entries(st).filter(([, v]) => v != null && v !== '').map(([k, v]) => `&${k}=${encodeURIComponent(v)}`).join('');
     };
-    // footer "Data:" link goes to the City dataset behind the chart on screen
-    const dataLink = document.getElementById('dataLink');
-    const setDataLink = () => { const ds = cur.ds || opts.ds; if (!dataLink || !ds) return; dataLink.href = 'https://data.nola.gov/d/' + ds[0]; dataLink.textContent = ds[1] + ' on data.nola.gov'; };
-    const draw = () => { cur.draw(panes[cur.id], !drawn.has(cur.id)); drawn.add(cur.id); csvB.hidden = !cur.csv; setDataLink(); writeHash(); };
-    function show(id) {
-      cur = list.find(v => v.id === id) || list[0]; sel.value = cur.id;
-      Object.entries(panes).forEach(([k, p]) => p.hidden = k !== cur.id);
-      document.querySelectorAll('[data-for]').forEach(el => el.hidden = !el.dataset.for.split(' ').includes(cur.id));
-      tip.hide(); draw();
-    }
-    sel.onchange = () => show(sel.value);
+    const linkFor = id => location.href.split('#')[0] + '#' + id + stateKV();
+    const writeHash = () => { const kv = stateKV(); if (cur || kv) history.replaceState(null, '', '#' + (cur ? cur.id : '') + kv); };
+    const btn = t => { const b = document.createElement('button'); b.className = 'btn'; b.type = 'button'; b.textContent = t; return b; };
+    list.forEach(v => {
+      const sec = document.createElement('section'); sec.className = 'vsec'; sec.id = 'v-' + v.id;
+      const head = document.createElement('div'); head.className = 'vsec-h';
+      const h = document.createElement('h2'); h.textContent = v.label;
+      const tools = document.createElement('div'); tools.className = 'tools';
+      const linkB = btn('Copy link');
+      linkB.onclick = async () => {
+        cur = v; writeHash(); const url = linkFor(v.id);
+        try { await navigator.clipboard.writeText(url); linkB.textContent = 'Link copied'; }
+        catch (e) { prompt('Copy this link:', url); }
+        setTimeout(() => linkB.textContent = 'Copy link', 1600);
+      };
+      tools.appendChild(linkB);
+      if (v.csv) { const csvB = btn('Download CSV'); csvB.onclick = () => downloadCSV(v); tools.appendChild(csvB); }
+      head.append(h, tools);
+      const p = document.createElement('div'); p.className = 'pane ' + (v.cls || 'card');
+      sec.append(head, p); host.appendChild(sec); panes[v.id] = p; secs[v.id] = sec;
+      // the chart last touched is the one a copied link (and the address bar) points to
+      sec.addEventListener('pointerdown', () => { if (cur !== v) { cur = v; writeHash(); } });
+    });
+    // footer "Data:" link goes to the page's City dataset
+    const dataLink = document.getElementById('dataLink'), ds = opts.ds || (list.find(v => v.ds) || {}).ds;
+    if (dataLink && ds) { dataLink.href = 'https://data.nola.gov/d/' + ds[0]; dataLink.textContent = ds[1] + ' on data.nola.gov'; }
+    const drawOne = v => { v.draw(panes[v.id], !drawn.has(v.id)); drawn.add(v.id); };
+    const draw = () => { tip.hide(); list.forEach(drawOne); writeHash(); };
+    const go = (id, smooth) => {
+      const v = list.find(x => x.id === id); if (!v) return;
+      cur = v; secs[id].scrollIntoView({ behavior: smooth ? 'smooth' : 'auto', block: 'start' });
+    };
     // a link with filters opened on this same page (only the hash changes) reloads, so its filters apply;
-    // the pages' own jumps between views set a bare view id and keep the current filters
+    // the pages' own jumps to a chart set a bare chart id and keep the current filters
     addEventListener('hashchange', () => {
       const h = hashState(), st = opts.state ? opts.state() : {};
       const want = Object.entries(h).filter(([k]) => k !== 'view'), have = Object.entries(st).filter(([, v]) => v != null && v !== '');
       if (want.length && (want.length !== have.length || want.some(([k, v]) => String(st[k]) !== v))) return location.reload();
-      show(h.view);
+      draw(); go(h.view, true);
     });
-    let rt; addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => { if (!cur.keep) draw(); }, 150); });
-    linkB.onclick = async () => {
-      try { await navigator.clipboard.writeText(location.href); linkB.textContent = 'Link copied'; }
-      catch (e) { prompt('Copy this link:', location.href); }
-      setTimeout(() => linkB.textContent = 'Copy link', 1600);
-    };
-    csvB.onclick = () => {
-      const rows = cur.csv(); if (!rows || !rows.length) return;
+    let rt, lastW = innerWidth;
+    addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => {
+      if (innerWidth === lastW) return; lastW = innerWidth; // phones fire resize on scroll (address bar); only width matters
+      list.forEach(v => { if (!v.keep) drawOne(v); });
+    }, 150); });
+    function downloadCSV(v) {
+      const rows = v.csv(); if (!rows || !rows.length) return;
       const keys = Object.keys(rows[0]);
-      const cell = v => { v = v == null ? '' : String(v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
+      const cell = x => { x = x == null ? '' : String(x); return /[",\n]/.test(x) ? '"' + x.replace(/"/g, '""') + '"' : x; };
       const text = [keys.map(cell).join(','), ...rows.map(r => keys.map(k => cell(r[k])).join(','))].join('\n');
       const a = document.createElement('a');
       a.href = URL.createObjectURL(new Blob(['\ufeff' + text], { type: 'text/csv;charset=utf-8' }));
-      a.download = `${location.pathname.split('/').pop().replace('.html', '') || 'index'}-${cur.id}.csv`;
+      a.download = `${location.pathname.split('/').pop().replace('.html', '') || 'index'}-${v.id}.csv`;
       document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-    };
-    show(hashState().view);
-    return { refresh: draw, get id() { return cur.id; } };
+    }
+    const h0 = hashState().view;
+    draw();
+    if (list.some(v => v.id === h0)) requestAnimationFrame(() => go(h0, false));
+    return { refresh: draw, get id() { return cur ? cur.id : list[0].id; } };
   }
   const legendHTML = items => '<div class="legend">' + items.map(([c, l, round]) => `<span><i style="background:${c}${round ? ';border-radius:50%' : ''}"></i>${l}</span>`).join('') + '</div>';
 
-  return { css, S, fmt, pct, tip, row, setGeo, views, hashState, legendHTML, stage, fsec, flist, seg, nbPick, phoneToggle, popOf, perK, fmtRate, POP_NOTE, basisChips, shown, nbList, nbSelect, lonlat, get FULL() { return FULL; }, get GEO() { return GEO; }, map, mapButtons, seqVar, seqLegend, classes, stepLegend, short, frame, yGrid, chips, months, monthsLong,
+  return { css, S, fmt, pct, tip, row, setGeo, views, hashState, legendHTML, stage, fsec, flist, seg, ftabs, nbPick, phoneToggle, popOf, perK, fmtRate, POP_NOTE, basisChips, shown, nbList, nbSelect, lonlat, get FULL() { return FULL; }, get GEO() { return GEO; }, map, mapButtons, seqVar, seqLegend, classes, stepLegend, short, frame, yGrid, chips, months, monthsLong,
     setYear, get YEAR() { return YEAR; }, monthTicks, doyTime, doyDate, doyISO, doyMonth, monthStarts, isoDate, share, numWord, cap, setText, setHTML, title };
 })();
 </script>
