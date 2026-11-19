@@ -13,7 +13,7 @@ on:
   workflow_dispatch:         # "Run workflow" button on the Actions tab
     inputs:
       full:
-        description: 'Download and rebuild everything, even datasets the City has not changed'
+        description: 'Download and rebuild everything, even datasets the City has not changed (ignores the saved downloads)'
         type: boolean
         default: false
 
@@ -34,6 +34,7 @@ jobs:
     outputs:
       changed: ${{ steps.commit.outputs.changed }}
       failed: ${{ steps.fetch.outputs.failed }}
+      alerts: ${{ steps.fetch.outputs.alerts }}
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
@@ -42,18 +43,31 @@ jobs:
           cache: pip
           cache-dependency-path: pipeline/requirements.txt
       - run: pip install -r pipeline/requirements.txt
-      # Downloads that rarely change (boundaries, population), plus saved copies of the big datasets (Calls for
-      # Service, 311) that are updated incrementally, kept between runs. A miss only means downloading them again.
-      - uses: actions/cache@v5
+      # .cache/raw holds the saved copies of the big datasets updated incrementally (311, Calls for Service) and
+      # the API answers of datasets the City hasn't changed (see fetch.py). Restored here, saved again below even
+      # if a later step fails. GitHub drops a cache unused for 7 days; the daily run reads it every day. If it's ever
+      # lost, the next run downloads everything once and warns; twice within a few days fails the run.
+      - name: Restore saved downloads
+        id: cache
+        uses: actions/cache/restore@v5
         with:
           path: .cache/raw
-          key: raw-${{ github.run_id }}
+          key: raw-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: raw-
       - name: Fetch data and rebuild pages
         id: fetch
         env:
           SOCRATA_APP_TOKEN: ${{ secrets.SOCRATA_APP_TOKEN }}
-        run: python pipeline/fetch.py ${{ inputs.full && '--full' || '' }}
+        run: |
+          echo "Saved downloads restored from: ${{ steps.cache.outputs.cache-matched-key || 'nothing (first run, or the cache expired)' }}"
+          python pipeline/fetch.py ${{ inputs.full && '--full' || '' }}
+          du -sh .cache/raw || true
+      - name: Save downloads for the next run
+        if: always()
+        uses: actions/cache/save@v5
+        with:
+          path: .cache/raw
+          key: raw-${{ github.run_id }}-${{ github.run_attempt }}
       - name: Commit if anything changed
         id: commit
         run: |
@@ -103,13 +117,19 @@ jobs:
       - id: deployment
         uses: actions/deploy-pages@v4
 
-  # A dataset that failed kept its last good version while the rest published. Fail the run now, so GitHub
-  # emails the owner.
+  # A dataset that failed kept its last good version while the rest published, or an alert fired (a dataset the
+  # City stopped updating, or the saved downloads not surviving between runs). Fail the run now, so GitHub emails
+  # the owner.
   report:
     needs: [refresh, deploy]
-    if: always() && needs.refresh.outputs.failed != ''
+    if: always() && (needs.refresh.outputs.failed != '' || needs.refresh.outputs.alerts != '')
     runs-on: ubuntu-latest
     steps:
       - run: |
-          echo "::error::Not refreshed today (last good version still on the site): ${{ needs.refresh.outputs.failed }}. See the refresh job's log for why."
+          if [ -n "${{ needs.refresh.outputs.failed }}" ]; then
+            echo "::error::Not refreshed today (last good version still on the site): ${{ needs.refresh.outputs.failed }}. See the refresh job's log for why."
+          fi
+          if [ -n "${{ needs.refresh.outputs.alerts }}" ]; then
+            echo "::error::${{ needs.refresh.outputs.alerts }} alert(s): see the red lines in the refresh job's log (a dataset the City stopped updating, or the saved downloads not kept between runs)."
+          fi
           exit 1

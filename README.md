@@ -20,10 +20,14 @@ build.py    src/ + data/ -> site/
 ## How the daily refresh works
 
 1. At 10:30 UTC (4:30 a.m. Central in winter, 5:30 a.m. in summer), `daily.yml` runs `python pipeline/fetch.py`.
-2. `fetch.py` checks each dataset's "last updated" time on data.nola.gov and downloads only the ones the City changed. For the big datasets (Calls for Service, 311) it downloads only the rows changed since the last run and merges them into a saved copy. On the 1st of each month everything is downloaded fresh as a backstop.
-3. Each rebuilt data file is checked. If a dataset comes back empty, a column is missing, or a count drops by more than 10%, that page keeps its last good version and the others still publish.
-4. Files are rewritten only when their content changed, so a day with no new City data commits and publishes nothing. Otherwise the workflow commits `data/` and `site/` and publishes the site.
-5. If any dataset failed, the run ends with a red X on the repo's **Actions** tab and GitHub emails you. Warnings (for example, the City hasn't added new calls in over a week) show in yellow on the run but don't stop it.
+2. `fetch.py` asks data.nola.gov once for every dataset's "last updated" time (one request for all of them) and downloads only the ones the City changed. Pages whose datasets didn't change are left alone: nothing is downloaded, parsed or rebuilt for them.
+3. For the two big datasets the City updates in place (311, Calls for Service) it downloads only the rows changed since the last run and merges them into a saved copy. Most other datasets are reloaded by the City every night, so they're downloaded whole when they change. Every API answer is kept until the City changes that dataset, so nothing is downloaded twice. All of this lives in `.cache/raw`, which the workflow keeps between runs.
+4. On the 1st of each month the pipeline also checks the few datasets that almost never change (neighborhood and police district boundaries, past years of calls) and compares each saved copy's rows with the City's. A mismatch means one full download of that dataset.
+5. Each rebuilt data file is checked. If a dataset comes back empty, a column is missing, or a count drops by more than 10%, that page keeps its last good version and the others still publish.
+6. Files are rewritten only when their content changed, so a day with no new City data commits and publishes nothing. Otherwise the workflow commits `data/` and `site/` and publishes the site.
+7. If any dataset failed, the run ends with a red X on the repo's **Actions** tab and GitHub emails you. It also fails when a dataset the City normally reloads every night hasn't changed in 5 days (60 for drone flights and abatements), or when the saved copies had to be downloaded again twice within a few days (the cache isn't being kept). Warnings (for example, the City hasn't added new calls in over a week) show in yellow on the run but don't stop it.
+
+A typical day costs 18 requests to the City's API (about 44 MB, 7 MB as transferred), down from 42; a day without new data costs one request instead of 21, and the 1st of the month adds 4 requests instead of downloading everything again (248 MB). Per-dataset numbers are in `pipeline/REFERENCE.md` ("What each dataset costs").
 
 To run it by hand: GitHub repo → **Actions** → **Daily data refresh** → **Run workflow** (tick the box to download everything fresh).
 
