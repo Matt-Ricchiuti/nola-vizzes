@@ -97,7 +97,7 @@
     if (!rows.length) { plot.innerHTML = `<div class="legend">No non-commercial licenses in ${nbName(st.nb)}.</div>`; return; }
     const narrow = (plot.clientWidth || 600) < 600, rh = narrow ? 42 : 34;
     const f = NOLA.frame(plot, { h: 30 + rows.length * rh, m: { t: 4, r: 40, b: 24, l: narrow ? 6 : 210 } });
-    const x = d3.scaleLinear().domain([0, d3.max(rows, r => r.n) * 1.05]).range([0, f.iw]).nice();
+    const x = d3.scaleLinear().domain([0, Math.max(4, d3.max(rows, r => r.n) * 1.05)]).range([0, f.iw]).nice();
     f.g.append('g').attr('class', 'gridl').attr('transform', `translate(0,${f.ih})`).call(d3.axisBottom(x).ticks(Math.min(5, x.domain()[1])).tickFormat(d3.format(',~d')).tickSize(-f.ih)).call(g => g.select('.domain').remove());
     f.g.selectAll('.gridl .tick line').attr('stroke', 'var(--grid)');
     rows.forEach((r, i) => {
@@ -131,7 +131,7 @@
     plot.innerHTML = '';
     const f = NOLA.frame(plot, { h: 380, m: { t: 18, r: 10, b: 28, l: 44 } });
     const x = d3.scaleBand().domain(D.years).range([0, f.iw]).paddingInner(.22);
-    const y = d3.scaleLinear().domain([0, (d3.max(data, d => d3.sum(d)) || 1) * 1.05]).range([f.ih, 0]).nice();
+    const y = d3.scaleLinear().domain([0, Math.max(4, (d3.max(data, d => d3.sum(d)) || 0) * 1.05)]).range([f.ih, 0]).nice();
     NOLA.yGrid(f, y, 5, d3.format(',~d'));
     const partial = k => D.years[k] === YEAR && !D.last.endsWith('-12-31');
     data.forEach((d, k) => { let y0 = 0; d.forEach((v, s) => { if (!v) return;

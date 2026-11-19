@@ -116,7 +116,7 @@
     const narrow = (plot.clientWidth || 600) < 600, rh = narrow ? 42 : 30;
     const f = NOLA.frame(plot, { h: 30 + rows.length * rh, m: { t: 4, r: 46, b: 24, l: narrow ? 6 : labelW } });
     const mx = d3.max(rows, r => Math.max(d3.sum(r.a), prev ? r.prev || 0 : 0)) || 1;
-    const x = d3.scaleLinear().domain([0, mx * 1.04]).range([0, f.iw]).nice();
+    const x = d3.scaleLinear().domain([0, Math.max(4, mx * 1.04)]).range([0, f.iw]).nice();
     f.g.append('g').attr('class', 'gridl').attr('transform', `translate(0,${f.ih})`).call(d3.axisBottom(x).ticks(5).tickSize(-f.ih).tickFormat(d3.format('~s'))).call(g => g.select('.domain').remove());
     f.g.selectAll('.gridl .tick line').attr('stroke', 'var(--grid)');
     rows.forEach((r, i) => {
@@ -154,7 +154,7 @@
     plot.innerHTML = '';
     const f = NOLA.frame(plot, { h: 340, m: { t: 18, r: 10, b: 28, l: 44 } });
     const x = d3.scaleBand().domain(D.years).range([0, f.iw]).paddingInner(.22);
-    const y = d3.scaleLinear().domain([0, (d3.max(D.hear, d => d3.sum(d)) || 1) * 1.05]).range([f.ih, 0]).nice();
+    const y = d3.scaleLinear().domain([0, Math.max(4, (d3.max(D.hear, d => d3.sum(d)) || 0) * 1.05)]).range([f.ih, 0]).nice();
     NOLA.yGrid(f, y, 5, d3.format(',~d'));
     D.hear.forEach((d, k) => { let y0 = 0; d.forEach((v, g) => { if (!v) return;
       f.g.append('rect').attr('x', x(D.years[k])).attr('width', x.bandwidth()).attr('y', y(y0 + v)).attr('height', Math.max(.5, y(y0) - y(y0 + v))).attr('fill', HEAR_C[g]).attr('opacity', partialYear(D.years[k]) ? .45 : 1); y0 += v; }); });
@@ -189,7 +189,7 @@
     const f = NOLA.frame(plot, { h: 320, m: { t: 14, r: 10, b: 28, l: 44 } });
     const x = d3.scaleBand().domain(imon.map(d => d.k)).range([0, f.iw]).paddingInner(.15);
     const show = g => st.ig < 0 || g === st.ig, tot = d => d3.sum(d.a.filter((v, g) => show(g)));
-    const y = d3.scaleLinear().domain([0, (d3.max(imon, tot) || 1) * 1.05]).range([f.ih, 0]).nice();
+    const y = d3.scaleLinear().domain([0, Math.max(4, (d3.max(imon, tot) || 0) * 1.05)]).range([f.ih, 0]).nice();
     NOLA.yGrid(f, y, 5, d3.format(',~d'));
     const lastMonthPartial = !isMonthEnd(D.last);
     imon.forEach(d => { let y0 = 0; d.a.forEach((v, g) => { if (!v || !show(g)) return;

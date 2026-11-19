@@ -85,7 +85,7 @@
     const show = c => st.cat < 0 || c === st.cat, tot = d => d3.sum(d.filter((v, c) => show(c)));
     const f = NOLA.frame(plot, { h: 380, m: { t: 18, r: 10, b: 28, l: 44 } });
     const x = d3.scaleBand().domain(D.years).range([0, f.iw]).paddingInner(.22);
-    const y = d3.scaleLinear().domain([0, (d3.max(D.yr, tot) || 1) * 1.05]).range([f.ih, 0]).nice();
+    const y = d3.scaleLinear().domain([0, Math.max(4, (d3.max(D.yr, tot) || 0) * 1.05)]).range([f.ih, 0]).nice();
     NOLA.yGrid(f, y, 5, d3.format(',~d'));
     D.yr.forEach((d, k) => { let y0 = 0; d.forEach((v, c) => { if (!v || !show(c)) return;
       f.g.append('rect').attr('x', x(D.years[k])).attr('width', x.bandwidth()).attr('y', y(y0 + v)).attr('height', Math.max(.5, y(y0) - y(y0 + v))).attr('fill', CCOL[c]).attr('opacity', partialYear(D.years[k]) ? .45 : 1); y0 += v; }); });

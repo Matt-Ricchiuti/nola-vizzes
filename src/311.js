@@ -110,7 +110,7 @@
     const x = d3.scaleBand().domain(mon.map(d => d.k)).range([0, f.iw]).paddingInner(.15);
     const show = t => st.type < 0 || t === st.type;
     const tot = d => d3.sum(d.a.filter((v, t) => show(t)));
-    const y = d3.scaleLinear().domain([0, (d3.max(mon, tot) || 1) * 1.05]).range([f.ih, 0]).nice();
+    const y = d3.scaleLinear().domain([0, Math.max(4, (d3.max(mon, tot) || 0) * 1.05)]).range([f.ih, 0]).nice();
     NOLA.yGrid(f, y, 5);
     const partial = d => d.k === mon.length - 1 && !isMonthEnd(lastISO);
     // stack: the colored types at the bottom, the gray ones on top
@@ -187,7 +187,7 @@
       [...AGE_L.map((l, a) => [l, AGE_C[a], fmt(d3.sum(sel, r => r[a]))]), ['Total', null, fmt(d3.sum(sel, r => d3.sum(r)))]]);
     const rows = D.T.map((t, k) => ({ key: k, name: t, a: A[k], n: d3.sum(A[k]), on: k === st.type })).filter(r => r.n).sort((a, b) => b.n - a.n || byName(a.name, b.name));
     if (!rows.length) { plot.innerHTML = `<div class="legend">No open requests${st.nb >= 0 ? ' in ' + nbName(st.nb) : ''}.</div>`; return; }
-    const mx = d3.max(rows, r => r.n) || 1, sc = d3.scaleLinear().domain([0, mx * 1.08]).nice();
+    const mx = d3.max(rows, r => r.n) || 1, sc = d3.scaleLinear().domain([0, Math.max(4, mx * 1.08)]).nice();
     rowsChart(plot, rows, {
       scale: sc, ticks: (() => { const t = sc.ticks(5); return [t, t.map(v => NOLA.short(v))]; })(),
       mark: (g, r, cy, x) => { let x0 = 0; r.a.forEach((v, a) => { if (!v) return; g.append('rect').attr('x', x(x0)).attr('width', Math.max(.5, x(x0 + v) - x(x0) - .5)).attr('y', cy - 7).attr('height', 14).attr('fill', AGE_C[a]).attr('opacity', st.type < 0 || r.on ? 1 : .45); x0 += v; }); },
