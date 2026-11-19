@@ -29,11 +29,11 @@ h1,.vsec-h h2,.cards h2{font-family:"Young Serif",Georgia,"Times New Roman",seri
 .eyebrow,.flist .ct,.scalebar,.src,.tip .r span:last-child{font-family:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace}
 a{color:var(--accent)}
 .wrap{max-width:1120px;margin:0 auto;padding:28px 24px 64px}
-.site{display:flex;align-items:center;gap:22px;border-bottom:1px solid var(--grid);padding-bottom:12px;margin-bottom:28px;position:relative;z-index:30}
+.site{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:22px;border-bottom:1px solid var(--grid);padding-bottom:12px;margin-bottom:28px;position:relative;z-index:30}
 .site b{font-size:13px;letter-spacing:.08em;text-transform:uppercase}
-/* header menu: "Visualizations" opens down to the pages; each page opens right to its views */
-.topnav{display:flex;align-items:center;gap:18px;flex:1;font-size:13px}
-.topnav .xlink{margin-left:auto;color:var(--ink2);text-decoration:none}
+/* header: site name left, the "Visualizations" menu centered, About right (the nav spans the middle and right columns) */
+.topnav{grid-column:2/4;display:grid;grid-template-columns:subgrid;align-items:center;font-size:13px}
+.topnav .xlink{justify-self:end;color:var(--ink2);text-decoration:none}
 .topnav .xlink.on{color:var(--ink);font-weight:600}
 .dd{position:relative}
 .ddbtn{font:inherit;font-size:13px;color:var(--ink2);background:none;border:0;padding:4px 0;cursor:pointer;display:inline-flex;align-items:center;gap:5px}
@@ -41,7 +41,7 @@ a{color:var(--accent)}
 .ddbtn span{font-size:10px;transition:transform .15s}
 .dd:hover .ddbtn span,.dd.open .ddbtn span{transform:rotate(180deg)}
 .dd1{list-style:none;margin:0;padding:6px;background:var(--surface);border:1px solid var(--ring);border-radius:10px;box-shadow:0 10px 30px rgb(0 0 0 / .14);display:none}
-.dd1{position:absolute;top:100%;left:-10px;min-width:230px;margin-top:6px}
+.dd1{position:absolute;top:100%;left:50%;transform:translateX(-50%);min-width:230px;margin-top:6px}
 .dd1::before{content:"";position:absolute;left:0;right:0;top:-10px;height:10px} /* hover bridge */
 .dd:hover .dd1,.dd:focus-within .dd1,.dd.open .dd1{display:block}
 .dd1 li{position:relative}
@@ -49,9 +49,9 @@ a{color:var(--accent)}
 .dd1 a.on{font-weight:600}
 .dd1 a:hover,.dd1 a:focus-visible{background:var(--chip);outline:none}
 @media(max-width:640px){
-  .site{flex-wrap:wrap;gap:8px 18px}
+  .site{gap:8px}
   .dd{position:static}
-  .dd1{left:0;right:0;top:100%;min-width:0;max-height:75vh;overflow:auto}
+  .dd1{left:0;right:0;transform:none;top:100%;min-width:0;max-height:75vh;overflow:auto}
 }
 h1{font-size:30px;line-height:1.15;margin:0 0 6px;letter-spacing:0}
 h2{font-size:19px;margin:0 0 4px}
