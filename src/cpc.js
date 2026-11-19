@@ -1,33 +1,59 @@
-// City Planning Commission cases page
+// City Planning Commission cases page: one map (upcoming hearings / cases filed), what each case type is,
+// filings per year by type, and cases per year by topic, stacked down the page
 (() => {
   const P = DATA.cpc; NOLA.setGeo(DATA.geo);
   const { fmt, tip, row } = NOLA;
   const PULLED = (DATA.meta && DATA.meta.pulled) || '2026-11-18';
   const YEAR = +PULLED.slice(0, 4);
   const lastFiled = P.lastFiled || PULLED;
+  // case types as colored on every chart; `about` paraphrases the City's own descriptions
+  // (Comprehensive Zoning Ordinance Articles 3-4, nola.gov application pages, CPC Subdivision Regulations)
   const FOLD = [
-    { n: 'Variance', t: [0] }, { n: 'Minor subdivision', t: [1] }, { n: 'Neighborhood notice (NPP)', t: [2] },
-    { n: 'Design review', t: [3] }, { n: 'Conditional use', t: [4] }, { n: 'Zoning, text & master plan changes', t: [5, 6, 9] },
-    { n: 'Appeals, major subdivisions & other', t: [7, 8, 10] }];
+    { n: 'Variance', t: [0], about: 'Permission to depart from a specific zoning rule, such as a setback, height or parking requirement, because of a hardship. Usually decided by the Board of Zoning Adjustments.' },
+    { n: 'Minor subdivision', t: [1], about: 'Dividing or redrawing property lines to create five or fewer lots, with no new street. Most are approved by CPC staff.' },
+    { n: 'Neighborhood notice (NPP)', t: [2], about: 'The notice and neighborhood meeting an applicant must hold before filing for things like a zoning change, conditional use or most variances. Nothing is decided.' },
+    { n: 'Design review', t: [3], about: 'CPC staff review of a project’s site plan and building design, required for larger projects and in some districts. Includes stormwater plan reviews.' },
+    { n: 'Conditional use', t: [4], about: 'A use allowed on a particular site only with City Council approval, often with conditions, after a CPC public hearing and recommendation.' },
+    { n: 'Zoning, text & master plan changes', t: [5, 6, 9], about: 'Changes to a property’s zoning district, to the wording of the zoning ordinance, or to the Master Plan. The CPC recommends; the City Council decides.' },
+    { n: 'Appeals, major subdivisions & other', t: [7, 8, 10], about: 'Appeals of planning and zoning decisions; subdivisions that create six or more lots or a new street, which need a CPC public hearing; and all other case types.' }];
   FOLD.forEach((f, i) => f.color = NOLA.S(i));
   const foldOf = t => FOLD.findIndex(f => f.t.includes(t));
   const TYPEIDX = Object.fromEntries(P.TYP.map((t, i) => [t, i]));
   const nbName = i => i >= 0 ? NOLA.GEO.nb[i].name : '—';
   const sw = c => `<i style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${c}"></i> `;
 
+  // ---------- filing dates: `pts` counts days from windowStart; the map can show any range the data holds ----------
+  const startDay = new Date((P.windowStart || '2025-11-18') + 'T00:00:00Z');
+  const dayOf = iso => Math.round((Date.parse(iso + 'T00:00:00Z') - startDay) / 864e5);
+  const isoOf = d => new Date(+startDay + d * 864e5).toISOString().slice(0, 10);
+  const pDate = d => NOLA.isoDate(isoOf(d));
+  const LAST = Math.max(dayOf(lastFiled.slice(0, 10)), d3.max(P.pts, p => p[0]) || 0);
+  const DEF_FROM = Math.max(0, LAST - 365); // the past 12 months
+  const clampD = d => Math.max(0, Math.min(LAST, d));
+  const hashDay = s => s && /^\d{4}-\d{2}-\d{2}$/.test(s) ? clampD(dayOf(s)) : null;
+
+  // older links pointed at the two separate maps; they open the matching tab of the one map now
+  { const [v, ...kv] = location.hash.slice(1).split('&');
+    if (v === 'upcoming' || v === 'recent') history.replaceState(null, '', '#map' + (v === 'recent' ? '&tab=filed' : '') + kv.map(s => '&' + s).join('')); }
   const H = NOLA.hashState();
-  const st = { fold: H.fold != null ? +H.fold : -1, theme: H.theme != null ? +H.theme : -1, nb: H.nb != null ? +H.nb : -1 };
+  const st = { tab: H.tab === 'filed' ? 'filed' : 'up', from: hashDay(H.from) ?? DEF_FROM, to: hashDay(H.to) ?? LAST,
+    fold: H.fold != null ? +H.fold : -1, theme: H.theme != null ? +H.theme : -1, nb: H.nb != null ? +H.nb : -1 };
+  if (st.from > st.to) [st.from, st.to] = [st.to, st.from];
+  const defRange = () => st.from === DEF_FROM && st.to === LAST;
+  const rangeTxt = () => defRange() ? 'past 12 months' : `${pDate(st.from)} – ${pDate(st.to)}`;
+  const mapTitle = () => st.tab === 'up' ? 'Upcoming hearings' : defRange() ? 'Cases filed in the past 12 months' : `Cases filed ${pDate(st.from)} – ${pDate(st.to)}`;
+
   const staged = (el, first, isMap, open) => { if (first) el._s = NOLA.stage(el, { map: isMap, open }); return el._s; };
   const set = (k, v) => { st[k] = v; V.refresh(); };
   const toggle = k => v => set(k, st[k] === v ? -1 : v);
   // shared filter sections
-  const nbSection = panel => NOLA.nbPick(NOLA.fsec(panel, 'Neighborhood'), st.nb, v => set('nb', v));
+  const nbSection = panel => { const s = NOLA.fsec(panel, 'Neighborhood'); NOLA.nbPick(s, st.nb, v => set('nb', v)); return s; };
   function typeSection(panel, counts) {
     NOLA.flist(NOLA.fsec(panel, 'Case type', st.fold >= 0 ? ['Show all', () => set('fold', -1)] : null),
       FOLD.map((f, i) => ({ key: i, name: f.n, color: f.color, count: counts[i] })), { pressed: i => st.fold === i, onClick: toggle('fold') });
   }
 
-  // ---------- upcoming hearings: map, with the agenda in the panel ----------
+  // ---------- upcoming hearings ----------
   const seen = new Set();
   const up = P.up.filter(u => { const k = u[0] + u[2]; if (seen.has(k)) return false; seen.add(k); return true; })
     .map(u => ({ when: u[0], body: u[1], cnum: u[2], type: u[3], fold: foldOf(TYPEIDX[u[3]]), addr: u[4].trim(), nb: u[5], x: u[6], y: u[7], desc: u[8] }));
@@ -40,35 +66,90 @@
   const dayFmt = s => new Date(s.slice(0, 10) + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
   const timeFmt = s => { const h = +s.slice(11, 13), mi = s.slice(14, 16); return !h && mi === '00' ? '' : (h % 12 || 12) + ':' + mi + (h < 12 ? ' a.m.' : ' p.m.'); };
   const cleanDesc = s => s.replace(/^Zoning Docket \d+\/\d+\s*/, '').replace(/^Applicant\(s\):\s*/, '').replace(/^Request:\s*/, '') + (s.length >= 170 ? '…' : '');
+  const okFold = u => st.fold < 0 || u.fold === st.fold;
   const upNb = () => up.filter(u => st.nb < 0 || u.nb === st.nb);
-  const upF = () => upNb().filter(u => st.fold < 0 || u.fold === st.fold);
-  let um, ud;
-  function drawUpcoming(pane, first) {
-    const { panel, plot } = staged(pane, first, true, true); // the agenda lives in the panel, so phones show it open
+  const upF = () => upNb().filter(okFold);
+
+  // ---------- cases filed ----------
+  const mapped = P.pts.filter(p => NOLA.shown(p[4]));
+  const okType = p => st.fold < 0 || foldOf(p[1]) === st.fold, okTheme = p => st.theme < 0 || (p[5] >> st.theme) & 1, okNb = p => st.nb < 0 || p[4] === st.nb;
+  const okDate = p => p[0] >= st.from && p[0] <= st.to;
+  const inRange = () => mapped.filter(okDate);
+  const matching = () => inRange().filter(p => okType(p) && okTheme(p));
+
+  // ---------- the map: one section, tabs at the top of its panel ----------
+  let mp, ud, rg, rangeSec, nbCnt = [];
+  // the filing-date inputs stay in place across redraws, so typing a date isn't interrupted
+  function makeRange(panel) {
+    const sec = NOLA.fsec(panel, 'Filed', ['Past 12 months', () => { st.from = DEF_FROM; st.to = LAST; V.refresh(); }]);
+    const box = document.createElement('div'); box.className = 'cpc-range';
+    box.innerHTML = '<label><span>From</span><input type="date" aria-label="Filed from"></label><label><span>To</span><input type="date" aria-label="Filed to"></label>';
+    const [a, b] = box.querySelectorAll('input');
+    [a, b].forEach(i => { i.min = isoOf(0); i.max = isoOf(LAST); i.required = true; });
+    const apply = which => () => {
+      const i = which ? b : a; if (!i.value) return;
+      const d = clampD(dayOf(i.value));
+      if (which) { st.to = d; if (st.from > d) st.from = d; } else { st.from = d; if (st.to < d) st.to = d; }
+      V.refresh();
+    };
+    a.onchange = apply(0); b.onchange = apply(1);
+    sec.appendChild(box); sec._in = [a, b];
+    return sec;
+  }
+  function syncRange() {
+    const [a, b] = rangeSec._in;
+    if (document.activeElement !== a) a.value = isoOf(st.from);
+    if (document.activeElement !== b) b.value = isoOf(st.to);
+    rangeSec.querySelector('.linkbtn').hidden = defRange();
+  }
+  function drawMap(pane, first) {
+    const { panel, plot } = staged(pane, first, true, true); // the tabs and agenda live in the panel, so phones show it open
+    const filed = st.tab === 'filed';
+    pane.parentElement.querySelector('.vsec-h h2').textContent = mapTitle();
+    [...panel.children].forEach(c => { if (!(filed && c === rangeSec)) c.remove(); });
+    const nbSec = nbSection(panel);
+    if (filed) {
+      if (!rangeSec) rangeSec = makeRange(panel);
+      else if (rangeSec.parentNode !== panel) panel.appendChild(rangeSec);
+      else panel.insertBefore(nbSec, rangeSec);
+      syncRange();
+    }
+    if (first) {
+      mp = NOLA.map(plot, { panel, label: 'Map of City Planning Commission cases',
+        tip: i => `<b>${NOLA.GEO.nb[i].name}</b>` + row(st.tab === 'up' ? 'Upcoming hearings' : `Matching cases, ${rangeTxt()}`, fmt(nbCnt[i] || 0)) });
+      rg = mp.layer.append('g'); ud = mp.layer.append('g'); mp.lastNb = -1;
+      mp.onZoom(k => {
+        ud.selectAll('circle').attr('r', 7 / Math.sqrt(k)).attr('stroke-width', 2 / Math.sqrt(k));
+        rg.selectAll('circle').attr('r', 4 / Math.sqrt(k)).attr('stroke-width', 1 / Math.sqrt(k));
+      });
+      // what each color means, right under the map
+      const key = document.createElement('div'); key.className = 'cpc-key';
+      key.innerHTML = FOLD.map(f => `<div class="cpc-kt"><i style="background:${f.color}"></i><div><b>${f.n}</b><p>${f.about}</p></div></div>`).join('');
+      pane.after(key);
+    }
+    if (mp.lastNb !== st.nb) { mp.focus(st.nb, first ? 0 : 450); mp.lastNb = st.nb; }
+    ud.style('display', filed ? 'none' : null); rg.style('display', filed ? null : 'none');
+    if (filed) drawFiled(panel); else drawUpcoming(panel);
+    NOLA.ftabs(panel, [['up', 'Upcoming hearings'], ['filed', 'Cases filed']], st.tab, v => set('tab', v));
+  }
+
+  function drawUpcoming(panel) {
     const list = upF();
-    panel.innerHTML = '';
-    nbSection(panel);
+    nbCnt = []; up.filter(okFold).forEach(u => { if (u.nb >= 0) nbCnt[u.nb] = (nbCnt[u.nb] || 0) + 1; });
     typeSection(panel, FOLD.map((f, i) => upNb().filter(u => u.fold === i).length));
     const ag = NOLA.fsec(panel, `Agenda · ${fmt(list.length)} case${list.length === 1 ? '' : 's'}`);
     const box = document.createElement('div'); box.className = 'agenda'; ag.appendChild(box);
     box.innerHTML = list.length ? d3.groups(list, u => u.when.slice(0, 10)).map(([day, us]) => `<div class="day"><div class="dh">${dayFmt(day)} · ${[...new Set(us.map(u => u.body))].join(', ')}${offDay(day) ? ` <span class="offday" title="This is the next meeting date the City lists for these cases, but it falls on a ${offDay(day)}.">${offDay(day)}: date as listed</span>` : ''}</div>` +
       us.map(u => `<div class="ui" data-c="${u.cnum}${u.when}"><i style="background:${FOLD[u.fold].color}"></i><div><b>${u.addr}</b> <span class="ty">${u.type}</span><div class="ds">${cleanDesc(u.desc)}</div><div class="nb">${nbName(u.nb)} · ${u.cnum}</div></div></div>`).join('') + '</div>').join('')
       : `<div class="ds">No hearings scheduled${st.nb >= 0 ? ' in ' + nbName(st.nb) : ''}.</div>`;
-    if (first) {
-      um = NOLA.map(plot, { panel, label: 'Map of upcoming planning cases' });
-      ud = um.layer.append('g');
-      um.onZoom(k => ud.selectAll('circle').attr('r', 7 / Math.sqrt(k)).attr('stroke-width', 2 / Math.sqrt(k)));
-      um.lastNb = -1;
-    }
-    if (um.lastNb !== st.nb) { um.focus(st.nb, first ? 0 : 450); um.lastNb = st.nb; }
     const upTip = d => `<b>${d.addr}</b><div style="color:var(--ink2)">${d.type} · ${d.cnum}</div>` + row('Hearing', dayFmt(d.when) + (timeFmt(d.when) ? ', ' + timeFmt(d.when) : '') + (offDay(d.when) ? ` (${offDay(d.when)}, as listed)` : '')) + row('Body', d.body) + row('Neighborhood', nbName(d.nb)) + `<div style="margin-top:6px">${cleanDesc(d.desc)}</div>`;
-    const k = um.k();
+    const k = mp.k();
     const dots = ud.selectAll('circle').data(list.filter(u => (u.x || u.y) && NOLA.shown(u.nb)), d => d.cnum + d.when).join('circle')
       .attr('cx', d => d.x).attr('cy', d => d.y).attr('r', 7 / Math.sqrt(k)).attr('stroke-width', 2 / Math.sqrt(k))
-      .attr('fill', d => FOLD[d.fold].color).attr('stroke', 'var(--surface)')
+      .attr('fill', d => FOLD[d.fold].color).attr('stroke', 'var(--surface)').attr('opacity', 1)
       .on('mousemove', (ev, d) => { tip.show(upTip(d), ev); hi(d); }).on('mouseleave', () => { tip.hide(); hi(null); });
     const items = [...box.querySelectorAll('.ui')];
-    items.forEach(it => { const u = list.find(v => v.cnum + v.when === it.dataset.c); it.onmouseenter = () => hi(u); it.onmouseleave = () => hi(null); it.onclick = () => { if (u.x) um.zoomTo([u.x - 60, u.y - 45, u.x + 60, u.y + 45], 500); }; });
+    items.forEach(it => { const u = list.find(v => v.cnum + v.when === it.dataset.c); it.onmouseenter = () => hi(u); it.onmouseleave = () => hi(null); it.onclick = () => { if (u.x) mp.zoomTo([u.x - 60, u.y - 45, u.x + 60, u.y + 45], 500); }; });
     function hi(u) {
       dots.attr('opacity', d => !u || d === u ? 1 : .25);
       items.forEach(it => it.classList.toggle('on', !!u && it.dataset.c === u.cnum + u.when));
@@ -76,38 +157,20 @@
     }
   }
 
-  // ---------- cases filed in the past 12 months ----------
-  const startDay = new Date((P.windowStart || '2025-11-18') + 'T00:00:00Z');
-  const pDate = d => { const t = new Date(+startDay + d * 864e5); return NOLA.months[t.getUTCMonth()] + ' ' + t.getUTCDate() + ', ' + t.getUTCFullYear(); };
-  const mapped = P.pts.filter(p => NOLA.shown(p[4]));
-  const okType = p => st.fold < 0 || foldOf(p[1]) === st.fold, okTheme = p => st.theme < 0 || (p[5] >> st.theme) & 1, okNb = p => st.nb < 0 || p[4] === st.nb;
-  const matching = () => mapped.filter(p => okType(p) && okTheme(p));
-  let rm, rg, recentNb = [];
-  function drawRecent(pane, first) {
-    const { panel, plot } = staged(pane, first, true);
-    const all = matching(), pts = all.filter(okNb);
-    recentNb = []; pts.forEach(p => { recentNb[p[4]] = (recentNb[p[4]] || 0) + 1; });
-    panel.innerHTML = '';
-    nbSection(panel);
-    typeSection(panel, FOLD.map((f, i) => mapped.filter(p => okTheme(p) && okNb(p) && foldOf(p[1]) === i).length));
+  function drawFiled(panel) {
+    const span = inRange(), all = matching(), pts = all.filter(okNb);
+    nbCnt = []; all.forEach(p => { nbCnt[p[4]] = (nbCnt[p[4]] || 0) + 1; });
+    typeSection(panel, FOLD.map((f, i) => span.filter(p => okTheme(p) && okNb(p) && foldOf(p[1]) === i).length));
     NOLA.flist(NOLA.fsec(panel, 'Topic in description', st.theme >= 0 ? ['Any topic', () => set('theme', -1)] : null),
-      P.TH.map((t, i) => ({ key: i, name: t, color: 'var(--ink2)', count: mapped.filter(p => okType(p) && okNb(p) && (p[5] >> i) & 1).length })),
+      P.TH.map((t, i) => ({ key: i, name: t, color: 'var(--ink2)', count: span.filter(p => okType(p) && okNb(p) && (p[5] >> i) & 1).length })),
       { pressed: i => st.theme === i, onClick: toggle('theme') });
     // where the matching cases are: neighborhoods ranked, the chosen one always listed with its rank
-    const cnt = []; all.forEach(p => { cnt[p[4]] = (cnt[p[4]] || 0) + 1; });
-    const ranked = NOLA.nbList().map(f => [f.idx, cnt[f.idx] || 0]).sort((a, b) => b[1] - a[1]).map((d, r) => [...d, r + 1]);
+    const ranked = NOLA.nbList().map(f => [f.idx, nbCnt[f.idx] || 0]).sort((a, b) => b[1] - a[1]).map((d, r) => [...d, r + 1]);
     const top = ranked.filter(d => d[1]).slice(0, 8), mine = ranked.find(d => d[0] === st.nb);
     if (mine && !top.includes(mine)) top.push(mine);
-    NOLA.flist(NOLA.fsec(panel, `Most cases · ${fmt(pts.length)} since ${pDate(0)}`),
+    NOLA.flist(NOLA.fsec(panel, `Most cases · ${fmt(pts.length)} shown`),
       top.map(([i, v, r]) => ({ key: i, name: `${r}. ${NOLA.GEO.nb[i].name}`, color: 'var(--s1)', count: v })), { pressed: i => st.nb === i, onClick: toggle('nb') });
-    if (first) {
-      rm = NOLA.map(plot, { panel, label: 'Map of planning cases filed in the past 12 months',
-        tip: i => `<b>${NOLA.GEO.nb[i].name}</b>` + row('Matching cases, past 12 months', recentNb[i] || 0) });
-      rg = rm.layer.append('g'); rm.lastNb = -1;
-      rm.onZoom(k => rg.selectAll('circle').attr('r', 4 / Math.sqrt(k)).attr('stroke-width', 1 / Math.sqrt(k)));
-    }
-    if (rm.lastNb !== st.nb) { rm.focus(st.nb, first ? 0 : 450); rm.lastNb = st.nb; }
-    const k = rm.k();
+    const k = mp.k();
     rg.selectAll('circle').data(pts, p => p.join()).join('circle').attr('cx', p => p[2]).attr('cy', p => p[3]).attr('r', 4 / Math.sqrt(k))
       .attr('fill', p => FOLD[foldOf(p[1])].color).attr('fill-opacity', .85).attr('stroke', 'var(--surface)').attr('stroke-width', 1 / Math.sqrt(k))
       .on('mousemove', (ev, p) => tip.show(`<b>${P.TYP[p[1]]}</b>` + row('Filed', pDate(p[0])) + row('Neighborhood', nbName(p[4])) + (p[5] ? row('Topics', P.TH.filter((t, i) => (p[5] >> i) & 1).join(', ')) : ''), ev)).on('mouseleave', tip.hide);
@@ -168,16 +231,16 @@
 
   // ---------- CSV downloads ----------
   const csvUp = () => upF().map(u => ({ hearing: u.when.replace('T', ' '), body: u.body, case_number: u.cnum, type: u.type, address: u.addr, neighborhood: nbName(u.nb), description: u.desc }));
-  const csvRecent = () => matching().filter(okNb).map(p => { const [lon, lat] = p[2] || p[3] ? NOLA.lonlat(p[2], p[3]) : ['', ''];
-    return { filed: new Date(+startDay + p[0] * 864e5).toISOString().slice(0, 10), type: P.TYP[p[1]], neighborhood: nbName(p[4]), topics: P.TH.filter((t, i) => (p[5] >> i) & 1).join('; '), lon, lat }; });
+  const csvFiled = () => matching().filter(okNb).map(p => { const [lon, lat] = p[2] || p[3] ? NOLA.lonlat(p[2], p[3]) : ['', ''];
+    return { filed: isoOf(p[0]), type: P.TYP[p[1]], neighborhood: nbName(p[4]), topics: P.TH.filter((t, i) => (p[5] >> i) & 1).join('; '), lon, lat }; });
   const csvYears = () => Object.keys(P.typeY).sort().map(y => Object.assign({ year: y }, ...P.TYP.map((t, i) => ({ [t]: P.typeY[y][i] }))));
   const csvTopics = () => Object.keys(P.themeY).sort().map(y => Object.assign({ year: y }, ...P.TH.map((t, i) => ({ [t]: P.themeY[y][i] }))));
 
   const V = NOLA.views([
-    { id: 'upcoming', label: 'Upcoming hearings', keep: true, draw: drawUpcoming, csv: csvUp },
-    { id: 'recent', label: 'Cases filed in the past 12 months', keep: true, draw: drawRecent, csv: csvRecent },
+    { id: 'map', label: mapTitle(), keep: true, draw: drawMap, csv: () => st.tab === 'up' ? csvUp() : csvFiled() },
     { id: 'years', label: 'Cases filed per year, by type', draw: drawYears, csv: csvYears },
     { id: 'topics', label: 'Cases per year mentioning each topic', draw: drawTopics, csv: csvTopics },
   ], { ds: ['xxb5-5azv', 'CPC Projects'],
-       state: () => ({ fold: st.fold >= 0 ? st.fold : null, theme: st.theme >= 0 ? st.theme : null, nb: st.nb >= 0 ? st.nb : null }) });
+       state: () => ({ tab: st.tab === 'filed' ? 'filed' : null, from: st.from !== DEF_FROM ? isoOf(st.from) : null, to: st.to !== LAST ? isoOf(st.to) : null,
+         fold: st.fold >= 0 ? st.fold : null, theme: st.theme >= 0 ? st.theme : null, nb: st.nb >= 0 ? st.nb : null }) });
 })();
