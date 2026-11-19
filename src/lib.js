@@ -428,7 +428,7 @@ const NOLA = (() => {
 
   // ---------- filters on the chart ----------
   // stage(el, { map }) turns a view's pane into a filter panel + plot area. On maps the panel floats over the map,
-  // and the section holding the map spans the window (see .vsec.wide in lib.css).
+  // and the map sits in the page's content column like every other chart; its full-screen button makes it big.
   function stage(el, { map: isMap = false, open = false } = {}) {
     el.classList.add('stage', isMap ? 'mapstage' : 'chartstage');
     el.innerHTML = '<div class="fpanel"></div><div class="plot"></div>';
@@ -438,7 +438,6 @@ const NOLA = (() => {
       if (open) b.textContent = 'Hide filters'; else panel.classList.add('collapsed');
       b.onclick = () => { panel.classList.toggle('collapsed'); b.textContent = panel.classList.contains('collapsed') ? 'Filters' : 'Hide filters'; };
       el.insertBefore(b, panel);
-      const sec = el.closest('.vsec'); if (sec) sec.classList.add('wide');
       lockInput(panel, plot);
     }
     return { panel, plot };
@@ -467,10 +466,6 @@ const NOLA = (() => {
       h.classList.add('on'); clearTimeout(ht); ht = setTimeout(() => h.classList.remove('on'), 1400);
     }, { passive: true });
   }
-  // the page's scrollbar width, so full-width sections (lib.css) span the window without a sideways scroll
-  const setSbw = () => document.documentElement.style.setProperty('--sbw', Math.max(0, innerWidth - document.documentElement.clientWidth) + 'px');
-  if (window.ResizeObserver) new ResizeObserver(setSbw).observe(document.documentElement);
-  addEventListener('resize', setSbw); setSbw();
   // panel section with a small heading and an optional link-style action ("Show all")
   function fsec(panel, title, action) {
     const sec = document.createElement('div'); sec.className = 'fsec';
@@ -784,7 +779,7 @@ const NOLA = (() => {
       if (fp && fp.scrollTop !== keep[0]) fp.scrollTop = keep[0];
       if (scrollY !== keep[2] || scrollX !== keep[1]) scrollTo(keep[1], keep[2]);
     };
-    const draw = () => { tip.hide(); list.forEach(v => { if (v !== cur && drawn.has(v.id)) stale.add(v.id); }); drawOne(cur); writeHash(); setDs(); setSbw(); };
+    const draw = () => { tip.hide(); list.forEach(v => { if (v !== cur && drawn.has(v.id)) stale.add(v.id); }); drawOne(cur); writeHash(); setDs(); };
     function show(v) {
       cur = v;
       list.forEach(x => { secs[x.id].hidden = x !== v; tabs[x.id].setAttribute('aria-selected', x === v); tabs[x.id].tabIndex = x === v ? 0 : -1; });

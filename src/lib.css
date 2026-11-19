@@ -7,7 +7,7 @@
   --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100; --s5:#e87ba4; --s6:#008300; --s7:#6250d6; --s8:#e34948;
   --q1:#cde2fb; --q2:#9ec5f4; --q3:#6da7ec; --q4:#3987e5; --q5:#256abf; --q6:#184f95; --q7:#0d366b;
   --none:#d9d8d2; --accent:#2a78d6; --chip:#efeee9;
-  --sbw:0px; --gut:24px; /* scrollbar width (set by lib.js) and side gutter of full-width map sections */
+  --gut:24px; /* page side gutter (matches .wrap's padding) */
 }
 @media (prefers-color-scheme: dark){
   :root:where(:not([data-theme="light"])){
@@ -143,8 +143,6 @@ a.btn{text-decoration:none;display:inline-block}
 .stage{position:relative}
 .stage.chartstage{display:grid;grid-template-columns:260px minmax(0,1fr);gap:18px;align-items:start}
 .stage.chartstage>.fpanel{position:sticky;top:12px}
-/* a section holding a map spans the window, less a small gutter; its heading stays in line with the page */
-.vsec.wide>.pane{--mw:min(calc(100vw - var(--sbw) - 2 * var(--gut)),2400px);width:var(--mw);max-width:none;margin-left:calc(50% - var(--mw) / 2)}
 .stage.mapstage{height:clamp(460px,78vh,900px);padding:0;overflow:hidden}
 .stage.mapstage .plot{position:absolute;inset:0}
 .stage.mapstage .plot .map,.stage.mapstage .plot>svg{width:100%;height:100%}
