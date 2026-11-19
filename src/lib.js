@@ -335,6 +335,7 @@ const NOLA = (() => {
       const li = document.createElement('li'), b = document.createElement('button'); b.type = 'button';
       const on = !!pressed(r.key); if (on) any = true; b.setAttribute('aria-pressed', on);
       const col = r.color || 'var(--muted)';
+      b.title = String(r.name).replace(/<[^>]*>/g, '').replace(/&amp;/g, '&') + (r.sub ? ' · ' + String(r.sub).replace(/<[^>]*>/g, '').replace(/&amp;/g, '&') : ''); // the full name, in case it's cut short
       b.innerHTML = `<span class="sw" style="background:${col}${r.square ? ';border-radius:3px' : ''}"></span><span class="nm"><span>${r.name}</span>${r.sub ? `<em>${r.sub}</em>` : ''}${r.count != null ? `<span class="fb"><i style="width:${(100 * r.count / mx).toFixed(1)}%;background:${col}"></i></span>` : ''}</span><span class="ct">${r.count != null ? fmt(r.count) : ''}</span>`;
       b.onclick = () => onClick(r.key); li.appendChild(b); ul.appendChild(li);
     });

@@ -159,7 +159,7 @@ tbody tr:hover td{background:var(--chip)}
 .flist button:focus-visible,.seg button:focus-visible,.mapctl button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .flist .sw{width:11px;height:11px;border-radius:50%}
 .flist .nm{min-width:0;display:flex;flex-direction:column;gap:3px}
-.flist .nm>span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.flist .nm>span:first-child{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden;line-height:1.3} /* long names wrap to a second line */
 .flist .nm em{font-style:normal;font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .flist .fb{height:3px;border-radius:2px;background:var(--grid);overflow:hidden}
 .flist .fb i{display:block;height:100%}

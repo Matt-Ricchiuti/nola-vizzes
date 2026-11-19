@@ -21,7 +21,7 @@
   const staged = (el, first, isMap) => { if (first) el._s = NOLA.stage(el, { map: isMap }); return el._s; };
   const set = (k, v) => { st[k] = v; if (k === 'type') st.reason = -1; V.refresh(); };
   const toggle = k => v => set(k, st[k] === v ? -1 : v);
-  const reasonName = r => D.R[r][1] === 'Other' ? `Other ${D.T[D.R[r][0]].toLowerCase()} requests` : D.R[r][1];
+  const reasonName = r => D.R[r][1] === 'Other' ? `Other ${D.T[D.R[r][0]].toLowerCase().replace(/ requests?$/, '')} requests` : D.R[r][1];
   // reasons apply to requests made in the past 12 months; open requests are counted by type only
   const rsn = () => st.measure === 'made' ? st.reason : -1;
 
