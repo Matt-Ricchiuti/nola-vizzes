@@ -1012,7 +1012,25 @@ def dot_dict(values):
 
 
 def clean_addr(s):
-    return re.sub(r'\s+', ' ', (s or '').strip())[:48]
+    """A street address, whitespace collapsed and cut to 48 characters; one in all capitals is put in the mixed case
+    the other datasets use ('625 PIRATE'S ALY' -> '625 Pirate's Aly', '2ND ST' -> '2nd St')."""
+    s = re.sub(r'\s+', ' ', (s or '').strip())[:48]
+    if s and not re.search(r'[a-z]', s):
+        s = ' '.join(w[:1] + w[1:].lower() for w in s.split(' '))
+        s = re.sub(r"O'([a-z])", lambda m: "O'" + m.group(1).upper(), s)
+    return s
+
+
+def dot_addresses(recs, cols):
+    """dot_pack, with each record's street address `ad` stored as an index `a` into the list `A` (most shared first;
+    -1 when missing, -2 when withheld: `ad` None)."""
+    A, _ = dot_dict([r['ad'] for r in recs if r['ad']])
+    ix = {v: k for k, v in enumerate(A)}
+    for r in recs:
+        r['a'] = -2 if r['ad'] is None else ix.get(r['ad'], -1)
+    out = dot_pack(recs, cols + ['a'])
+    out['A'] = A
+    return out
 
 
 # ---------------------------------------------------------------- 311 service requests
@@ -1299,7 +1317,7 @@ def blight_dots(rows, filed, nbs, grass, gfiled, gnb, ab, anb, today, win0):
     """Dots for the blight map, from the rows build_blight already has. cases: every open case and every case filed
     in the past 12 months (o 1 open; s stage index for open cases, -1 closed; i first inspection: 0 violation,
     1 no violation, 2 not yet or other). grass: grass-cutting cases open or filed in the past 12 months. abate:
-    properties in abatement now (the rows fetched carry no dates)."""
+    properties in abatement now (the rows fetched carry no dates). Each carries its street address (a, A)."""
     sp = lambda r: dot_xy(*(sp_lonlat(fnum(r.get('xpos')), fnum(r.get('ypos'))) or (None, None)))
     cases = []
     for r, f, nb in zip(rows, filed, nbs):
@@ -1313,7 +1331,7 @@ def blight_dots(rows, filed, nbs, grass, gfiled, gnb, ab, anb, today, win0):
         res = (r.get('initinspresult') or '').lower()
         cases.append({'day': f.date(), 'x': p[0], 'y': p[1], 'nb': nb, 'o': int(is_open),
                       's': CE_STAGES.index(st) if is_open and st in CE_STAGES else -1,
-                      'i': 0 if res.startswith('violation') else 1 if res.startswith('no violation') else 2})
+                      'i': 0 if res.startswith('violation') else 1 if res.startswith('no violation') else 2, 'ad': clean_addr(r.get('geoaddress'))})
     gr = []
     for r, f, nb in zip(grass, gfiled, gnb):
         is_open = r.get('o_c') == 'Open'
@@ -1321,26 +1339,26 @@ def blight_dots(rows, filed, nbs, grass, gfiled, gnb, ab, anb, today, win0):
             continue
         p = dot_xy(fnum(r.get('longitude')), fnum(r.get('latitude')))
         if p:
-            gr.append({'day': f.date(), 'x': p[0], 'y': p[1], 'nb': nb, 'o': int(is_open)})
+            gr.append({'day': f.date(), 'x': p[0], 'y': p[1], 'nb': nb, 'o': int(is_open), 'ad': clean_addr(r.get('address'))})
     abate = []
     for r, nb in zip(ab, anb):
         if r.get('o_c') == 'Open' and nb >= 0:
             p = sp(r)
             if p:
-                abate.append({'day': None, 'x': p[0], 'y': p[1], 'nb': nb})
-    return {'cases': dot_pack(cases, ['o', 's', 'i']), 'grass': dot_pack(gr, ['o']), 'abate': dot_pack(abate, [])}
+                abate.append({'day': None, 'x': p[0], 'y': p[1], 'nb': nb, 'ad': clean_addr(r.get('address'))})
+    return {'cases': dot_addresses(cases, ['o', 's', 'i']), 'grass': dot_addresses(gr, ['o']), 'abate': dot_addresses(abate, [])}
 
 
 def build_blight(api, nbp):
-    for ds, cols, label in [(CE_CASES, ['casefiled', 'o_c', 'stage', 'xpos', 'ypos', 'initinspresult'], 'Code enforcement cases'),
+    for ds, cols, label in [(CE_CASES, ['casefiled', 'o_c', 'stage', 'xpos', 'ypos', 'initinspresult', 'geoaddress'], 'Code enforcement cases'),
                             (CE_VIOL, ['violationdate', 'violation'], 'Code enforcement violations'),
                             (CE_INSP, ['inspectiondate', 'inspectiontype'], 'Code enforcement inspections'),
                             (CE_HEAR, ['hearingdate', 'judgment'], 'Code enforcement hearings'),
-                            (CE_GRASS, ['casefiled', 'o_c', 'longitude', 'latitude'], 'Grass cutting'),
-                            (CE_ABATE, ['o_c', 'stage', 'xpos', 'ypos'], 'Abatements')]:
+                            (CE_GRASS, ['casefiled', 'o_c', 'longitude', 'latitude', 'address'], 'Grass cutting'),
+                            (CE_ABATE, ['o_c', 'stage', 'xpos', 'ypos', 'address'], 'Abatements')]:
         api.require_columns(ds, cols, label)
     # cases: every open case, and every case filed since CE_START
-    rows = fetch_all(api, CE_CASES, 'casefiled,o_c,stage,xpos,ypos,initinspresult', where=f"o_c = 'Open' OR casefiled >= '{CE_START}-01-01'")
+    rows = fetch_all(api, CE_CASES, 'casefiled,o_c,stage,xpos,ypos,initinspresult,geoaddress', where=f"o_c = 'Open' OR casefiled >= '{CE_START}-01-01'")
     need(len(rows) > 20000, f'Code enforcement cases: only {len(rows)} rows')
     filed = [parse_ts(r.get('casefiled')) for r in rows]
     need(sum(f is None for f in filed) < 50, 'Code enforcement cases: unreadable casefiled dates')
@@ -1373,7 +1391,7 @@ def build_blight(api, nbp):
             new12[nb][0 if res.startswith('violation') else 1 if res.startswith('no violation') else 2] += 1
     need(sum(unknown_stage.values()) < 50, f'Code enforcement cases: open cases in unknown stages {dict(unknown_stage)}. Add them to CE_STAGES.')
     # overgrown lots (grass cutting cases), all rows
-    grass = fetch_all(api, CE_GRASS, 'casefiled,o_c,longitude,latitude')
+    grass = fetch_all(api, CE_GRASS, 'casefiled,o_c,longitude,latitude,address')
     need(len(grass) > 5000, f'Grass cutting: only {len(grass)} rows')
     gnb, _ = points_to_nb(nbp, grass)
     gfiled = [parse_ts(r.get('casefiled')) for r in grass]
@@ -1389,7 +1407,7 @@ def build_blight(api, nbp):
         if nb >= 0 and f.date() >= win0:
             g12[nb] += 1
     # properties in abatement now, and how closed abatement cases ended
-    ab = fetch_all(api, CE_ABATE, 'o_c,stage,xpos,ypos')
+    ab = fetch_all(api, CE_ABATE, 'o_c,stage,xpos,ypos,address')
     need(len(ab) > 1000, f'Abatements: only {len(ab)} rows')
     anb, _ = sp_points_to_nb(nbp, ab, 'xpos', 'ypos')
     abOpen = [0] * 72
@@ -1463,7 +1481,7 @@ PERMIT_POINTS = (0, 2, 3)   # categories small enough to map permit by permit
 
 
 def build_permits(api, nbp):
-    cols = ['code', 'type', 'filingdate', 'issuedate', 'landuse', 'location_1']
+    cols = ['code', 'type', 'filingdate', 'issuedate', 'landuse', 'location_1', 'address']
     api.require_columns(PERMITS, cols, 'Permits')
     # permits issued per year and code, counted by the API
     # (each group's newest issue date comes along, so the newest overall needs no request of its own)
@@ -1501,7 +1519,7 @@ def build_permits(api, nbp):
         p = dot_xy(fnum(loc.get('longitude')), fnum(loc.get('latitude'))) if nb >= 0 and issued else None
         if p:   # dots: every located permit; tn the City's permit type, f days from filing to issue (-1 unknown)
             dots.append({'day': issued.date(), 'x': p[0], 'y': p[1], 'nb': nb, 'c': c, 'lu': lu, 'f': -1 if d is None else int(d + 0.5),
-                         'tn': re.sub(r'\s+', ' ', (r.get('type') or '').strip()) or 'Not stated'})
+                         'tn': re.sub(r'\s+', ' ', (r.get('type') or '').strip()) or 'Not stated', 'ad': clean_addr(r.get('address'))})
     stat = lambda v: [len(v), median(v), p90(v)]
     return {
         'ds': PERMITS, 'last': today.isoformat(), 'winStart': win0.isoformat(),
@@ -1509,16 +1527,17 @@ def build_permits(api, nbp):
         'nbc': [[v for k in sorted(c) for v in (*k, c[k])] for c in nbc],   # [cat, landUse, n, ...] per nb, past 12 months
         'days': [[stat(v) for v in row] + [stat([d for v in row for d in v])] for row in days],  # [n, median, p90] per land use, then all
         'pts': sorted(pts), 'total': len(rows), 'noLoc': sum(nb < 0 for nb in nbs),
-        'dots': dot_typed(dots, ['c', 'lu', 't', 'f']),
+        'dots': dot_typed(dots, ['c', 'lu', 't', 'f'], addr=True),
     }
 
 
-def dot_typed(recs, cols):
-    """dot_pack, with each record's type name `tn` stored as an index `t` into the list `T`."""
+def dot_typed(recs, cols, addr=False):
+    """dot_pack, with each record's type name `tn` stored as an index `t` into the list `T` (and with addr, its
+    address as in dot_addresses)."""
     T, ti = dot_dict([r['tn'] for r in recs])
     for r, k in zip(recs, ti):
         r['t'] = k
-    out = dot_pack(recs, cols)
+    out = dot_addresses(recs, cols) if addr else dot_pack(recs, cols)
     out['T'] = T
     return out
 
@@ -1552,8 +1571,8 @@ def biz_type_key(s):
 
 
 def build_biz(api, nbp):
-    a_cols = ['application_filed', 'currentstatus', 'category', 'businesstype', 'ishome', 'longitude', 'latitude']
-    n_cols = ['businesstype', 'businessstartdate', 'longitude', 'latitude']
+    a_cols = ['application_filed', 'currentstatus', 'category', 'businesstype', 'ishome', 'longitude', 'latitude', 'address']
+    n_cols = ['businesstype', 'businessstartdate', 'longitude', 'latitude', 'address']
     api.require_columns(BIZ_APPS, a_cols, 'Business license applications')
     api.require_columns(BIZ_NOW, n_cols, 'Occupational business licenses')
     apps = fetch_all(api, BIZ_APPS, ','.join(a_cols))
@@ -1612,23 +1631,29 @@ def build_biz(api, nbp):
             nowNb[nb][s] += 1
     sparse = lambda c: [v for key in sorted(c) for v in ((*key, c[key]) if isinstance(key, tuple) else (key, c[key]))]
     # dots: every located application since BIZ_START (s sector, o outcome, h home-based 1 / not 0 / not stated -1,
-    # t business type), and every located business licensed now (day licensed since, s sector in S2, t type)
+    # t business type), and every located business licensed now (day licensed since, s sector in S2, t type).
+    # Street addresses are kept except where the business may be someone's home: applications marked home-based, and
+    # current licenses at an address that a home-based application names.
     tn = lambda v: re.sub(r'\s+', ' ', (v or '').strip()) or 'Not stated'
+    akey = lambda v: clean_addr(v).upper()
+    homes = {akey(r.get('address')) for r in apps if (r.get('ishome') or '').strip() == 'True'} - {''}
     da, dn = [], []
     for r, f, c, nb in zip(apps, filed, cat, nbs):
         p = dot_xy(fnum(r.get('longitude')), fnum(r.get('latitude'))) if nb >= 0 and f and BIZ_START <= f.year and f.date() <= today else None
         if p:
             h = (r.get('ishome') or '').strip()
             da.append({'day': f.date(), 'x': p[0], 'y': p[1], 'nb': nb, 's': sector(c), 'o': biz_outcome(r.get('currentstatus')),
-                       'h': 1 if h == 'True' else 0 if h == 'False' else -1, 'tn': tn(r.get('businesstype'))})
+                       'h': 1 if h == 'True' else 0 if h == 'False' else -1, 'tn': tn(r.get('businesstype')),
+                       'ad': None if h == 'True' else clean_addr(r.get('address'))})
     for r, nb, s in zip(now, nnb, now_s):
         p = dot_xy(fnum(r.get('longitude')), fnum(r.get('latitude'))) if nb >= 0 else None
         if p:
             sd = parse_ts(r.get('businessstartdate'))
             dn.append({'day': sd.date() if sd and sd.year > 1900 else None,   # 1900-01-01 stands for 'not recorded'
-                       'x': p[0], 'y': p[1], 'nb': nb, 's': s, 'tn': tn(r.get('businesstype'))})
+                       'x': p[0], 'y': p[1], 'nb': nb, 's': s, 'tn': tn(r.get('businesstype')),
+                       'ad': None if akey(r.get('address')) in homes else clean_addr(r.get('address'))})
     return {
-        'dots': {'apps': dot_typed(da, ['s', 'o', 'h', 't']), 'now': dot_typed(dn, ['s', 't'])},
+        'dots': {'apps': dot_typed(da, ['s', 'o', 'h', 't'], addr=True), 'now': dot_typed(dn, ['s', 't'], addr=True)},
         'ds': [BIZ_APPS, BIZ_NOW], 'last': today.isoformat(), 'winStart': win0.isoformat(),
         'S': S, 'out': BIZ_OUT, 'years': years, 'yr': yr, 'yo': yo, 'home': home,
         'nby': [sparse(c) for c in nby],      # [yearIdx, sector, n, ...] per nb
@@ -1691,7 +1716,7 @@ def check_not_collapsed(label, new, old, floor=0.9):
 
 def dots_ok(label, d, least):
     """A dots object: every column as long as the record count, and at least `least` records."""
-    cols = [k for k, v in d.items() if isinstance(v, list) and k not in ('R', 'T')]
+    cols = [k for k, v in d.items() if isinstance(v, list) and k not in ('R', 'T', 'A')]
     need(all(len(d[k]) == d['n'] for k in cols), f'{label} dots: columns of different lengths')
     need(d['n'] >= least, f'{label} dots: only {d["n"]} records')
 
