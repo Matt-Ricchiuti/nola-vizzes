@@ -103,9 +103,29 @@
   for (let c = 0; c < GW * GH; c++) cellStart[c + 1] += cellStart[c];
   const cellItems = new Uint32Array(N); { const f = cellStart.slice(); for (let i = 0; i < N; i++) cellItems[f[cellOf[i]]++] = i; }
 
+  // ---------- 311 tree requests (DATA.treq, from the pipeline): the map's second view ----------
+  const TR = DATA.treq, TN = TR ? TR.x.length : 0;
+  const rx = new Float32Array(TN), ry = new Float32Array(TN), rh = new Int16Array(TN);
+  // the request file uses the City's 72 neighborhoods (geo.json); map them onto the inventory's own neighborhood list
+  const hoodKey = D.hoods.map(h => normN(h.n));
+  const geoToHood = NOLA.GEO.nb.map(f => { const k = normN(f.n), e = hoodKey.indexOf(k); return e >= 0 ? e : hoodKey.findIndex(h => h.startsWith(k) || k.startsWith(h)); });
+  for (let i = 0; i < TN; i++) { rx[i] = (TR.x[i] * 1e-5 - D.lon0) * COS; ry[i] = -(TR.y[i] * 1e-5 - D.lat0); rh[i] = geoToHood[TR.nb[i]] ?? -1; }
+  const R_COLORS = ['#178f8f', '#c46a28', '#c23a3a', '#7a68d8', '#d4a017', '#3f7fd6'];
+  const RS = TR ? TR.R.map((n, i) => ({ name: n === 'Tree Trim' ? 'Trim' : n, color: n === 'Other' ? null : R_COLORS[i % R_COLORS.length], on: true })) : [];
+  const dayISO = d => { const t = new Date(TR.t0 + 'T12:00:00Z'); t.setUTCDate(t.getUTCDate() + d); return t.toISOString().slice(0, 10); };
+  const lastDay = TR ? Math.round((Date.parse(TR.last + 'T12:00:00Z') - Date.parse(TR.t0 + 'T12:00:00Z')) / 864e5) : 0;
+
   // ---------- state (kept in the link) ----------
   const H0 = NOLA.hashState();
   let selSp = H0.sp != null ? +H0.sp : -1, selNb = H0.nb != null ? +H0.nb : -1, setF = H0.set != null ? +H0.set : -1;
+  let mode = H0.m === 'req' && TN ? 'req' : 'trees';           // which map: the tree inventory or the 311 tree requests
+  let rStat = ['open', 'closed'].includes(H0.rs) ? H0.rs : 'all', rPer = ['1', '12', 'all'].includes(H0.rp) ? H0.rp : '6';
+  if (H0.ro) H0.ro.split('.').forEach(k => { if (RS[+k]) RS[+k].on = false; });
+  const PER_DAYS = { 1: 30, 6: 182, 12: 365 };
+  const inPer = i => rPer === 'all' || TR.d[i] > lastDay - PER_DAYS[rPer];
+  const statOk = i => rStat === 'all' || (rStat === 'open' ? TR.c[i] === -1 : TR.c[i] !== -1);
+  const reqPass = i => inPer(i) && statOk(i) && (selNb < 0 || rh[i] === selNb);
+  const reqVisible = i => RS[TR.r[i]].on && reqPass(i);
   const inNb = i => selNb < 0 || D.h[i] === selNb;
   const setOk = i => setF < 0 || tset[i] === setF;
   const isVisible = i => valid[i] && inNb(i) && setOk(i) && (selSp >= 0 ? D.s[i] === selSp : groups[spGroup[D.s[i]]].on);
@@ -161,8 +181,26 @@
       { mode: 'toggle', pressed: i => groups[i].on && selSp < 0, onClick: i => { selSp = -1; groups[i].on = !groups[i].on; refresh(); } });
   }
 
+  function reqSections(panel) {
+    NOLA.seg(NOLA.fsec(panel, 'Filed in the last'), [['1', 'Month'], ['6', '6 months'], ['12', 'Year'], ['all', 'All']], rPer, v => { rPer = v; refresh(); });
+    NOLA.seg(NOLA.fsec(panel, 'Status'), [['all', 'All'], ['open', 'Open'], ['closed', 'Closed']], rStat, v => { rStat = v; refresh(); });
+    const cnt = RS.map(() => 0); for (let i = 0; i < TN; i++) if (reqPass(i)) cnt[TR.r[i]]++;
+    const allOn = RS.every(r => r.on);
+    NOLA.flist(NOLA.fsec(panel, 'Reason', [allOn ? 'Hide all' : 'Show all', () => { RS.forEach(r => r.on = !allOn); refresh(); }]),
+      RS.map((r, i) => ({ key: i, name: esc(r.name), color: r.color || C['t-other'], count: cnt[i] })),
+      { mode: 'toggle', pressed: i => RS[i].on, onClick: i => { RS[i].on = !RS[i].on; refresh(); } });
+    // totals for what's shown: requests, still open, and typical days to close
+    let n = 0, open = 0; const days = [];
+    for (let i = 0; i < TN; i++) { if (!reqVisible(i)) continue; n++; if (TR.c[i] === -1) open++; else if (TR.c[i] >= 0) days.push(TR.c[i]); }
+    days.sort((a, b) => a - b);
+    const med = days.length ? (days.length % 2 ? days[days.length >> 1] : (days[days.length / 2 - 1] + days[days.length / 2]) / 2) : null;
+    const sec = NOLA.fsec(panel, selNb >= 0 ? 'In ' + esc(hoods[selNb].name) : 'Shown');
+    sec.insertAdjacentHTML('beforeend', '<div class="tstats">' + row('Requests', fmt(n)) + row('Open now', fmt(open)) +
+      row('Median days to close', med == null ? '—' : fmt(Math.round(med))) + '</div>');
+  }
+
   // ---------- canvas map ----------
-  let ctx, panelEl, W = 0, H = 0, DPR = 1, view = { s: 1, tx: 0, ty: 0 }, C = {}, raf = 0, hoverHood = -1, hoverTree = -1, hoverGS = -1, scaleEl = null;
+  let ctx, panelEl, W = 0, H = 0, DPR = 1, view = { s: 1, tx: 0, ty: 0 }, C = {}, raf = 0, hoverHood = -1, hoverTree = -1, hoverGS = -1, hoverReq = -1, scaleEl = null, modeEl = null;
   const req = () => { if (cv && !raf) raf = requestAnimationFrame(draw); };
   const insetL = () => NOLA.panelInset(panelEl, W);
   function fitBox([x0, y0, x1, y1], padPx) {
@@ -210,7 +248,8 @@
         if (circles || rad > r) { ctx.moveTo(px + rad, py); ctx.arc(px, py, rad, 0, 6.2832); } else ctx.rect(px - rad, py - rad, rad * 2, rad * 2); any = true; }
       if (any) ctx.fill(); };
     const pass = i => inNb(i) && setOk(i);
-    if (selSp >= 0) {
+    if (mode === 'req') { drawReqs(s, vx0, vx1, vy0, vy1, cull); }
+    else if (selSp >= 0) {
       for (const gi of drawOrder) plot(groups[gi].idx, C['t-dim'], i => !(D.s[i] === selSp && pass(i)));
       const g = groups[spGroup[selSp]], col = spGroup[selSp] < 9 || selSp === stumpIdx ? g.color : TOP_COLORS[0];
       plot(g.idx, col, i => D.s[i] === selSp && pass(i), Math.max(r * 1.6, 1.6));
@@ -220,8 +259,33 @@
       for (const gi of drawOrder) { const g = groups[gi]; if (g.on) plot(g.idx, g.color, filtering ? pass : null); }
     }
     drawLabels(s);
-    if (hoverTree >= 0) { const px = wx[hoverTree] * s + view.tx, py = wy[hoverTree] * s + view.ty; ctx.strokeStyle = C.ink; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(px, py, Math.max(r, 2) + 3, 0, 6.2832); ctx.stroke(); }
+    if (mode === 'req' && hoverReq >= 0) { const px = rx[hoverReq] * s + view.tx, py = ry[hoverReq] * s + view.ty; ctx.strokeStyle = C.ink; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(px, py, reqR(s) + 3, 0, 6.2832); ctx.stroke(); }
+    if (mode === 'trees' && hoverTree >= 0) { const px = wx[hoverTree] * s + view.tx, py = wy[hoverTree] * s + view.ty; ctx.strokeStyle = C.ink; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(px, py, Math.max(r, 2) + 3, 0, 6.2832); ctx.stroke(); }
     drawScale();
+  }
+  // requests: a dot each, colored by reason; open ones solid, closed ones faded; outside a chosen neighborhood, gray
+  const reqR = s => Math.max(2, Math.min(7, s * 0.00011));
+  function drawReqs(s, vx0, vx1, vy0, vy1, cull) {
+    const r = reqR(s), order = RS.map((_, k) => k).sort((a, b) => (RS[a].color ? 1 : 0) - (RS[b].color ? 1 : 0) || a - b); // "Other" first, so named reasons sit on top
+    const dot = i => { const x = rx[i], y = ry[i]; if (cull && (x < vx0 || x > vx1 || y < vy0 || y > vy1)) return; const px = x * s + view.tx, py = y * s + view.ty; ctx.moveTo(px + r, py); ctx.arc(px, py, r, 0, 6.2832); };
+    if (selNb >= 0) { ctx.fillStyle = C['t-dim']; ctx.beginPath(); for (let i = 0; i < TN; i++) if (RS[TR.r[i]].on && inPer(i) && statOk(i) && rh[i] !== selNb) dot(i); ctx.fill(); }
+    for (const pass of ['closed', 'open']) {
+      ctx.globalAlpha = pass === 'closed' ? 0.45 : 1;
+      for (const k of order) { if (!RS[k].on) continue; ctx.fillStyle = RS[k].color || C['t-other']; ctx.beginPath();
+        for (let i = 0; i < TN; i++) if (TR.r[i] === k && (TR.c[i] === -1) === (pass === 'open') && reqPass(i)) dot(i);
+        ctx.fill(); if (r >= 3) { ctx.strokeStyle = C.surface; ctx.lineWidth = 1; ctx.stroke(); } }
+    }
+    ctx.globalAlpha = 1;
+  }
+  function nearestReq(x, y, maxPx) {
+    const wxp = (x - view.tx) / view.s, wyp = (y - view.ty) / view.s; let best = -1, bd = (maxPx / view.s) ** 2;
+    for (let i = 0; i < TN; i++) { if (!reqVisible(i)) continue; const d = (rx[i] - wxp) ** 2 + (ry[i] - wyp) ** 2; if (d < bd) { bd = d; best = i; } }
+    return best;
+  }
+  const dateLabel = iso => new Date(iso + 'T12:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+  function reqTip(i) {
+    const c = TR.c[i], st = c === -1 ? `Open, ${fmt(lastDay - TR.d[i])} days` : c >= 0 ? `Closed after ${fmt(c)} day${c === 1 ? '' : 's'}` : 'Closed';
+    return `<b>${esc(RS[TR.r[i]].name)}</b>` + row('Filed', dateLabel(dayISO(TR.d[i]))) + row('Status', st) + (rh[i] >= 0 ? row('Neighborhood', esc(hoods[rh[i]].name)) : '');
   }
   function drawLabels(s) {
     const ff = getComputedStyle(document.body).fontFamily, cell = 64, grid = new Map(), pad = 3;
@@ -281,7 +345,8 @@
   }
   const topSp = (m, n) => [...m].sort((a, b) => b[1] - a[1]).slice(0, n).map(([sp, c]) => row(esc(D.species[sp][0]), fmt(c))).join('');
   function hover(ev, x, y, tap) {
-    const t = view.s > 4000 ? nearestTree(x, y, tap ? 12 : 7) : -1;
+    const t = mode === 'trees' && view.s > 4000 ? nearestTree(x, y, tap ? 12 : 7) : -1;
+    const q = mode === 'req' ? nearestReq(x, y, tap ? 12 : Math.max(6, reqR(view.s) + 3)) : -1;
     ctx.setTransform(view.s, 0, 0, view.s, view.tx, view.ty);
     const wxp = (x - view.tx) / view.s, wyp = (y - view.ty) / view.s;
     let gh = -1;
@@ -289,8 +354,9 @@
       if (wxp < g.bb[0] || wxp > g.bb[2] || wyp < g.bb[1] || wyp > g.bb[3]) continue; if (ctx.isPointInPath(g.path, x, y)) { gh = k; break; } }
     let hh = -1; for (let k = 0; k < hoods.length; k++) if (ctx.isPointInPath(hoods[k].path, x, y)) { hh = k; break; }
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    if (t !== hoverTree || hh !== hoverHood || gh !== hoverGS) { hoverTree = t; hoverHood = hh; hoverGS = gh; req(); }
-    if (t >= 0) {
+    if (t !== hoverTree || hh !== hoverHood || gh !== hoverGS || q !== hoverReq) { hoverTree = t; hoverHood = hh; hoverGS = gh; hoverReq = q; req(); }
+    if (q >= 0) tip.show(reqTip(q), ev);
+    else if (t >= 0) {
       const sp = D.species[D.s[t]], st = D.near[t] >= 0 ? D.roadNames[D.near[t]] : '', gk = D.tg[t];
       const where = gk >= 0 ? (GS[gk].c === 0 ? 'Neutral ground' + (st ? ' on ' + st : '') : 'In ' + (GS[gk].nm || GCAT[GS[gk].c].short.toLowerCase())) : (st ? 'Near ' + st : '');
       tip.show(`<b>${esc(sp[0])}</b><div style="color:var(--ink2)"><i>${esc(sp[1])}</i></div>` + (where ? row('Where', esc(where)) : '') + (D.h[t] >= 0 ? row('Neighborhood', esc(hoods[D.h[t]].name)) : ''), ev);
@@ -299,7 +365,9 @@
       tip.show(`<b>${esc(gsName(g))}</b><div style="color:var(--ink2)">${esc(g.u)}${g.own ? ' · ' + esc(g.own) : ''}</div>` + row('Acres', a < 1 ? a.toFixed(2) : fmt(Math.round(a))) + row('Trees', fmt(g.n)) + (g.n ? '<div style="margin-top:4px"></div>' + topSp(g.sp, 4) : ''), ev);
     } else if (hh >= 0) {
       const Hd = hoods[hh];
-      tip.show(`<b>${esc(Hd.name)}</b>` + row('Trees', fmt(Hd.n)) + row('Species', Hd.sp.size) + '<div style="margin-top:4px"></div>' + topSp(Hd.sp, 4), ev);
+      if (mode === 'req') { let n = 0, open = 0; for (let i = 0; i < TN; i++) if (rh[i] === hh && RS[TR.r[i]].on && inPer(i) && statOk(i)) { n++; if (TR.c[i] === -1) open++; }
+        tip.show(`<b>${esc(Hd.name)}</b>` + row('Requests', fmt(n)) + row('Open now', fmt(open)) + row('Trees', fmt(Hd.n)), ev); }
+      else tip.show(`<b>${esc(Hd.name)}</b>` + row('Trees', fmt(Hd.n)) + row('Species', Hd.sp.size) + '<div style="margin-top:4px"></div>' + topSp(Hd.sp, 4), ev);
     } else tip.hide();
   }
   // left-click a neighborhood to select it (the "Most common" list follows); click it again, or outside any neighborhood, to clear.
@@ -315,6 +383,15 @@
   function initMap(plot) {
     plot.innerHTML = '<canvas class="tmap" aria-label="Map of street trees in New Orleans, colored by species"></canvas><div class="scalebar"><span></span><i></i></div>';
     cv = plot.querySelector('canvas'); ctx = cv.getContext('2d'); scaleEl = plot.querySelector('.scalebar');
+    // the two maps, switched from a pill floating at the top center of the map (it comes along into full screen);
+    // the view stays put, so a spot can be compared back and forth
+    if (TN) {
+      modeEl = document.createElement('div'); modeEl.className = 'ftabs tmode'; modeEl.setAttribute('role', 'tablist'); modeEl.setAttribute('aria-label', 'Map');
+      [['trees', 'Trees'], ['req', 'Tree requests (311)']].forEach(([m, l]) => { const b = document.createElement('button'); b.type = 'button'; b.setAttribute('role', 'tab'); b.dataset.m = m; b.textContent = l;
+        b.onclick = () => { if (mode !== m) { mode = m; hoverTree = hoverReq = -1; tip.hide(); refresh(); } }; modeEl.appendChild(b); });
+      modeEl.addEventListener('keydown', e => { if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); mode = mode === 'req' ? 'trees' : 'req'; refresh(); modeEl.querySelector(`[data-m="${mode}"]`).focus(); } });
+      plot.appendChild(modeEl);
+    }
     const zoomAt = (f, x, y) => { const ns = Math.max(700, Math.min(600000, view.s * f)); f = ns / view.s; view.tx = x - (x - view.tx) * f; view.ty = y - (y - view.ty) * f; view.s = ns; userView = true; req(); };
     // the shared map controls (full screen, zoom, reset); entering or leaving full screen resizes the canvas, and fit() follows
     NOLA.mapButtons(plot, { zoomIn: () => zoomAt(1.8, (insetL() + W) / 2, H / 2), zoomOut: () => zoomAt(1 / 1.8, (insetL() + W) / 2, H / 2),
@@ -351,7 +428,7 @@
       if (pointers.size === 1) { const p = [...pointers.values()][0]; last = { x: p.x, y: p.y }; }
       if (!moved && e.type === 'pointerup') { if (e.button === 0) clickHood(e.offsetX, e.offsetY); hover(e, e.offsetX, e.offsetY, true); } };
     cv.addEventListener('pointerup', endPtr); cv.addEventListener('pointercancel', endPtr);
-    cv.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse') { tip.hide(); if (hoverHood >= 0 || hoverTree >= 0 || hoverGS >= 0) { hoverHood = hoverTree = hoverGS = -1; req(); } } });
+    cv.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse') { tip.hide(); if (hoverHood >= 0 || hoverTree >= 0 || hoverGS >= 0 || hoverReq >= 0) { hoverHood = hoverTree = hoverGS = hoverReq = -1; req(); } } });
     cv.addEventListener('dblclick', e => zoomAt(2, e.offsetX, e.offsetY));
     // follow the canvas's box (window resizes, the page's scrollbar appearing, rotating a phone): an untouched map is
     // refitted; one the reader has moved keeps its center and scale. Redrawn at once, since resizing clears the canvas.
@@ -373,9 +450,13 @@
     if (first) { pane._s = NOLA.stage(pane, { map: true }); fillHeight(pane); }
     const { panel, plot } = pane._s; panelEl = panel;
     panel.innerHTML = '';
-    nbSection(panel); findSection(panel); settingSection(panel); speciesSection(panel); layerSection(panel);
+    if (mode === 'req') { nbSection(panel); reqSections(panel); layerSection(panel); }
+    else { nbSection(panel); findSection(panel); settingSection(panel); speciesSection(panel); layerSection(panel); }
     if (first) { initMap(plot); lastNb = selNb; }
     else if (W !== cv.clientWidth || H !== cv.clientHeight) { resize(); zoomToHood(); }
+    if (modeEl) modeEl.querySelectorAll('button').forEach(b => { const on = b.dataset.m === mode; b.setAttribute('aria-selected', on); b.tabIndex = on ? 0 : -1; });
+    const h = document.getElementById('vh-map'); if (h) h.textContent = mode === 'req' ? 'Tree requests to 311' : 'Map of every tree';
+    cv.setAttribute('aria-label', mode === 'req' ? 'Map of 311 tree requests in New Orleans, colored by reason' : 'Map of street trees in New Orleans, colored by species');
     if (lastNb !== selNb) { zoomToHood(); lastNb = selNb; }
     draw();
   }
@@ -389,14 +470,13 @@
     set(); addEventListener('resize', set); if (document.fonts) document.fonts.ready.then(set);
   }
 
-  // ---------- CSV downloads ----------
-  const ll = i => [+(D.x[i] * 1e-5 + D.lon0).toFixed(6), +(D.y[i] * 1e-5 + D.lat0).toFixed(6)];
-  const csvMap = () => { const o = []; for (let i = 0; i < N; i++) if (isVisible(i)) { const [lon, lat] = ll(i), sp = D.species[D.s[i]], gk = D.tg[i];
-    o.push({ species: sp[0], botanical_name: sp[1], neighborhood: hoods[D.h[i]].name, setting: SETTINGS[tset[i]].name, green_space: gk >= 0 ? GS[gk].nm : '', near_street: D.near[i] >= 0 ? D.roadNames[D.near[i]] : '', lon, lat }); } return o; };
-
   readColors();
   const V = NOLA.views([
-    { id: 'map', label: 'Map of every tree', keep: true, draw: drawMap, csv: csvMap },
+    { id: 'map', label: 'Map of every tree', keep: true, draw: drawMap,
+      ds: () => mode === 'req' ? ['2jgv-pqrq', '311 OPCD Calls'] : ['3tyj-9x33', 'Tree Location'] },
   ], { ds: ['3tyj-9x33', 'Tree Location'],
-       state: () => ({ sp: selSp >= 0 ? selSp : null, nb: selNb >= 0 ? selNb : null, set: setF >= 0 ? setF : null }) });
+       state: () => mode === 'req'
+         ? ({ m: 'req', nb: selNb >= 0 ? selNb : null, rs: rStat !== 'all' ? rStat : null, rp: rPer !== '6' ? rPer : null,
+              ro: RS.some(r => !r.on) ? RS.map((r, i) => r.on ? null : i).filter(i => i != null).join('.') : null })
+         : ({ sp: selSp >= 0 ? selSp : null, nb: selNb >= 0 ? selNb : null, set: setF >= 0 ? setF : null }) });
 })();

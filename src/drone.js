@@ -61,8 +61,6 @@
     }
   }
   const staged = (el, first, isMap) => { if (first) el._s = NOLA.stage(el, { map: isMap }); return el._s; };
-  const nbName = i => i >= 0 ? NOLA.GEO.nb[i].name : '';
-  const hm = h => String(Math.floor(h)).padStart(2, '0') + ':' + String(Math.round((h % 1) * 60) % 60).padStart(2, '0');
 
   // ---------- over time: flights per week, takeoffs by hour, or each drone's flights (tabs) ----------
   function drawTime(pane, first) {
@@ -195,19 +193,10 @@
     }).on('mouseleave', tip.hide);
   }
 
-  // ---------- CSV downloads (what the chart shows, with its filters) ----------
-  const flightRows = fs => fs.map(f => { const [lon, lat] = f.hasLoc ? NOLA.lonlat(f.x, f.y) : ['', ''];
-    return { date: NOLA.doyISO(f.day), time_central: hm(f.hr), purpose: CATS[f.cat].n, neighborhood: nbName(f.nb), drone: 'X10-' + D.drones[f.drone], minutes: Math.round(f.dur / 6) / 10, lon, lat }; });
-  const csvWeek = () => d3.range(Math.floor(LAST / 7) + 1).map(w => { const fs = flights.filter(f => inNb(f) && Math.floor(f.day / 7) === w);
-    return Object.assign({ week_of: NOLA.doyISO(w * 7), flights: fs.length }, ...CATS.map((c, ci) => ({ [c.n]: fs.filter(f => f.cat === ci).length }))); });
-  const csvPurpose = () => CATS.map((c, ci) => { const fs = flights.filter(f => f.cat === ci && inPeriod(f)); return { purpose: c.n, flights: fs.length, hours: +(d3.sum(fs, f => f.dur) / 3600).toFixed(1), median_minutes: fs.length ? Math.round(med(fs)) : '' }; });
-  const csvHour = () => { const fs = flights.filter(pass); return d3.range(24).map(h => ({ hour_central: hrLab(h), flights: fs.filter(f => Math.floor(f.hr) === h).length })); };
-  const csvFleet = () => D.drones.map((dn, d) => { const fs = flights.filter(f => f.drone === d && passT(f)); return { drone: 'X10-' + dn, flights: fs.length, first: fs.length ? NOLA.doyISO(d3.min(fs, f => f.day)) : '', last: fs.length ? NOLA.doyISO(d3.max(fs, f => f.day)) : '' }; });
-
   const V = NOLA.views([
-    { id: 'map', label: 'Launch points', keep: true, draw: drawMap, csv: () => flightRows(flights.filter(f => NOLA.shown(f.nb) && pass(f))) },
-    { id: 'week', label: 'Flights over time', draw: drawTime, csv: () => ({ week: csvWeek, hour: csvHour, drone: csvFleet })[st.tl](), file: () => ({ week: 'week', hour: 'hour', drone: 'fleet' })[st.tl] },
-    { id: 'purpose', label: 'Flights by purpose', draw: drawPurpose, csv: csvPurpose },
+    { id: 'map', label: 'Launch points', keep: true, draw: drawMap },
+    { id: 'week', label: 'Flights over time', draw: drawTime },
+    { id: 'purpose', label: 'Flights by purpose', draw: drawPurpose },
   ], { ds: ['ay9z-ynxz', 'NOPD Drone Flights'],
        state: () => ({ cat: st.cat >= 0 ? st.cat : null, period: st.period !== 'all' ? st.period : null, nb: st.nb >= 0 ? st.nb : null, tl: st.tl !== 'week' ? st.tl : null }) });
 })();

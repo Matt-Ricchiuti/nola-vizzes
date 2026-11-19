@@ -134,16 +134,10 @@
     });
   }
 
-  // ---------- CSV downloads ----------
-  const csvMap = () => NOLA.nbList().map(f => Object.assign({ neighborhood: f.name, housing_units_2020: HU[f.idx], land_use: st.lu >= 0 ? D.lu[st.lu] : 'All', permits_past_12_months: countOf(f.idx, -1) },
-    ...D.cats.map((c, k) => ({ [c]: countOf(f.idx, k) }))));
-  const csvYears = () => D.yr.map((d, k) => Object.assign({ year: D.years[k], total: d3.sum(d) }, ...D.cats.map((c, j) => ({ [c]: d[j] }))));
-  const csvDays = () => D.cats.flatMap((c, k) => [...D.lu, 'All'].map((l, j) => ({ permit_type: c, land_use: l, issued_past_12_months: D.days[k][j][0], median_days: D.days[k][j][1] ?? '', slowest_10pct_days: D.days[k][j][2] ?? '' })));
-
   const V = NOLA.views([
-    { id: 'map', label: () => dots() ? `${D.cats[st.cat]}: permits issued in the past 12 months` : 'Permits issued in the past 12 months, by neighborhood', tab: 'Map of permits', keep: true, draw: drawMap, csv: csvMap },
-    { id: 'years', label: 'Permits issued per year', tab: 'Per year', draw: drawYears, csv: csvYears },
-    { id: 'days', label: 'Days from application to permit, past 12 months', tab: 'Days to permit', draw: drawDays, csv: csvDays },
+    { id: 'map', label: () => dots() ? `${D.cats[st.cat]}: permits issued in the past 12 months` : 'Permits issued in the past 12 months, by neighborhood', tab: 'Map of permits', keep: true, draw: drawMap },
+    { id: 'years', label: 'Permits issued per year', tab: 'Per year', draw: drawYears },
+    { id: 'days', label: 'Days from application to permit, past 12 months', tab: 'Days to permit', draw: drawDays },
   ], { ds: [D.ds, 'Permits'],
        state: () => ({ cat: st.cat >= 0 ? st.cat : null, lu: st.lu >= 0 ? st.lu : null, basis: st.basis !== 'n' ? st.basis : null, nb: st.nb >= 0 ? st.nb : null }) });
 })();

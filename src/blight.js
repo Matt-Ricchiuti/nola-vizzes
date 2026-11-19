@@ -201,27 +201,17 @@
     f.g.append('line').attr('x1', 0).attr('x2', f.iw).attr('y1', f.ih).attr('y2', f.ih).attr('stroke', 'var(--axis)');
   }
 
-  // ---------- CSV downloads ----------
-  const csvMap = () => NOLA.nbList().map(f => { const i = f.idx;
-    return Object.assign({ neighborhood: f.name, housing_units_2020: HU[i], open_cases: openOf(i, -1) }, ...STAGE.map((s, k) => ({ ['open, ' + s.toLowerCase()]: openOf(i, k) })),
-      { cases_filed_past_12_months: newOf(i, -1) }, ...NEW_L.map(([l], k) => ({ ['filed past 12 months, ' + l.toLowerCase()]: D.new12[i][k] })),
-      { overgrown_lot_cases_past_12_months: D.g12[i], properties_in_abatement: D.abOpen[i] }); });
-  const csvYears = () => { const years = st.kind === 'grass' ? D.gyears : D.years, data = (st.kind === 'grass' ? D.gyr : D.yr)[st.nb >= 0 ? st.nb : 72];
-    return data.map((d, k) => ({ year: years[k], area: st.nb >= 0 ? nbName(st.nb) : 'New Orleans', cases: st.kind === 'grass' ? 'overgrown lots' : 'code enforcement', still_open: d[0], closed: d[1] })); };
-  const csvOpen = () => { const A = D.openAge[st.nb >= 0 ? st.nb : 72];
-    return STAGE.map((s, k) => Object.assign({ area: st.nb >= 0 ? nbName(st.nb) : 'New Orleans', stage: s, open: d3.sum(A[k]) }, ...AGE_L.map((l, a) => ({ [l]: A[k][a] })))); };
-  const csvHear = () => D.hear.map((d, k) => Object.assign({ year: D.years[k] }, ...D.hearGroups.map((g, j) => ({ [HEAR_L[g] || g]: d[j] }))));
-  const csvViol = () => D.viol.map(v => ({ violation: vName(v[0]), code_section: vCode(v[0]) ? '26-' + vCode(v[0]) : '', past_12_months: v[1], previous_12_months: v[2] }));
-  const csvInsp = () => imon.map(d => Object.assign({ month: `${d.y}-${String(d.mo + 1).padStart(2, '0')}` }, ...D.inspGroups.map((g, k) => ({ [g]: d.a[k] }))));
-
+  // each chart's City dataset (Download CSV links there)
+  const DS = { cases: [D.ds[0], 'Code Enforcement All Cases'], viol: [D.ds[1], 'Code Enforcement All Violations'], insp: [D.ds[2], 'Code Enforcement All Inspections'],
+               hear: [D.ds[3], 'Code Enforcement All Hearings'], grass: [D.ds[4], 'Grass Cutting (Lot Abatement/Chapter 66)'], abate: [D.ds[5], 'Code Enforcement - Abatements'] };
   const V = NOLA.views([
-    { id: 'map', label: () => MAP_L[st.measure], tab: 'Map of cases', keep: true, draw: drawMap, csv: csvMap },
-    { id: 'years', label: () => KIND_L[st.kind], tab: 'Cases filed per year', draw: drawYears, csv: csvYears },
-    { id: 'open', label: 'Open cases, by stage and how long they have been open', tab: 'Open cases', draw: drawOpen, csv: csvOpen },
-    { id: 'violations', label: 'Most cited violations, past 12 months', tab: 'Violations', draw: drawViol, csv: csvViol },
-    { id: 'hearings', label: 'Hearing results per year', tab: 'Hearings', draw: drawHear, csv: csvHear },
-    { id: 'inspections', label: 'Inspections per month', tab: 'Inspections', draw: drawInsp, csv: csvInsp },
-  ], { ds: [D.ds[0], 'Code Enforcement All Cases'],
+    { id: 'map', label: () => MAP_L[st.measure], tab: 'Map of cases', keep: true, draw: drawMap, ds: () => DS[st.measure] || DS.cases },
+    { id: 'years', label: () => KIND_L[st.kind], tab: 'Cases filed per year', draw: drawYears, ds: () => st.kind === 'grass' ? DS.grass : DS.cases },
+    { id: 'open', label: 'Open cases, by stage and how long they have been open', tab: 'Open cases', draw: drawOpen, ds: DS.cases },
+    { id: 'violations', label: 'Most cited violations, past 12 months', tab: 'Violations', draw: drawViol, ds: DS.viol },
+    { id: 'hearings', label: 'Hearing results per year', tab: 'Hearings', draw: drawHear, ds: DS.hear },
+    { id: 'inspections', label: 'Inspections per month', tab: 'Inspections', draw: drawInsp, ds: DS.insp },
+  ], { ds: DS.cases,
        state: () => ({ measure: st.measure !== 'open' ? st.measure : null, stage: st.stage >= 0 ? st.stage : null, res: st.res >= 0 ? st.res : null, basis: st.basis !== 'n' ? st.basis : null,
                        kind: st.kind !== 'ce' ? st.kind : null, ig: st.ig >= 0 ? st.ig : null, nb: st.nb >= 0 ? st.nb : null }) });
 })();

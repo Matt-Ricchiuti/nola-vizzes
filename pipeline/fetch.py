@@ -1,26 +1,31 @@
 """Fetch data.nola.gov datasets and rebuild every data/*.json file.
 
-    python pipeline/fetch.py                 # fetch everything, validate, write data/, run build.py
+    python pipeline/fetch.py                 # fetch what changed, validate, write data/, run build.py if anything changed
     python pipeline/fetch.py --no-build      # skip build.py
     python pipeline/fetch.py --cache DIR     # dev only: keep raw API responses in DIR and reuse them
     python pipeline/fetch.py --today 2026-11-18   # pretend it's this date (to compare with old snapshots)
-    python pipeline/fetch.py --full          # rebuild everything, even datasets the City hasn't changed
+    python pipeline/fetch.py --full          # download and rebuild everything, ignoring .cache/raw
 
-The aggregation rules are documented in pipeline/REFERENCE.md.
+The aggregation rules, and what each dataset costs, are documented in pipeline/REFERENCE.md.
 
-Only what changed is downloaded and written. Each data file records, in data/sources.json, the dataset
-versions it was built from (Socrata's rowsUpdatedAt, or for the street centerline its segment count and
-newest edit). If those are the same today, the file is kept as it is. Rebuilt files are written only when
-their content differs, so a day without new City data leaves data/ and site/ untouched and the workflow
-commits nothing. Boundary and population downloads are kept in .cache/raw/ (restored between runs by the
-workflow), and so is a copy of this year's Calls for Service rows: on a day the City changed that dataset, only
-the rows updated since the newest one in the copy are downloaded and merged in (see cfs_rows). On the 1st of
-each month, and with --full, everything is downloaded fresh.
+Only what changed is downloaded and written. One request to the Socrata catalog returns every dataset's "last
+updated" date (rowsUpdatedAt) and columns. Each data file records, in data/sources.json, the dataset versions it was
+built from; if those are the same today, the file is kept as it is and nothing about it is downloaded or parsed.
+Rebuilt files are written only when their content differs, so a day without new City data leaves data/ and site/
+untouched and the workflow commits nothing.
+
+.cache/raw/ (restored between runs by the workflow) keeps saved copies of the datasets the City updates in place
+(311, Calls for Service), brought up to date with only the rows changed since the last run (see synced_rows), and
+the API's answers to every other query, kept under the dataset's version (see Socrata) and reused until it changes.
+On the 1st of each month the boundary layers and past years of Calls for Service are checked too, and each saved
+copy's row ids are compared with the City's; a mismatch triggers a full download. --full ignores the cache.
 
 Every rebuilt file is checked before it's written. If a fetch comes back empty, a column disappears, or a
 count collapses compared with the last good file, that file keeps its last good version, the other files
 still refresh, and the script reports the failure (exit code 1, or `failed=` in $GITHUB_OUTPUT so the
 workflow can publish first and then fail the run). A failure in the shared boundaries stops everything.
+The run also fails (`alerts=`) when a dataset's "last updated" date stands still far longer than usual (DATASETS),
+or a saved copy had to be downloaded in full twice within a few days (the cache isn't being kept).
 
 Set SOCRATA_APP_TOKEN in the environment to avoid API throttling.
 """
@@ -58,84 +63,150 @@ def warn(msg):
 
 
 # ---------------------------------------------------------------- HTTP
+RESOURCE_RX = re.compile(r'^/resource/([a-z0-9]{4}-[a-z0-9]{4})\.')
+ISO = '%Y-%m-%dT%H:%M:%SZ'
+
+
 class Socrata:
+    """data.nola.gov client.
+
+    Versions. A dataset's version is its rowsUpdatedAt ("data last updated"). One request to the Discovery API
+    catalog (`prefetch`) returns it, with the column names, for every dataset at once; it matches rowsUpdatedAt to
+    the second (checked 2026-11-19 on all 20 catalogued datasets). Datasets the catalog doesn't list (the 2015
+    boundary layers) fall back to their own metadata request.
+
+    Response cache. A query on a dataset whose version is known is kept in RAW_CACHE/q/ under that version
+    (GitHub Actions restores the folder between runs). While the City hasn't changed the dataset, the same query
+    returns the same rows, so it's read from disk instead of the API. Queries are always ordered, so this is exact."""
+
     def __init__(self, cache=None, use_raw=True):
         self.s = requests.Session()
         tok = os.environ.get('SOCRATA_APP_TOKEN')
         if tok:
             self.s.headers['X-App-Token'] = tok
         self.s.headers['User-Agent'] = 'nola-vizzes-pipeline'
+        self.s.headers['Accept-Encoding'] = 'gzip'
         self.cache = cache
         if cache:
             os.makedirs(cache, exist_ok=True)
         self.use_raw = use_raw
         self.metas = {}
-        self.n_req = self.n_bytes = 0
+        self.vers = {}       # ds -> version, from the catalog, a metadata request, or (for datasets checked monthly) sources.json
+        self.cols = {}       # ds -> set of column field names
+        self.n_req = self.n_bytes = self.n_wire = 0
+        self.by_ds = defaultdict(lambda: [0, 0, 0])   # ds -> [requests, bytes, bytes over the wire]
+        self.touched, self.queried = set(), set()    # response-cache files used this run, datasets queried this run
+        self.hits = 0
 
-    def get(self, path, params=None, kind='json'):
-        key = None
+    def get(self, path, params=None, kind='json', cache=True):
+        dev = None
         if self.cache:
-            key = os.path.join(self.cache, hashlib.sha1((path + json.dumps(params, sort_keys=True)).encode()).hexdigest() + '.' + kind)
-            if os.path.exists(key):
-                with open(key, encoding='utf-8') as f:
+            dev = os.path.join(self.cache, hashlib.sha1((path + json.dumps(params, sort_keys=True)).encode()).hexdigest() + '.' + kind)
+            if os.path.exists(dev):
+                with open(dev, encoding='utf-8') as f:
                     return json.load(f) if kind != 'csv' else f.read()
+        m = RESOURCE_RX.match(path)
+        ds = m and m.group(1)
+        qfn = None
+        if ds:
+            self.queried.add(ds)
+            if cache and ds in self.vers:   # a full run (use_raw False) doesn't read saved answers, but saves them
+                h = hashlib.sha1((path + json.dumps(params, sort_keys=True)).encode()).hexdigest()[:16]
+                qfn = os.path.join(RAW_CACHE, 'q', f"{ds}-{h}-{self.vers[ds].replace(':', '')}.{kind}.gz")
+                self.touched.add(os.path.basename(qfn))
+                if self.use_raw and os.path.exists(qfn):
+                    try:
+                        with gzip.open(qfn, 'rt', encoding='utf-8') as f:
+                            body = f.read()
+                        self.hits += 1
+                        return json.loads(body) if kind != 'csv' else body
+                    except (OSError, EOFError, ValueError):
+                        pass
         last = None
         for attempt in range(5):
             try:
-                r = self.s.get(API + path, params=params, timeout=180)
+                r = self.s.get(API + path, params=params, timeout=180, stream=True)
+                raw = r.raw.read(decode_content=False)   # as transferred (gzip), to count it
+                content = gzip.decompress(raw) if r.headers.get('Content-Encoding') == 'gzip' else raw
                 self.n_req += 1
-                self.n_bytes += len(r.content)
+                self.n_bytes += len(content)
+                self.n_wire += len(raw)
+                st = self.by_ds[ds or ('catalog' if 'catalog' in path else 'metadata')]
+                st[0] += 1; st[1] += len(content); st[2] += len(raw)
                 if r.status_code == 200:
-                    r.encoding = 'utf-8'
-                    body = r.text
-                    if key:
-                        with open(key, 'w', encoding='utf-8') as f:
+                    body = content.decode('utf-8')
+                    if dev:
+                        with open(dev, 'w', encoding='utf-8') as f:
                             f.write(body)
+                    if qfn:
+                        os.makedirs(os.path.dirname(qfn), exist_ok=True)
+                        with gzip.open(qfn + '.tmp', 'wt', encoding='utf-8') as f:
+                            f.write(body)
+                        os.replace(qfn + '.tmp', qfn)
                     return json.loads(body) if kind != 'csv' else body
-                last = f'HTTP {r.status_code}: {r.text[:300]}'
+                last = f"HTTP {r.status_code}: {content.decode('utf-8', 'replace')[:300]}"
                 if r.status_code in (400, 403, 404):
                     break
-            except requests.RequestException as e:
+            except (requests.RequestException, OSError, EOFError) as e:   # includes a truncated gzip body
                 last = repr(e)
             time.sleep(5 * (attempt + 1))
         raise PipelineError(f'GET {path} {params} failed: {last}')
 
+    def prefetch(self, ids):
+        """Versions and column names of many datasets in one catalog request. Datasets missing from the answer
+        (or all of them, if the catalog fails) are looked up one by one when needed."""
+        ids = sorted({i for i in ids if i and i not in self.vers})
+        if not ids:
+            return
+        try:
+            res = self.get('/api/catalog/v1', [('ids', i) for i in ids] + [('limit', len(ids))])
+        except PipelineError as e:
+            warn(f'catalog request failed, checking datasets one by one: {e}')
+            return
+        for r in res.get('results', []):
+            x = r.get('resource') or {}
+            t = x.get('data_updated_at')
+            if x.get('id') in ids and t and x.get('columns_field_name'):
+                self.vers[x['id']] = dt.datetime.fromisoformat(t.replace('Z', '+00:00')).astimezone(dt.timezone.utc).strftime(ISO)
+                self.cols[x['id']] = set(x['columns_field_name'])
+
     def meta(self, ds):
-        """Dataset metadata, fetched once per run. It carries both the schema and rowsUpdatedAt."""
+        """Dataset metadata (schema and rowsUpdatedAt), fetched once per run, for datasets the catalog doesn't list."""
         if ds not in self.metas:
             self.metas[ds] = self.get(f'/api/views/{ds}.json')
         return self.metas[ds]
 
     def version(self, ds):
         """When the City last loaded rows into the dataset, as 'YYYY-MM-DDTHH:MM:SSZ'. Changes whenever its data may have."""
-        t = self.meta(ds).get('rowsUpdatedAt')
-        need(t, f'{ds}: metadata has no rowsUpdatedAt')
-        return dt.datetime.fromtimestamp(t, dt.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
-
-    def raw(self, ds, path, params=None, kind='json'):
-        """A whole download that can only change when the dataset does, kept in RAW_CACHE under the dataset's
-        version (GitHub Actions restores that folder between runs). A cache miss just means downloading it."""
-        fn = os.path.join(RAW_CACHE, f"{ds}-{self.version(ds).replace(':', '')}.{kind}")
-        if self.use_raw and os.path.exists(fn):
-            with open(fn, encoding='utf-8') as f:
-                return json.load(f)
-        body = self.get(path, params, kind)
-        os.makedirs(RAW_CACHE, exist_ok=True)
-        for old in os.listdir(RAW_CACHE):
-            if old.startswith(ds + '-'):
-                os.remove(os.path.join(RAW_CACHE, old))
-        with open(fn, 'w', encoding='utf-8') as f:
-            json.dump(body, f)
-        return body
+        if ds not in self.vers:
+            t = self.meta(ds).get('rowsUpdatedAt')
+            need(t, f'{ds}: metadata has no rowsUpdatedAt')
+            self.vers[ds] = dt.datetime.fromtimestamp(t, dt.timezone.utc).strftime(ISO)
+        return self.vers[ds]
 
     def columns(self, ds):
-        return {c['fieldName']: c['dataTypeName'] for c in self.meta(ds)['columns']}
+        if ds not in self.cols:
+            self.cols[ds] = {c['fieldName'] for c in self.meta(ds)['columns']}
+        return self.cols[ds]
 
     def require_columns(self, ds, cols, label):
         have = self.columns(ds)
         missing = [c for c in cols if c not in have]
         need(not missing, f'{label} ({ds}): columns missing from the dataset: {missing}. The schema changed.')
         return have
+
+    def tidy_cache(self):
+        """Drop cached responses this run replaced: those of datasets queried this run that weren't used.
+        Responses of datasets not queried today stay, for the day they're needed again."""
+        qdir = os.path.join(RAW_CACHE, 'q')
+        if os.path.isdir(qdir):
+            for fn in os.listdir(qdir):
+                if fn[:9] in self.queried and fn not in self.touched:
+                    os.remove(os.path.join(qdir, fn))
+        if os.path.isdir(RAW_CACHE):   # whole downloads kept by older versions of this script
+            for fn in os.listdir(RAW_CACHE):
+                if re.match(r'^[a-z0-9]{4}-[a-z0-9]{4}-\d{4}-\d\d-\d\dT\d{6}Z\.(geo)?json$', fn):
+                    os.remove(os.path.join(RAW_CACHE, fn))
 
 
 # ---------------------------------------------------------------- helpers
@@ -279,9 +350,12 @@ def keep_order(fc, name, prev):
     fc['features'].sort(key=lambda f: pos[f['properties'][name]])
 
 
+NB_DS, PD_DS, POP_DS = '7fw3-kdpf', 'evki-aju8', '2w4d-xaw2'   # neighborhoods, police districts, 2020 population
+
+
 def build_geo(api, prev=None):
-    nbg = api.raw('7fw3-kdpf', '/resource/7fw3-kdpf.geojson', kind='geojson')
-    pdg = api.raw('evki-aju8', '/resource/evki-aju8.geojson', kind='geojson')
+    nbg = api.get(f'/resource/{NB_DS}.geojson', kind='geojson')
+    pdg = api.get(f'/resource/{PD_DS}.geojson', kind='geojson')
     need(len(nbg.get('features', [])) == 72, f"neighborhoods: expected 72 features, got {len(nbg.get('features', []))}")
     need(len(pdg.get('features', [])) == 8, f"police districts: expected 8 features, got {len(pdg.get('features', []))}")
     keep_order(nbg, 'gnocdc_lab', prev and [f['n'] for f in prev['nb']])
@@ -305,13 +379,8 @@ POP_ALIAS = {'FILMORE': 'FILLMORE', 'MARLYVILLE - FONTAINEBLEAU': 'MARLYVILLE - 
 def add_population(api, geo):
     """2020 Census population and housing units per neighborhood (2w4d-xaw2, sum_pop100 and sum_hu100), stored as
     geo['pop'] and geo['hu'] in neighborhood order."""
-    api.require_columns('2w4d-xaw2', ['gnocdc_lab', 'sum_pop100', 'sum_hu100'], 'Neighborhood demographics 2020')
-    params = {'$select': 'gnocdc_lab,sum_pop100,sum_hu100', '$limit': 500}
-    rows = api.raw('2w4d-xaw2', '/resource/2w4d-xaw2.json', params)
-    if rows and 'sum_hu100' not in rows[0]:  # a copy saved before housing units were added
-        api.use_raw, keep = False, api.use_raw
-        rows = api.raw('2w4d-xaw2', '/resource/2w4d-xaw2.json', params)
-        api.use_raw = keep
+    api.require_columns(POP_DS, ['gnocdc_lab', 'sum_pop100', 'sum_hu100'], 'Neighborhood demographics 2020')
+    rows = api.get(f'/resource/{POP_DS}.json', {'$select': 'gnocdc_lab,sum_pop100,sum_hu100', '$order': ':id', '$limit': 500})
     def col(c):
         return {POP_ALIAS.get(r['gnocdc_lab'], r['gnocdc_lab']): int(float(r[c])) for r in rows if r.get('gnocdc_lab') and r.get(c)}
     pop, hu = col('sum_pop100'), col('sum_hu100')
@@ -520,57 +589,12 @@ def resp_minutes(create, arrive):
 
 
 def cfs_rows(api, ds, cols, total):
-    """This year's call rows, downloaded incrementally.
-
-    The City updates the dataset in place every night (a few thousand of ~300,000 rows change), so a copy of
-    every row, with its Socrata row id and last-updated time, is kept in RAW_CACHE (GitHub Actions restores
-    that folder between runs). Each run asks only for rows updated since the newest one in the copy and merges
-    them in by row id. If the merged copy's row count differs from the City's (rows were deleted), the copy is
-    missing, or this is a full run (the 1st of the month, or --full), every row is downloaded again.
-    A deletion offset by an addition on the same day goes unnoticed until the next monthly full download."""
-    fn = os.path.join(RAW_CACHE, f'cfs-{ds}.csv.gz')
-    fields = [':id', ':updated_at'] + cols
-
-    def fetch(where=None):
-        got = []
-        while True:
-            params = {'$select': ','.join(fields), '$order': ':id', '$limit': 50000, '$offset': len(got)}
-            if where:
-                params['$where'] = where
-            page = list(csv.DictReader(io.StringIO(api.get(f'/resource/{ds}.csv', params, kind='csv'))))
-            got += page
-            if len(page) < 50000:
-                return got
-
-    rows, how = None, ''
-    if api.use_raw and os.path.exists(fn):
-        try:
-            with gzip.open(fn, 'rt', encoding='utf-8', newline='') as f:
-                copy = {r[':id']: r for r in csv.DictReader(f)}
-        except (OSError, EOFError, csv.Error):
-            copy = {}
-        mark = max((r[':updated_at'] for r in copy.values()), default='')
-        if copy and mark:
-            delta = fetch(f":updated_at >= '{mark.rstrip('Z')}'")
-            for r in delta:
-                copy[r[':id']] = r
-            if len(copy) == total:
-                rows, how = list(copy.values()), f'{len(delta):,} new or changed rows merged into the saved copy'
-            else:
-                print(f'  saved copy has {len(copy):,} rows but the City has {total:,}: downloading all', flush=True)
-    if rows is None:
-        rows, how = fetch(), 'full download'
-    need(len(rows) >= total * 0.99, f'Calls for Service: fetched {len(rows)} rows but the API reports {total}')
-    print(f'  calls: {how}', flush=True)
-    os.makedirs(RAW_CACHE, exist_ok=True)
+    """This year's call rows, kept as a saved copy and downloaded incrementally (see synced_rows). The City updates
+    the dataset in place every night: a few thousand of ~300,000 rows change."""
+    rows, _ = synced_rows(api, ds, cols, None, 'Calls for Service', total, fn=f'cfs-{ds}.csv.gz')
     for old in os.listdir(RAW_CACHE):
-        if old.startswith('cfs-') and old != os.path.basename(fn):
+        if old.startswith('cfs-') and old != f'cfs-{ds}.csv.gz':
             os.remove(os.path.join(RAW_CACHE, old))  # last year's copy
-    with gzip.open(fn + '.tmp', 'wt', encoding='utf-8', newline='') as f:
-        w = csv.DictWriter(f, fieldnames=fields, extrasaction='ignore')
-        w.writeheader()
-        w.writerows(sorted(rows, key=lambda r: r[':id']))
-    os.replace(fn + '.tmp', fn)
     return rows
 
 
@@ -797,57 +821,75 @@ def build_cpc(api, nbp, today):
 
 
 # ---------------------------------------------------------------- large datasets, downloaded incrementally
-def synced_rows(api, ds, cols, where, label, total=None):
+CHECK_COPIES = False   # set on the monthly check day: compare each saved copy's row ids with the City's
+FULL_DOWNLOADS = {}    # ds -> why its saved copy was downloaded again in full this run
+OVERLAP = dt.timedelta(minutes=15)   # re-ask for rows updated this long before the copy's newest, in case a load was in progress
+
+
+def synced_rows(api, ds, cols, where, label, total=None, fn=None):
     """Every row of `ds` matching `where`, kept in RAW_CACHE as <ds>.csv.gz and brought up to date incrementally.
 
-    The same idea as cfs_rows: the copy holds each row's Socrata :id and :updated_at, so a run asks only for rows
-    updated since the newest one in the copy (usually one small request) and merges them in by :id. If the merged
-    copy's row count differs from the City's count for `where` (rows were deleted or moved out of the window), the
-    copy is missing or unreadable, its columns differ, or this is a full run (the 1st of the month, or --full),
-    every row is downloaded again in pages of 50,000. Returns (rows, how) with rows as dicts of strings."""
-    fn = os.path.join(RAW_CACHE, f'{ds}.csv.gz')
+    For datasets the City updates in place (311, Calls for Service): the copy holds each row's Socrata :id and
+    :updated_at, so a run asks only for rows updated since the newest one in the copy (one small request) and merges
+    them in by :id. Every run compares the merged copy's row count with the City's count for `where`; on the monthly
+    check day it also compares the row ids themselves (one request for the ids alone), which catches a deletion
+    offset by an addition. A mismatch, a missing or unreadable copy, changed columns, or a full run (--full) means
+    every row is downloaded again in pages of 50,000. Returns (rows sorted by :id, how), rows as dicts of strings."""
+    fn = os.path.join(RAW_CACHE, fn or f'{ds}.csv.gz')
     fields = [':id', ':updated_at'] + cols
     if total is None:
         total = int(api.get(f'/resource/{ds}.json', {'$select': 'count(*) as n', '$where': where})[0]['n'])
     need(total > 0, f'{label} ({ds}): 0 rows')
+    both = lambda w: f'({where}) AND {w}' if where else w
 
-    def fetch(w):
+    def fetch(w, select=fields, page=50000):
         got = []
         while True:
-            page = list(csv.DictReader(io.StringIO(api.get(f'/resource/{ds}.csv', {
-                '$select': ','.join(fields), '$where': w, '$order': ':id', '$limit': 50000, '$offset': len(got)}, kind='csv'))))
-            got += page
-            if len(page) < 50000:
+            params = {'$select': ','.join(select), '$order': ':id', '$limit': page, '$offset': len(got)}
+            if w:
+                params['$where'] = w
+            got += (p := list(csv.DictReader(io.StringIO(api.get(f'/resource/{ds}.csv', params, kind='csv', cache=False)))))
+            if len(p) < page:
                 return got
 
-    rows, how = None, ''
+    rows, how, why = None, '', 'no saved copy'
     if api.use_raw and os.path.exists(fn):
         try:
             with gzip.open(fn, 'rt', encoding='utf-8', newline='') as f:
                 rd = csv.DictReader(f)
                 copy = {r[':id']: r for r in rd} if rd.fieldnames == fields else {}
+            why = 'saved copy has different columns' if not copy else why
         except (OSError, EOFError, csv.Error):
-            copy = {}
+            copy, why = {}, 'saved copy unreadable'
         mark = max((r[':updated_at'] for r in copy.values()), default='')
         if copy and mark:
-            delta = fetch(f"({where}) AND :updated_at >= '{mark.rstrip('Z')}'")
+            since = (dt.datetime.fromisoformat(mark.rstrip('Z')[:23]) - OVERLAP).isoformat(timespec='milliseconds')
+            delta = fetch(both(f":updated_at >= '{since}'"))
             for r in delta:
                 copy[r[':id']] = r
-            if len(copy) == total:
-                rows, how = list(copy.values()), f'{len(delta):,} new or changed rows merged into the saved copy'
+            if len(copy) != total:
+                why = f'saved copy has {len(copy):,} rows but the City has {total:,}'
+            elif CHECK_COPIES and {r[':id'] for r in fetch(where, [':id'], 1000000)} != copy.keys():
+                why = 'saved copy has the right number of rows but not the same rows'
             else:
-                print(f'  saved copy has {len(copy):,} rows but the City has {total:,}: downloading all', flush=True)
+                rows, how = list(copy.values()), f'{len(delta):,} new or changed rows merged into the saved copy' + (', row ids checked' if CHECK_COPIES else '')
     if rows is None:
+        if not api.use_raw:
+            why = 'full run'
+        else:
+            FULL_DOWNLOADS[ds] = why
+        print(f'  {label}: {why}: downloading all {total:,} rows', flush=True)
         rows, how = fetch(where), f'full download, {total:,} rows'
     need(len(rows) >= total * 0.99, f'{label}: fetched {len(rows)} rows but the API reports {total}')
+    rows.sort(key=lambda r: r[':id'])
     os.makedirs(RAW_CACHE, exist_ok=True)
     with gzip.open(fn + '.tmp', 'wt', encoding='utf-8', newline='') as f:
         w = csv.DictWriter(f, fieldnames=fields, extrasaction='ignore')
         w.writeheader()
-        w.writerows(sorted(rows, key=lambda r: r[':id']))
+        w.writerows(rows)
     os.replace(fn + '.tmp', fn)
     print(f'  {label}: {how}', flush=True)
-    return sorted(rows, key=lambda r: r[':id']), how
+    return rows, how
 
 
 def points_to_nb(nbp, rows, lon='longitude', lat='latitude'):
@@ -977,7 +1019,8 @@ def build_311(api, nbp):
                 if nb >= 0:
                     closeNb[nb][t].append(d)
     stat = lambda v: [len(v), median(v), p90(v)]
-    return {
+    trees = tree_requests(rows, created, closed, nbs, typ, reason, pending, last)
+    return trees, {
         'ds': SR_DS, 'start': SR_START[:7], 'last': last.strftime('%Y-%m-%d'), 'winStart': win0.isoformat(),
         'T': T, 'R': R, 'mon': mon, 'years': years, 'nby': nby,
         'nb12': [[v for r in sorted(c) for v in (r, c[r])] for c in nb12],   # [reason, n, reason, n, ...]
@@ -986,6 +1029,38 @@ def build_311(api, nbp):
         'closeNb': [[[len(v), median(v)] for v in row] for row in closeNb],
         'total': n, 'recent': sum(recent), 'open': sum(pending), 'noLoc': sum(nb < 0 for nb in nbs),
     }
+
+
+TR_TYPE = 'Tree Service'  # the 311 request type for trees (trims, dead or dying trees, blocked streets and signs)
+TR_REASON_MIN = 30        # a reason needs this many tree requests in all to be listed by name; the rest are "Other"
+
+
+def tree_requests(rows, created, closed, nbs, typ, reason, pending, last):
+    """The 311 tree requests, one point each, for the trees page's request map. Built from the 311 rows already
+    downloaded, so it costs no extra API requests. Points: lon/lat x 1e5, reason index, day filed (days since
+    `t0`), and days to close (-1 still open, -2 closed with no close date)."""
+    idx = [i for i in range(len(rows)) if typ[i] == TR_TYPE]
+    need(len(idx) > 1000, f'311 tree requests: only {len(idx)} found')
+    rc = Counter(reason[i] for i in idx)
+    R = [r for r in ranked(rc) if rc[r] >= TR_REASON_MIN]
+    R += ['Other'] * any(rc[r] < TR_REASON_MIN for r in rc)
+    ri = {r: k for k, r in enumerate(R)}
+    t0 = min(created[i] for i in idx).date()
+    x, y, rr, d, c, nb = [], [], [], [], [], []
+    no_loc = 0
+    for i in idx:
+        lo, la = fnum(rows[i]['longitude']), fnum(rows[i]['latitude'])
+        if nbs[i] < 0 or lo is None or la is None:
+            no_loc += 1
+            continue
+        x.append(round(lo * 1e5)); y.append(round(la * 1e5))
+        rr.append(ri.get(reason[i], len(R) - 1))
+        d.append((created[i].date() - t0).days)
+        days = days_between(created[i], closed[i]) if not pending[i] else None
+        c.append(-1 if pending[i] else -2 if days is None else round(days))
+        nb.append(nbs[i])
+    return {'ds': SR_DS, 't0': t0.isoformat(), 'last': last.strftime('%Y-%m-%d'), 'R': R,
+            'x': x, 'y': y, 'r': rr, 'd': d, 'c': c, 'nb': nb, 'total': len(idx), 'noLoc': no_loc}
 
 
 # ---------------------------------------------------------------- short-term rentals
@@ -1194,20 +1269,27 @@ def build_blight(api, nbp):
         else:
             abEnd[re.sub(r'^Closed:?\s*', '', (r.get('stage') or '').strip()) or 'Not stated'] += 1
     # hearings, violations and inspections: counted by the API
-    hear = api.get(f'/resource/{CE_HEAR}.json', {'$select': 'date_extract_y(hearingdate) as y, judgment, count(*) as n',
-                                                 '$where': f"hearingdate >= '{CE_START}-01-01' AND hearingdate <= '{today.isoformat()}T23:59:59'",
-                                                 '$group': 'y, judgment', '$order': 'y, judgment', '$limit': 5000})
+    # one request each: hearings through "today" by year and judgment, plus those after it (w = 'up');
+    # violations in the past 12 months (w = 0) and the 12 before (w = 1)
+    end = f'{today.isoformat()}T23:59:59'
+    hear = api.get(f'/resource/{CE_HEAR}.json', {'$select': f"date_extract_y(hearingdate) as y, judgment, case(hearingdate > '{end}', 'up', true, 'past') as w, count(*) as n",
+                                                 '$where': f"hearingdate >= '{CE_START}-01-01'",
+                                                 '$group': 'y, judgment, w', '$order': 'w, y, judgment', '$limit': 5000})
     hyr = [[0] * len(CE_HEAR_GROUPS) for _ in years]
+    upcoming = 0
     for r in hear:
-        hyr[int(r['y']) - CE_START][ce_hearing_group(r.get('judgment'))] += int(r['n'])
-    upcoming = int(api.get(f'/resource/{CE_HEAR}.json', {'$select': 'count(*) as n', '$where': f"hearingdate > '{today.isoformat()}T23:59:59'"})[0]['n'])
+        if r['w'] == 'up':
+            upcoming += int(r['n'])
+        else:
+            hyr[int(r['y']) - CE_START][ce_hearing_group(r.get('judgment'))] += int(r['n'])
     prev0 = win0 - dt.timedelta(days=365)
     viol = {}
-    for k, (a, b) in enumerate([(win0, today), (prev0, win0 - dt.timedelta(days=1))]):
-        for r in api.get(f'/resource/{CE_VIOL}.json', {'$select': 'violation, count(*) as n', '$where': f"violationdate >= '{a}' AND violationdate <= '{b}T23:59:59'",
-                                                       '$group': 'violation', '$order': 'violation', '$limit': 5000}):
+    for r in api.get(f'/resource/{CE_VIOL}.json', {'$select': f"violation, case(violationdate >= '{win0}', 0, violationdate <= '{win0 - dt.timedelta(days=1)}T23:59:59', 1) as w, count(*) as n",
+                                                   '$where': f"violationdate >= '{prev0}' AND violationdate <= '{end}'",
+                                                   '$group': 'violation, w', '$order': 'violation, w', '$limit': 5000}):
+        if r.get('w') is not None:
             v = re.sub(r'\s+', ' ', (r.get('violation') or '').strip()) or 'Not stated'
-            viol.setdefault(v, [0, 0])[k] += int(r['n'])
+            viol.setdefault(v, [0, 0])[int(r['w'])] += int(r['n'])
     V = sorted(viol.items(), key=lambda kv: (-kv[1][0], -kv[1][1], kv[0]))
     insp = api.get(f'/resource/{CE_INSP}.json', {'$select': 'date_trunc_ym(inspectiondate) as m, inspectiontype, count(*) as n',
                                                  '$where': f"inspectiondate >= '{CE_START}-01-01' AND inspectiondate <= '{today.isoformat()}T23:59:59'",
@@ -1250,10 +1332,11 @@ def build_permits(api, nbp):
     cols = ['code', 'type', 'filingdate', 'issuedate', 'landuse', 'location_1']
     api.require_columns(PERMITS, cols, 'Permits')
     # permits issued per year and code, counted by the API
-    yrows = api.get(f'/resource/{PERMITS}.json', {'$select': 'date_extract_y(issuedate) as y, code, count(*) as n',
+    # (each group's newest issue date comes along, so the newest overall needs no request of its own)
+    yrows = api.get(f'/resource/{PERMITS}.json', {'$select': 'date_extract_y(issuedate) as y, code, count(*) as n, max(issuedate) as m',
                                                  '$where': f"issuedate >= '{PERMIT_START}-01-01'", '$group': 'y, code', '$order': 'y, code', '$limit': 5000})
     need(len(yrows) > 100, f'Permits: only {len(yrows)} year/code counts')
-    last = parse_ts(api.get(f'/resource/{PERMITS}.json', {'$select': 'max(issuedate) as m', '$where': f"issuedate >= '{PERMIT_START}-01-01'"})[0]['m'])
+    last = parse_ts(max(r['m'] for r in yrows))
     today = last.date()
     years = list(range(PERMIT_START, today.year + 1))
     yr = [[0] * len(PERMIT_CATS) for _ in years]
@@ -1388,11 +1471,39 @@ def build_biz(api, nbp):
 
 # Data files of the pages added with the 311 / housing / business set, and when each counts as stale
 # (file, label, field holding its newest record date, days without a new record before warning).
-NEW_FILES = ['311.json', 'str.json', 'blight.json', 'permits.json', 'biz.json']
+NEW_FILES = ['311.json', 'treereq.json', 'str.json', 'blight.json', 'permits.json', 'biz.json']
 STALE = [('311.json', '311 calls', 'last', 7), ('str.json', 'Short-term rental permit applications', 'last', 14),
          ('blight.json', 'Code enforcement cases', 'last', 14), ('permits.json', 'Permits', 'last', 14),
          ('biz.json', 'Business license applications', 'last', 14)]
 
+
+# Every dataset the pipeline reads (besides Calls for Service, whose id changes each year): when its "last updated"
+# date is checked, and how many days that date may stand still before the run fails (None: it changes rarely or
+# never, so no limit). "daily" datasets cost nothing extra to check: one catalog request covers them all.
+# "monthly" ones aren't in the catalog and are checked with a request each on the 1st. Measured cadences are in
+# REFERENCE.md ("The daily refresh").
+DATASETS = {
+    NB_DS: ('Neighborhood boundaries', 'monthly', None),       # last changed 2015
+    PD_DS: ('Police districts', 'monthly', None),              # last changed 2015
+    POP_DS: ('Neighborhood population 2020', 'daily', None),   # last changed 2023
+    '22q2-dqpb': ('Street centerlines', 'daily', None),        # a few edits a month
+    'ay9z-ynxz': ('NOPD drone flights', 'daily', 60),          # loaded in occasional batches
+    'xxb5-5azv': ('CPC projects', 'daily', 5),                 # the rest: reloaded every night
+    SR_DS: ('311 calls', 'daily', 5),
+    STR_ACTIVE: ('Active short-term rental licenses', 'daily', 5),
+    STR_APPS: ('Short-term rental permit applications', 'daily', 5),
+    STR_NC: ('Non-commercial short-term rental licenses', 'daily', 5),
+    CE_CASES: ('Code enforcement cases', 'daily', 5),
+    CE_VIOL: ('Code enforcement violations', 'daily', 5),
+    CE_INSP: ('Code enforcement inspections', 'daily', 5),
+    CE_HEAR: ('Code enforcement hearings', 'daily', 5),
+    CE_GRASS: ('Grass cutting cases', 'daily', 5),
+    CE_ABATE: ('Code enforcement abatements', 'daily', 60),    # updated in place every week or two
+    PERMITS: ('Permits', 'daily', 5),
+    BIZ_APPS: ('Business license applications', 'daily', 5),
+    BIZ_NOW: ('Occupational business licenses', 'daily', 5),
+}
+CFS_MAX_DAYS = 5   # the current year's Calls for Service dataset is reloaded every night
 
 # ---------------------------------------------------------------- sanity checks against the last good build
 def load_prev(name):
@@ -1441,6 +1552,11 @@ def validate(name, obj, prev, same_year=True):
         need(obj['total'] > 100000 and obj['recent'] > 20000, '311: suspiciously few requests')
         need(obj['noLoc'] < 0.1 * obj['total'], '311: most requests failed to map to a neighborhood')
         check_not_collapsed('311 requests', obj['total'], prev and prev.get('total'))
+    elif name == 'treereq.json':
+        n = len(obj['x'])
+        need(all(len(obj[k]) == n for k in ('y', 'r', 'd', 'c', 'nb')) and len(obj['R']) >= 2, 'tree requests: shape')
+        need(obj['noLoc'] < 0.1 * obj['total'], 'tree requests: most failed to map to a neighborhood')
+        check_not_collapsed('311 tree requests', obj['total'], prev and prev.get('total'))
     elif name == 'str.json':
         need(len(obj['nby']) == 72 and len(obj['yr']) == len(obj['years']) and all(len(p) == 9 for p in obj['pts']), 'str: shape')
         need(obj['total'] > 500 and len(obj['nc']['rows']) > 100, 'str: suspiciously few licenses')
@@ -1480,6 +1596,7 @@ def report_error(msg):
 
 # ---------------------------------------------------------------- main
 def main():
+    global CHECK_COPIES
     ap = argparse.ArgumentParser()
     ap.add_argument('--cache')
     ap.add_argument('--today')
@@ -1488,15 +1605,20 @@ def main():
     ap.add_argument('--out', default=DATA, help='write data files here instead of data/')
     a = ap.parse_args()
     today = dt.date.fromisoformat(a.today) if a.today else dt.datetime.now(dt.timezone(dt.timedelta(hours=-6))).date()
-    # On the 1st of every month everything is downloaded fresh, in case a change slipped past the version checks.
-    full = a.full or today.day == 1
+    full = a.full
+    # The 1st of the month is the check day: the datasets that aren't in the catalog (boundaries) and past years of
+    # Calls for Service get their "last updated" date checked, and each saved copy's row ids are compared with the City's.
+    check_day = today.day == 1 or full
+    CHECK_COPIES = check_day and not full
     api = Socrata(a.cache, use_raw=not full)
     state = load_prev('sources.json') or {}
     files = state.get('files', {})                 # data file -> {'key': what it was built from, 'changed': date its content last changed}
     hist_versions = state.get('histVersions', {})  # year -> version of that year's dataset when hist.json last counted it
+    copies = dict(state.get('copies', {}))         # ds -> last day its saved copy had to be downloaded again in full, unasked
     FOUND_IDS.update({int(y): i for y, i in state.get('cfsIds', {}).items()})
     prev = {n: load_prev(n) for n in ['geo.json', 'streets.json', 'drone.json', 'cfs.json', 'hist.json', 'cpc.json', *NEW_FILES]}
-    out, keys, failed = {}, {}, []
+    out, keys, key_only, failed, alerts = {}, {}, {}, [], []
+    watch = {ds: (label, days) for ds, (label, _, days) in DATASETS.items()}
 
     def unchanged(name, key):
         """True when the last good `name` was built from exactly these inputs, so it can be kept as it is."""
@@ -1519,22 +1641,57 @@ def main():
                 out.pop(n, None)
                 keys.pop(n, None)
 
-    # Boundaries and population hardly ever change and come from the raw cache. Every other file is
+    # One catalog request: the "last updated" date and columns of every dataset checked daily, this year's Calls for
+    # Service (and last year's in January and February, when the City loads its final rows), and on the check day
+    # every past year.
+    cfs_years = [y for y in range(2014, today.year + 1) if check_day or y >= today.year - (today.month <= 2)
+                 or str(y) not in (prev['hist.json'] or {})]
+    api.prefetch([ds for ds, (_, how, _) in DATASETS.items() if how == 'daily'] + [cfs_dataset_id(api, y) for y in cfs_years])
+
+    # Boundaries and population: checked monthly / daily, rebuilt only when one of them changed. Every other file is
     # positioned against them, so if they fail, nothing is published.
     print('geo ...', flush=True)
-    geo, nbp, pdp = build_geo(api, prev['geo.json'])
-    add_population(api, geo)
-    validate('geo.json', geo, prev['geo.json'])
-    out['geo.json'] = geo
+    gk = (files.get('geo.json', {}).get('key') or '').split('|')
+    if not check_day and len(gk) == 3 and prev['geo.json'] is not None:
+        api.vers.setdefault(NB_DS, gk[0])   # last checked on the 1st
+        api.vers.setdefault(PD_DS, gk[1])
+    polys = []
+
+    def P():
+        """Point-in-polygon lookups (neighborhoods, police districts), built only when some file is rebuilt."""
+        if not polys:
+            _, nbp, pdp = build_geo(api, prev['geo.json'])
+            polys.extend([nbp, pdp])
+        return polys
+
+    if unchanged('geo.json', '|'.join(api.version(d) for d in (NB_DS, PD_DS, POP_DS))):
+        geo = prev['geo.json']
+    else:
+        geo, nbp, pdp = build_geo(api, prev['geo.json'])
+        polys.extend([nbp, pdp])
+        add_population(api, geo)
+        validate('geo.json', geo, prev['geo.json'])
+        out['geo.json'] = geo
     geo_key = hashlib.sha1(dumps(geo).encode()).hexdigest()[:12]
 
     def streets():
+        # The centerline is re-synced from the City's GIS whether or not anything was edited, so a new version only
+        # prompts a look at the segment count and the newest edit, which say whether the streets changed.
+        ver = api.version('22q2-dqpb')
+        old = files.get('streets.json', {}).get('key') or ''
+        if not full and prev['streets.json'] is not None and old.startswith(ver + '|'):
+            keys['streets.json'] = old
+            print("  streets.json: the City's data hasn't changed, kept", flush=True)
+            return
         api.require_columns('22q2-dqpb', ['the_geom', 'roadclass', 'inwater', 'fullnameabv', 'lastupdate'], 'Centerline')
-        # The centerline is re-synced from the City's GIS whether or not anything was edited, so its version says
-        # little. The segment count and the newest edit say whether the streets changed.
         fp = api.get('/resource/22q2-dqpb.json', {'$select': 'count(*) as n, max(lastupdate) as m'})[0]
-        if not unchanged('streets.json', f"{fp.get('n')}|{fp.get('m')}"):
-            out['streets.json'] = build_streets(api)
+        key = f"{ver}|{fp.get('n')}|{fp.get('m')}"
+        if not full and prev['streets.json'] is not None and old.split('|')[-2:] == key.split('|')[-2:]:
+            key_only['streets.json'] = key
+            print('  streets.json: centerline re-synced without street edits, kept', flush=True)
+            return
+        keys['streets.json'] = key
+        out['streets.json'] = build_streets(api)
     print('streets ...', flush=True)
     attempt(['streets.json'], streets)
 
@@ -1543,13 +1700,13 @@ def main():
         if unchanged('drone.json', f"{api.version('ay9z-ynxz')}|{geo_key}|{today.year}"):
             return
         try:
-            d = build_drone(api, nbp, today.year)
+            d = build_drone(api, P()[0], today.year)
         except PipelineError as e:
             if 'rows for' not in str(e):
                 raise
             if today.month > 1:
                 warn(f'Drone flights has no {today.year} flights yet; still showing {today.year - 1}.')
-            d = build_drone(api, nbp, today.year - 1)  # fails too if the dataset is empty
+            d = build_drone(api, P()[0], today.year - 1)  # fails too if the dataset is empty
         out['drone.json'] = d
     print('drone ...', flush=True)
     attempt(['drone.json'], drone)
@@ -1565,19 +1722,22 @@ def main():
         elif today.month == 1 and int(api.get(f'/resource/{ds}.json', {'$select': 'count(*) as n'})[0]['n']) == 0:
             cyear -= 1  # the new year's dataset exists but is still empty
             ds = cfs_dataset_id(api, cyear)
+        else:
+            watch[ds] = (f'Calls for Service {cyear}', CFS_MAX_DAYS)
         hist = dict(prev['hist.json'] or {})
         version = api.version(ds)
         cur = None
         if not (unchanged('cfs.json', f'{ds}|{version}|{geo_key}') and str(cyear) in hist):
             keys['cfs.json'] = f'{ds}|{version}|{geo_key}'
+            nbp, pdp = P()
             out['cfs.json'], cur = build_cfs(api, nbp, pdp, geo, cyear, ds)
 
         print('history ...', flush=True)
         # Past years are closed, but the City loads each year's last rows on January 1 and has occasionally
         # touched old years later. A year is recounted only when its dataset's version moved: last year is
-        # checked daily in January and February, every year on the 1st of the month.
+        # checked daily in January and February, every year on the check day.
         hist = {k: v for k, v in hist.items() if int(k) < cyear}
-        check = range(2014, cyear) if full else [cyear - 1] if today.month <= 2 else []
+        check = range(2014, cyear) if check_day else [cyear - 1] if today.month <= 2 else []
         for y in range(2014, cyear):
             v = api.version(cfs_dataset_id(api, y)) if (y in check or str(y) not in hist) else None
             if str(y) not in hist or (v and hist_versions.get(str(y)) and v != hist_versions[str(y)]):
@@ -1599,38 +1759,39 @@ def main():
     def cpc():
         version = api.version('xxb5-5azv')
         if not unchanged('cpc.json', f'{version}|{geo_key}'):
-            out['cpc.json'] = build_cpc(api, nbp, today if a.today else min(today, central_date(version)))
+            out['cpc.json'] = build_cpc(api, P()[0], today if a.today else min(today, central_date(version)))
     print('planning cases ...', flush=True)
     attempt(['cpc.json'], cpc)
 
     # ---- pages added with the 311 / housing / business set: each file is rebuilt when its dataset(s) or geo changed
-    def sr():
-        if not unchanged('311.json', f'{api.version(SR_DS)}|{geo_key}'):
-            out['311.json'] = build_311(api, nbp)
+    def sr():  # 311.json and the trees page's tree requests come from the same rows
+        key = f'{api.version(SR_DS)}|{geo_key}'
+        if not (unchanged('311.json', key) & unchanged('treereq.json', key)):
+            out['treereq.json'], out['311.json'] = build_311(api, P()[0])
     print('311 requests ...', flush=True)
-    attempt(['311.json'], sr)
+    attempt(['311.json', 'treereq.json'], sr)
 
     def strs():
         if not unchanged('str.json', '|'.join([api.version(d) for d in (STR_ACTIVE, STR_APPS, STR_NC)] + [geo_key])):
-            out['str.json'] = build_str(api, nbp)
+            out['str.json'] = build_str(api, P()[0])
     print('short-term rentals ...', flush=True)
     attempt(['str.json'], strs)
 
     def blight():
         if not unchanged('blight.json', '|'.join([api.version(d) for d in (CE_CASES, CE_VIOL, CE_INSP, CE_HEAR, CE_GRASS, CE_ABATE)] + [geo_key])):
-            out['blight.json'] = build_blight(api, nbp)
+            out['blight.json'] = build_blight(api, P()[0])
     print('blight and code enforcement ...', flush=True)
     attempt(['blight.json'], blight)
 
     def permits():
         if not unchanged('permits.json', f'{api.version(PERMITS)}|{geo_key}'):
-            out['permits.json'] = build_permits(api, nbp)
+            out['permits.json'] = build_permits(api, P()[0])
     print('building permits ...', flush=True)
     attempt(['permits.json'], permits)
 
     def biz():
         if not unchanged('biz.json', f'{api.version(BIZ_APPS)}|{api.version(BIZ_NOW)}|{geo_key}'):
-            out['biz.json'] = build_biz(api, nbp)
+            out['biz.json'] = build_biz(api, P()[0])
     print('new businesses ...', flush=True)
     attempt(['biz.json'], biz)
 
@@ -1655,6 +1816,24 @@ def main():
         d = cur.get(name)
         if d and d.get(field) and d[field][:10] < (today - dt.timedelta(days=days)).isoformat():
             warn(f'{label} has no records after {d[field][:10]}.')
+    # A dataset the City normally reloads every night but hasn't for days means its feed broke: fail the run, so the
+    # owner hears about it instead of the page quietly going stale.
+    for ds, (label, days) in sorted(watch.items()):
+        if days and ds in api.vers:
+            age = (today - central_date(api.vers[ds])).days
+            if age > days:
+                alerts.append(f'{label} ({ds}) was last updated by the City on {central_date(api.vers[ds])}, {age} days ago; '
+                              f'it normally updates at least every {days} days. Its page still shows that data.')
+    # A saved copy downloaded again in full twice within a few days means the GitHub cache isn't keeping it between
+    # runs (or it keeps disagreeing with the City), and every day would cost a full download.
+    for ds, why in sorted(FULL_DOWNLOADS.items()):
+        last = copies.get(ds)
+        if last and (today - dt.date.fromisoformat(last)).days <= 3:
+            alerts.append(f'{ds} was downloaded again in full ({why}), as it was on {last}. The saved copy in .cache/raw is not '
+                          'surviving between runs: check the cache steps of the workflow.')
+        else:
+            warn(f'{ds} was downloaded again in full ({why}). Expected after a long pause; if it repeats, check the workflow cache.')
+        copies[ds] = today.isoformat()
 
     # Write only the files whose content changed, so a day without new data leaves data/ and the site untouched.
     os.makedirs(a.out, exist_ok=True)
@@ -1673,30 +1852,42 @@ def main():
         if name in keys:
             entry['key'] = keys[name]
         files[name] = entry
+    for name, key in key_only.items():   # inputs moved without changing the file: noted along with the next real change
+        files[name] = {**files.get(name, {}), 'key': key}
     old_meta = os.path.join(a.out, 'meta.json')  # the run timestamp it held changed every page every day; sources.json replaces it
     if os.path.exists(old_meta):
         os.remove(old_meta)
         changed.append('meta.json (removed)')
-    # sources.json is rewritten only along with a data change, so an idle day commits nothing.
-    if changed or not os.path.exists(os.path.join(a.out, 'sources.json')):
+    # sources.json is rewritten only along with a data change (or a full re-download to remember), so an idle day commits nothing.
+    if changed or copies != state.get('copies', {}) or not os.path.exists(os.path.join(a.out, 'sources.json')):
         state = {'files': dict(sorted(files.items())), 'histVersions': dict(sorted(hist_versions.items())),
                  'cfsIds': {str(y): i for y, i in sorted(FOUND_IDS.items())}}
+        if copies:
+            state['copies'] = dict(sorted(copies.items()))
         with open(os.path.join(a.out, 'sources.json'), 'w', encoding='utf-8', newline='\n') as f:
             json.dump(state, f, indent=1, ensure_ascii=False)
+    api.tidy_cache()
     print(f"changed: {', '.join(changed) or 'nothing'}")
     print(f"  drone {len(drone_d['recs'])} flights ({drone_d['year']}), cfs {sum(map(sum, cfs_d['daily']))} calls ({cfs_d['year']}, through day {cfs_d['last']}), "
           f"cpc {cpc_d['total']} cases, {len(cpc_d['up'])} upcoming")
     for name in NEW_FILES:
         if cur.get(name):
             print(f"  {name}: {cur[name].get('total', '?')} records through {cur[name].get('last', '?')}")
-    print(f'  {api.n_req} API requests, {api.n_bytes / 1e6:.1f} MB')
-    if not a.no_build and a.out == DATA:
+    for k, (n, b, w) in sorted(api.by_ds.items()):
+        print(f'    {k:10} {n:3} requests {b / 1e6:7.2f} MB ({w / 1e6:.2f} MB transferred)')
+    print(f'  {api.n_req} API requests, {api.n_bytes / 1e6:.1f} MB ({api.n_wire / 1e6:.1f} MB transferred, compressed); '
+          f'{api.hits} answered from the saved responses')
+    if changed and not a.no_build and a.out == DATA:
         subprocess.run([sys.executable, os.path.join(ROOT, 'build.py')], check=True)
+    for msg in alerts:
+        report_error(msg)
     if failed:
         report_error(f"Not refreshed today, last good version kept: {', '.join(failed)}")
+    if failed or alerts:
         if os.environ.get('GITHUB_OUTPUT'):  # the workflow publishes what did refresh, then fails the run
             with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
                 f.write(f"failed={' '.join(failed)}\n")
+                f.write(f"alerts={len(alerts)}\n" if alerts else '')
         else:
             sys.exit(1)
 
