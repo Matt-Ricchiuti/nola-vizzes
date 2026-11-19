@@ -68,10 +68,16 @@ const NOLA = (() => {
   // map(el, opts) -> {svg, layer, zoomTo, setFill, focus, k()}
   // The map fills el. It keeps clear of an on-map filter panel (o.panel) when fitting, and carries its own
   // zoom controls, scale bar and street-name labels.
+  // Input: the mouse wheel (or trackpad pinch) zooms and dragging pans; the page never scrolls under the map.
+  // On touch screens one finger scrolls the page and two fingers move and zoom the map (see stage()).
+  // The map follows its box when the page is resized: one unit is one CSS pixel once the map is over 1000px wide
+  // (narrower maps scale down, as before), so text and dots keep their size on wide screens.
   let mapN = 0;
   function map(el, o) {
     el.classList.add('map');
-    const W = 1000, H = Math.round(W * (el.clientHeight > 50 ? el.clientHeight / Math.max(1, el.clientWidth) : (o.height || 640) / 1000));
+    const dims = () => { const cw = el.clientWidth, ch = el.clientHeight, w = Math.max(1000, Math.round(cw));
+      return [w, Math.round(w * (ch > 50 && cw > 0 ? ch / cw : (o.height || 640) / 1000))]; };
+    let [W, H] = dims();
     const svg = d3.select(el).append('svg').attr('viewBox', `0 0 ${W} ${H}`).attr('role', 'img').attr('aria-label', o.label || 'Map of New Orleans');
     const root = svg.append('g');
     const base = root.append('g');
@@ -127,7 +133,7 @@ const NOLA = (() => {
     }
 
     // ---- zoom, controls, scale bar ----
-    let k = 1, lt = 0; const listeners = [];
+    let k = 1, lt = 0, moved = false, target = null; const listeners = [];
     const scaleEl = document.createElement('div'); scaleEl.className = 'scalebar'; scaleEl.innerHTML = '<span></span><i></i>'; el.appendChild(scaleEl);
     function drawScale() {
       const pxPerMile = 80.47 * k * (el.clientWidth || W) / W, opts = [0.05, 0.1, 0.25, 0.5, 1, 2, 5]; let m = opts[0];
@@ -136,16 +142,30 @@ const NOLA = (() => {
       scaleEl.firstChild.textContent = m < 1 ? (m * 5280 >= 1000 ? m + ' mi' : Math.round(m * 5280) + ' ft') : m + ' mi';
     }
     // the opening view is about k = 0.45; allow zooming out far enough to see the whole parish, east marsh included
-    const zoom = d3.zoom().scaleExtent([0.25, 40]).on('zoom', ev => {
-      root.attr('transform', ev.transform); k = ev.transform.k; streetZoom(k); drawScale();
-      stLabG.selectAll('text').style('font-size', d => (d.fs / k) + 'px').style('stroke-width', (3 / k) + 'px');
-      listeners.forEach(f => f(k)); clearTimeout(lt); lt = setTimeout(layoutLabels, 90);
-    });
+    const zoom = d3.zoom().scaleExtent([0.25, 40])
+      // touch: only two-finger gestures move the map, so one finger still scrolls the page (touch-action in lib.css)
+      .filter(ev => ev.type.startsWith('touch') ? ev.touches.length >= 2 : (!ev.ctrlKey || ev.type === 'wheel') && !ev.button)
+      .on('zoom', ev => {
+        if (ev.sourceEvent) moved = true; // the reader moved the map, so a resize keeps their view instead of refitting
+        root.attr('transform', ev.transform); k = ev.transform.k; streetZoom(k); drawScale();
+        stLabG.selectAll('text').style('font-size', d => (d.fs / k) + 'px').style('stroke-width', (3 / k) + 'px');
+        listeners.forEach(f => f(k)); clearTimeout(lt); lt = setTimeout(layoutLabels, 90);
+      });
     svg.call(zoom).on('dblclick.zoom', null);
+    // Safari's trackpad pinch arrives as gesture events rather than ctrl+wheel; zoom the map instead of the page
+    // (on iPhone/iPad the same events come with two-finger touches, which d3 already handles)
+    let gk = 1, touching = false;
+    el.addEventListener('touchstart', e => { touching = true; }, { passive: true });
+    const untouch = e => { touching = e.touches.length > 0; };
+    el.addEventListener('touchend', untouch, { passive: true }); el.addEventListener('touchcancel', untouch, { passive: true });
+    el.addEventListener('gesturestart', e => { e.preventDefault(); gk = k; });
+    el.addEventListener('gesturechange', e => { e.preventDefault(); if (touching) return; moved = true;
+      const r = svg.node().getBoundingClientRect(); svg.call(zoom.scaleTo, gk * e.scale, [(e.clientX - r.left) * W / r.width, (e.clientY - r.top) * H / r.height]); });
     // fit an extent into the part of the map the filter panel doesn't cover
     const inset = () => { if (!o.panel || getComputedStyle(o.panel).position !== 'absolute' || !o.panel.childElementCount) return 0;
       return (o.panel.offsetWidth + 24) * W / Math.max(1, el.clientWidth); };
-    function zoomTo([x0, y0, x1, y1], dur = 0) {
+    function zoomTo(ext, dur = 0) {
+      const [x0, y0, x1, y1] = ext; target = ext; moved = false;
       const L = inset(), s = Math.min((W - L) / (x1 - x0), H / (y1 - y0)) * 0.96;
       const tr = d3.zoomIdentity.translate(L + (W - L) / 2, H / 2).scale(s).translate(-(x0 + x1) / 2, -(y0 + y1) / 2);
       (dur ? svg.transition().duration(dur) : svg).call(zoom.transform, tr);
@@ -153,10 +173,24 @@ const NOLA = (() => {
     const home = o.extent || FULL;
     let focused = -1;
     const ctl = document.createElement('div'); ctl.className = 'mapctl';
-    [['+', 'Zoom in', () => svg.transition().duration(250).call(zoom.scaleBy, 1.7)], ['−', 'Zoom out', () => svg.transition().duration(250).call(zoom.scaleBy, 1 / 1.7)],
+    const by = f => () => { moved = true; svg.transition().duration(250).call(zoom.scaleBy, f); };
+    [['+', 'Zoom in', by(1.7)], ['−', 'Zoom out', by(1 / 1.7)],
      ['⤢', 'Reset view', () => api.focus(focused)]].forEach(([t, l, fn]) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = t; b.title = l; b.setAttribute('aria-label', l); b.onclick = fn; ctl.appendChild(b); });
     el.appendChild(ctl);
     zoomTo(home); drawScale(); layoutLabels();
+    // follow the map's box (window resizes, the page's scrollbar appearing, rotating a phone): an untouched map is
+    // refitted to what it was showing; one the reader has moved keeps its center and scale
+    const fit = () => {
+      if (!el.clientWidth || !el.clientHeight) return;
+      const [nw, nh] = dims(); if (nw === W && nh === H) return;
+      const t = d3.zoomTransform(svg.node()), c = t.invert([W / 2, H / 2]);
+      W = nw; H = nh; svg.interrupt().attr('viewBox', `0 0 ${W} ${H}`);
+      if (!moved && target) zoomTo(target);
+      else svg.call(zoom.transform, d3.zoomIdentity.translate(W / 2, H / 2).scale(t.k).translate(-c[0], -c[1]));
+      drawScale();
+    };
+    if (window.ResizeObserver) new ResizeObserver(fit).observe(el);
+    addEventListener('resize', fit);
     const api = {
       svg, layer, nbSel, zoomTo, k: () => k, onZoom: f => listeners.push(f), home,
       setFill(fn) { nbSel.attr('fill', f => fn(f.idx) || null).style('fill', f => fn(f.idx) || null); },
@@ -173,19 +207,50 @@ const NOLA = (() => {
   function mapButtons() {}
 
   // ---------- filters on the chart ----------
-  // stage(el, { map }) turns a view's pane into a filter panel + plot area. On maps the panel floats over the map.
+  // stage(el, { map }) turns a view's pane into a filter panel + plot area. On maps the panel floats over the map,
+  // and the section holding the map spans the window (see .vsec.wide in lib.css).
   function stage(el, { map: isMap = false, open = false } = {}) {
     el.classList.add('stage', isMap ? 'mapstage' : 'chartstage');
     el.innerHTML = '<div class="fpanel"></div><div class="plot"></div>';
-    const panel = el.firstChild;
+    const panel = el.firstChild, plot = el.lastChild;
     if (isMap) { // on phones the map's filters fold away behind a button, so the map shows first
       const b = document.createElement('button'); b.type = 'button'; b.className = 'btn ftoggle'; b.textContent = 'Filters';
       if (open) b.textContent = 'Hide filters'; else panel.classList.add('collapsed');
       b.onclick = () => { panel.classList.toggle('collapsed'); b.textContent = panel.classList.contains('collapsed') ? 'Filters' : 'Hide filters'; };
       el.insertBefore(b, panel);
+      const sec = el.closest('.vsec'); if (sec) sec.classList.add('wide');
+      lockInput(panel, plot);
     }
-    return { panel, plot: el.lastChild };
+    return { panel, plot };
   }
+  // Keep input over a map in the map. The wheel over the map belongs to the map (each map zooms on it), even at the
+  // zoom limits, where it would otherwise fall through and scroll the page. The floating filter panel scrolls itself
+  // and stops at its ends instead of handing the scroll on to the page. On touch screens one finger scrolls the page
+  // and two fingers move the map (each map does the moving); a one-finger swipe over the map shows a short hint.
+  function lockInput(panel, plot) {
+    plot.addEventListener('wheel', e => e.preventDefault(), { passive: false });
+    panel.addEventListener('wheel', e => {
+      if (e.ctrlKey || getComputedStyle(panel).position !== 'absolute') return; // page zoom; phones: the panel is part of the page
+      for (let n = e.target; n && n !== panel.parentNode; n = n.parentNode) {
+        if (n.nodeType !== 1 || n.scrollHeight <= n.clientHeight + 1 || !/auto|scroll/.test(getComputedStyle(n).overflowY)) continue;
+        if (e.deltaY < 0 ? n.scrollTop > 0 : n.scrollTop + n.clientHeight < n.scrollHeight - 1) return; // this box can still scroll
+      }
+      e.preventDefault();
+    }, { passive: false });
+    let y0 = null, two = false, ht = 0;
+    plot.addEventListener('touchstart', e => { two = e.touches.length > 1; y0 = two ? null : [e.touches[0].clientX, e.touches[0].clientY]; }, { passive: true });
+    plot.addEventListener('touchmove', e => {
+      if (two || !y0 || e.touches.length !== 1) return;
+      const t = e.touches[0]; if (Math.hypot(t.clientX - y0[0], t.clientY - y0[1]) < 12) return; y0 = null;
+      let h = plot.querySelector(':scope>.maphint');
+      if (!h) { h = document.createElement('div'); h.className = 'maphint'; h.setAttribute('aria-hidden', 'true'); h.textContent = 'Use two fingers to move the map'; plot.appendChild(h); }
+      h.classList.add('on'); clearTimeout(ht); ht = setTimeout(() => h.classList.remove('on'), 1400);
+    }, { passive: true });
+  }
+  // the page's scrollbar width, so full-width sections (lib.css) span the window without a sideways scroll
+  const setSbw = () => document.documentElement.style.setProperty('--sbw', Math.max(0, innerWidth - document.documentElement.clientWidth) + 'px');
+  if (window.ResizeObserver) new ResizeObserver(setSbw).observe(document.documentElement);
+  addEventListener('resize', setSbw); setSbw();
   // panel section with a small heading and an optional link-style action ("Show all")
   function fsec(panel, title, action) {
     const sec = document.createElement('div'); sec.className = 'fsec';
@@ -307,84 +372,116 @@ const NOLA = (() => {
   const setText = (id, s) => { const el = document.getElementById(id); if (el) el.textContent = s; };
   const setHTML = (id, s) => { const el = document.getElementById(id); if (el) el.innerHTML = s; };
 
-  // ---------- one subject per page: every chart stacked down the page ----------
-  // The URL hash holds the chart last used and the page's filters: #chartId&key=value&... so a link opens
-  // the page scrolled to that chart with exactly those filters.
+  // ---------- one subject per page: a row of tabs, one per chart ----------
+  // The URL hash holds the open chart and the page's filters: #chartId&key=value&... so a link opens
+  // that chart with exactly those filters.
   function hashState() {
     const [view, ...kv] = location.hash.slice(1).split('&'), o = { view };
     kv.forEach(p => { const [k, v] = p.split('='); if (k) o[k] = decodeURIComponent(v || ''); });
     return o;
   }
-  // views(list, { state, ds }) -- list: [{ id, label, cls, keep, draw(el, first), csv() -> rows, ds: [id, name] }]
-  // Each chart gets its own full-width section in #chart: a heading (label), its Copy link / Download CSV, then the chart.
-  // Filters are shared page state, so refresh() redraws every chart. state() returns the filters that differ from
-  // their defaults; they're written into the link. A page can jump to a chart with location.hash = 'chartId'.
+  // views(list, { state, ds }) -- list: [{ id, label, tab, cls, keep, draw(el, first), csv() -> rows, file() -> CSV name (default id), ds: [id, name] }]
+  // A bar at the top of #chart holds a tab per chart (`tab`, or `label`) and Copy link / Download CSV for the open one.
+  // Below it, each chart is its own section (heading `label`, then the chart); only the open one shows.
+  // With a single chart there are no tabs: its heading takes their place in the bar.
+  // Filters are shared page state: refresh() redraws the open chart, and the others redraw when next opened.
+  // state() returns the filters that differ from their defaults; they're written into the link.
+  // A page can open a chart with location.hash = 'chartId'.
   function views(list, opts = {}) {
     const host = document.getElementById('chart');
-    const panes = {}, secs = {}, drawn = new Set(); let cur = null;
+    const panes = {}, secs = {}, tabs = {}, drawn = new Set(), stale = new Set();
     const stateKV = () => {
       const st = opts.state ? opts.state() : {};
       return Object.entries(st).filter(([, v]) => v != null && v !== '').map(([k, v]) => `&${k}=${encodeURIComponent(v)}`).join('');
     };
-    const linkFor = id => location.href.split('#')[0] + '#' + id + stateKV();
-    const writeHash = () => { const kv = stateKV(); if (cur || kv) history.replaceState(null, '', '#' + (cur ? cur.id : '') + kv); };
+    const h0 = hashState().view;
+    let cur = list.find(v => v.id === h0) || list[0];
+    const linkFor = () => location.href.split('#')[0] + '#' + cur.id + stateKV();
+    const writeHash = () => history.replaceState(null, '', '#' + cur.id + stateKV());
     const btn = t => { const b = document.createElement('button'); b.className = 'btn'; b.type = 'button'; b.textContent = t; return b; };
+    // the bar: tabs, then the open chart's Copy link / Download CSV
+    const bar = document.createElement('div'); bar.className = 'vbar';
+    const tabRow = document.createElement('div'); tabRow.className = 'vtabs'; tabRow.setAttribute('role', 'tablist'); tabRow.setAttribute('aria-label', 'Charts');
+    const tools = document.createElement('div'); tools.className = 'tools';
+    const linkB = btn('Copy link'), csvB = btn('Download CSV');
+    linkB.onclick = async () => {
+      writeHash(); const url = linkFor();
+      try { await navigator.clipboard.writeText(url); linkB.textContent = 'Link copied'; }
+      catch (e) { prompt('Copy this link:', url); }
+      setTimeout(() => linkB.textContent = 'Copy link', 1600);
+    };
+    csvB.onclick = () => downloadCSV(cur);
+    tools.append(linkB, csvB);
+    // a page with a single chart has no tabs: the bar holds that chart's heading instead
+    const one = list.length === 1;
+    if (one) bar.classList.add('one');
+    bar.append(one ? document.createElement('h2') : tabRow, tools); host.appendChild(bar);
     list.forEach(v => {
+      const t = document.createElement('button'); t.type = 'button'; t.textContent = v.tab || v.label;
+      t.id = 'vt-' + v.id; t.setAttribute('role', 'tab'); t.setAttribute('aria-controls', 'v-' + v.id);
+      t.onclick = () => open(v.id); tabRow.appendChild(t); tabs[v.id] = t;
       const sec = document.createElement('section'); sec.className = 'vsec'; sec.id = 'v-' + v.id;
-      const head = document.createElement('div'); head.className = 'vsec-h';
-      const h = document.createElement('h2'); h.textContent = v.label;
-      const tools = document.createElement('div'); tools.className = 'tools';
-      const linkB = btn('Copy link');
-      linkB.onclick = async () => {
-        cur = v; writeHash(); const url = linkFor(v.id);
-        try { await navigator.clipboard.writeText(url); linkB.textContent = 'Link copied'; }
-        catch (e) { prompt('Copy this link:', url); }
-        setTimeout(() => linkB.textContent = 'Copy link', 1600);
-      };
-      tools.appendChild(linkB);
-      if (v.csv) { const csvB = btn('Download CSV'); csvB.onclick = () => downloadCSV(v); tools.appendChild(csvB); }
-      head.append(h, tools);
+      const h = one ? bar.firstChild : document.createElement('h2'); h.textContent = v.label;
       const p = document.createElement('div'); p.className = 'pane ' + (v.cls || 'card');
-      sec.append(head, p); host.appendChild(sec); panes[v.id] = p; secs[v.id] = sec;
-      // the chart last touched is the one a copied link (and the address bar) points to
-      sec.addEventListener('pointerdown', () => { if (cur !== v) { cur = v; writeHash(); } });
+      if (one) { h.id = 'vh-' + v.id; sec.setAttribute('aria-labelledby', h.id); sec.append(p); }
+      else {
+        sec.setAttribute('role', 'tabpanel'); sec.setAttribute('aria-labelledby', 'vt-' + v.id);
+        const head = document.createElement('div'); head.className = 'vsec-h'; head.appendChild(h); sec.append(head, p);
+      }
+      host.appendChild(sec); panes[v.id] = p; secs[v.id] = sec;
     });
     // footer "Data:" link goes to the page's City dataset
     const dataLink = document.getElementById('dataLink'), ds = opts.ds || (list.find(v => v.ds) || {}).ds;
     if (dataLink && ds) { dataLink.href = 'https://data.nola.gov/d/' + ds[0]; dataLink.textContent = ds[1] + ' on data.nola.gov'; }
-    const drawOne = v => { v.draw(panes[v.id], !drawn.has(v.id)); drawn.add(v.id); };
-    const draw = () => { tip.hide(); list.forEach(drawOne); writeHash(); };
-    const go = (id, smooth) => {
+    // charts are drawn only while shown (hidden ones have no size); a hidden chart whose filters changed redraws when opened
+    const drawOne = v => { v.draw(panes[v.id], !drawn.has(v.id)); drawn.add(v.id); stale.delete(v.id); };
+    const draw = () => { tip.hide(); list.forEach(v => { if (v !== cur && drawn.has(v.id)) stale.add(v.id); }); drawOne(cur); writeHash(); setSbw(); };
+    function show(v) {
+      cur = v;
+      list.forEach(x => { secs[x.id].hidden = x !== v; tabs[x.id].setAttribute('aria-selected', x === v); tabs[x.id].tabIndex = x === v ? 0 : -1; });
+      csvB.hidden = !v.csv;
+      if (!drawn.has(v.id) || stale.has(v.id)) drawOne(v);
+      // on phones the tab row scrolls sideways: bring the open tab into view
+      const r = tabRow.getBoundingClientRect(), t = tabs[v.id].getBoundingClientRect();
+      if (t.left < r.left || t.right > r.right) tabRow.scrollLeft += t.left - r.left - 16;
+    }
+    function open(id, focusTab) {
       const v = list.find(x => x.id === id); if (!v) return;
-      cur = v; secs[id].scrollIntoView({ behavior: smooth ? 'smooth' : 'auto', block: 'start' });
-    };
+      tip.hide(); if (v !== cur || !drawn.has(v.id)) show(v); writeHash();
+      if (focusTab) tabs[id].focus();
+      if (bar.getBoundingClientRect().top < 0) bar.scrollIntoView({ block: 'start' }); // jumped here from further down the page
+    }
+    // arrow keys move between tabs
+    tabRow.addEventListener('keydown', ev => {
+      const i = list.indexOf(cur), n = list.length;
+      const j = ev.key === 'ArrowRight' ? (i + 1) % n : ev.key === 'ArrowLeft' ? (i - 1 + n) % n : ev.key === 'Home' ? 0 : ev.key === 'End' ? n - 1 : -1;
+      if (j >= 0) { ev.preventDefault(); open(list[j].id, true); }
+    });
     // a link with filters opened on this same page (only the hash changes) reloads, so its filters apply;
     // the pages' own jumps to a chart set a bare chart id and keep the current filters
     addEventListener('hashchange', () => {
       const h = hashState(), st = opts.state ? opts.state() : {};
       const want = Object.entries(h).filter(([k]) => k !== 'view'), have = Object.entries(st).filter(([, v]) => v != null && v !== '');
       if (want.length && (want.length !== have.length || want.some(([k, v]) => String(st[k]) !== v))) return location.reload();
-      draw(); go(h.view, true);
+      if (list.some(v => v.id === h.view) && h.view !== cur.id) { list.forEach(x => { if (drawn.has(x.id)) stale.add(x.id); }); open(h.view); } else draw();
     });
     let rt, lastW = innerWidth;
     addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => {
       if (innerWidth === lastW) return; lastW = innerWidth; // phones fire resize on scroll (address bar); only width matters
-      list.forEach(v => { if (!v.keep) drawOne(v); });
+      list.forEach(v => { if (!v.keep && drawn.has(v.id)) { if (v === cur) drawOne(v); else stale.add(v.id); } });
     }, 150); });
     function downloadCSV(v) {
-      const rows = v.csv(); if (!rows || !rows.length) return;
+      const rows = v.csv && v.csv(); if (!rows || !rows.length) return;
       const keys = Object.keys(rows[0]);
       const cell = x => { x = x == null ? '' : String(x); return /[",\n]/.test(x) ? '"' + x.replace(/"/g, '""') + '"' : x; };
       const text = [keys.map(cell).join(','), ...rows.map(r => keys.map(k => cell(r[k])).join(','))].join('\n');
       const a = document.createElement('a');
       a.href = URL.createObjectURL(new Blob(['\ufeff' + text], { type: 'text/csv;charset=utf-8' }));
-      a.download = `${location.pathname.split('/').pop().replace('.html', '') || 'index'}-${v.id}.csv`;
+      a.download = `${location.pathname.split('/').pop().replace('.html', '') || 'index'}-${v.file ? v.file() : v.id}.csv`;
       document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
     }
-    const h0 = hashState().view;
-    draw();
-    if (list.some(v => v.id === h0)) requestAnimationFrame(() => go(h0, false));
-    return { refresh: draw, get id() { return cur ? cur.id : list[0].id; } };
+    show(cur); writeHash();
+    return { refresh: draw, open, get id() { return cur.id; } };
   }
   const legendHTML = items => '<div class="legend">' + items.map(([c, l, round]) => `<span><i style="background:${c}${round ? ';border-radius:50%' : ''}"></i>${l}</span>`).join('') + '</div>';
 

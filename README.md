@@ -41,7 +41,7 @@ Commit and push changes to `src/` together with the rebuilt `site/`.
 
 ## Page layout
 
-Every page has a title, one source line linking to its City dataset, **Copy link** / **Download CSV** right under it, and a dropdown that switches between views of that subject. The selected view and its filters are kept in the URL.
+Every page has a title, one source line linking to its City dataset, then a row of tabs (one per chart) with **Copy link** / **Download CSV** for the open chart at the end of the row. The chart's title and the chart sit below. A page with one chart (street trees) has no tabs: the chart's title sits in that row instead, and the trees map fills the window below it. The open chart and its filters are kept in the URL.
 
 Filters live **on the chart**, in a panel styled after the original street-trees map: legend-style rows (swatch, name, live count, proportion bar), segmented switches and a neighborhood picker. On maps the panel floats over the top-left corner, with zoom buttons and a scale bar on the map; on charts it's a sidebar inside the chart card; on phones it stacks above (maps fold it behind a "Filters" button).
 

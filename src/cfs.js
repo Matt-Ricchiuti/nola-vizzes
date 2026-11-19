@@ -12,7 +12,10 @@
   const tcase = s => NOLA.title(s).replace(/\(Private\)/, '(private)').replace(/ With /, ' with ').replace(/ For /, ' for ').replace(/ Of /, ' of ');
   const hl = h => { h = h % 24; return h === 0 ? '12a' : h < 12 ? h + 'a' : h === 12 ? '12p' : (h - 12) + 'p'; };
   const H = NOLA.hashState();
-  const st = { metric: H.metric || 'res', basis: H.basis || 'n', nb: H.nb != null ? +H.nb : -1, show: H.show || 'both' }, nb = C.nb;
+  // per: which calls-over-time chart shows (month: per month since 2014, day: per day this year)
+  const st = { metric: H.metric || 'res', basis: H.basis || 'n', nb: H.nb != null ? +H.nb : -1, show: H.show || 'both', per: H.per === 'day' ? 'day' : 'month' }, nb = C.nb;
+  // links from before the two time charts were merged: #daily is now the "Per day" tab of #trend
+  if (H.view === 'daily') { st.per = 'day'; history.replaceState(null, '', location.hash.replace(/^#daily/, '#trend')); }
   const staged = (el, first, isMap) => { if (first) el._s = NOLA.stage(el, { map: isMap }); return el._s; };
   const showRes = () => st.show !== 'self', showSelf = () => st.show !== 'res';
   // "Who started the call" rows: click one to show it alone, click again for both
@@ -29,9 +32,13 @@
       .on('mouseleave', () => { cross.style('opacity', 0); tip.hide(); });
   };
 
-  // ---------- calls per month since 2014 ----------
-  function drawTrend(pane, first) {
+  // ---------- calls over time: per month since 2014, or per day this year (tabs) ----------
+  function drawTime(pane, first) {
     const { panel, plot } = staged(pane, first); plot.innerHTML = '';
+    (st.per === 'day' ? drawDaily : drawTrend)(panel, plot);
+    NOLA.ftabs(panel, [['month', 'Per month'], ['day', `Per day, ${YEAR}`]], st.per, v => { st.per = v; V.refresh(); });
+  }
+  function drawTrend(panel, plot) {
     const pts = []; Object.keys(HIST).sort().forEach(y => HIST[y].forEach((v, m) => { if (!(+y === YEAR && m >= cutMonth)) pts.push({ y: +y, m, i: pts.length, res: v[0], self: v[1] }); }));
     seriesPanel(panel, d3.sum(pts, p => p.res), d3.sum(pts, p => p.self));
     const f = NOLA.frame(plot, { h: 380, m: { t: 16, r: 16, b: 28, l: 44 } });
@@ -53,9 +60,7 @@
     crosshair(f, x, pts.length, i => { const p = pts[i]; return `<b>${NOLA.months[p.m]} ${p.y}</b>` + row('From the public', fmt(p.res)) + row('Started by officers', fmt(p.self)); });
   }
 
-  // ---------- calls per day this year ----------
-  function drawDaily(pane, first) {
-    const { panel, plot } = staged(pane, first); plot.innerHTML = '';
+  function drawDaily(panel, plot) {
     seriesPanel(panel, d3.sum(C.daily, d => d[0]), d3.sum(C.daily, d => d[1]));
     const n = C.daily.length;
     const roll = k => C.daily.map((d, i) => i < 6 ? null : d3.mean(C.daily.slice(i - 6, i + 1), v => v[k]));
@@ -110,11 +115,9 @@
       { pressed: i => sortK === i, onClick: i => { sortDir = sortK === i ? -sortDir : -1; sortK = i; V.refresh(); } });
     const sorted = rows.slice().sort((a, b) => { const A = cols[sortK][1](a), B = cols[sortK][1](b); return (A == null) - (B == null) || (A < B ? -1 : A > B ? 1 : 0) * sortDir; });
     const mx = d3.max(rows, r => r.n), p = v => Math.round(100 * v) + '%';
-    el.innerHTML = '<div style="overflow-x:auto"><table><thead><tr>' + cols.map((c, i) => `<th data-i="${i}" class="${c[2] ? 'num' : ''}">${c[0]}${i === sortK ? (sortDir < 0 ? ' ↓' : ' ↑') : ''}</th>`).join('') + '</tr></thead><tbody>' +
-      sorted.map(r => `<tr data-k="${r.k}"><td>${r.name}</td><td class="num"><span class="bar" style="width:${50 * r.n / mx}px;margin-right:6px"></span>${fmt(r.n)}</td><td class="num">${p(r.selfP)}</td><td class="num">${r.med == null ? '—' : r.med < 1 ? '<1 min' : Math.round(r.med) + ' min'}</td><td class="num">${p(r.goaP)}</td><td class="num">${p(r.rtfP)}</td></tr>`).join('') + '</tbody></table></div>';
+    el.innerHTML = '<div style="overflow-x:auto"><table class="static"><thead><tr>' + cols.map((c, i) => `<th data-i="${i}" class="${c[2] ? 'num' : ''}">${c[0]}${i === sortK ? (sortDir < 0 ? ' ↓' : ' ↑') : ''}</th>`).join('') + '</tr></thead><tbody>' +
+      sorted.map(r => `<tr><td>${r.name}</td><td class="num"><span class="bar" style="width:${50 * r.n / mx}px;margin-right:6px"></span>${fmt(r.n)}</td><td class="num">${p(r.selfP)}</td><td class="num">${r.med == null ? '—' : r.med < 1 ? '<1 min' : Math.round(r.med) + ' min'}</td><td class="num">${p(r.goaP)}</td><td class="num">${p(r.rtfP)}</td></tr>`).join('') + '</tbody></table></div>';
     el.querySelectorAll('th').forEach(th => th.onclick = () => { const i = +th.dataset.i; sortDir = sortK === i ? -sortDir : (i ? -1 : 1); sortK = i; V.refresh(); });
-    // clicking a mappable call type opens it on the map
-    el.querySelectorAll('tbody tr').forEach(tr => tr.onclick = () => { const k = +tr.dataset.k; if (unmappable(k)) return; st.metric = 't' + k; location.hash = 'map'; });
   }
 
   // ---------- neighborhood map ----------
@@ -204,12 +207,11 @@
   const csvDist = () => C.pd.map(d => ({ district: d[0], from_public: d[1], started_by_officers: d[2], emergency_median_min: d[3], emergency_90th_pct_min: d[4], nonemergency_median_min: d[5] }));
 
   const V = NOLA.views([
-    { id: 'trend', label: 'Calls per month since 2014', draw: drawTrend, csv: csvTrend },
-    { id: 'daily', label: `Calls per day, ${YEAR}`, draw: drawDaily, csv: csvDaily },
+    { id: 'map', label: 'Calls by neighborhood', keep: true, draw: drawMap, csv: csvMap },
+    { id: 'trend', label: 'Calls over time', draw: drawTime, csv: () => st.per === 'day' ? csvDaily() : csvTrend(), file: () => st.per === 'day' ? 'daily' : 'trend' },
     { id: 'heat', label: 'Calls by weekday and hour', draw: drawHeat, csv: csvHeat },
     { id: 'types', label: 'Call types', draw: drawTypes, csv: csvTypes },
-    { id: 'map', label: 'Calls by neighborhood', keep: true, draw: drawMap, csv: csvMap },
     { id: 'dist', label: 'Officer arrival time by police district', draw: drawDist, csv: csvDist },
   ], { ds: [C.ds || 'es9j-6y5d', `Calls for Service ${YEAR}`],
-       state: () => ({ show: st.show !== 'both' ? st.show : null, metric: st.metric !== 'res' ? st.metric : null, basis: st.basis !== 'n' ? st.basis : null, nb: st.nb >= 0 ? st.nb : null }) });
+       state: () => ({ show: st.show !== 'both' ? st.show : null, per: st.per !== 'month' ? st.per : null, metric: st.metric !== 'res' ? st.metric : null, basis: st.basis !== 'n' ? st.basis : null, nb: st.nb >= 0 ? st.nb : null }) });
 })();

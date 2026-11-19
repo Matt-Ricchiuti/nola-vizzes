@@ -10,6 +10,7 @@
   --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100; --s5:#e87ba4; --s6:#008300; --s7:#6250d6; --s8:#e34948;
   --q1:#cde2fb; --q2:#9ec5f4; --q3:#6da7ec; --q4:#3987e5; --q5:#256abf; --q6:#184f95; --q7:#0d366b;
   --none:#d9d8d2; --accent:#2a78d6; --chip:#efeee9;
+  --sbw:0px; --gut:24px; /* scrollbar width (set by lib.js) and side gutter of full-width map sections */
 }
 @media (prefers-color-scheme: dark){
   :root:where(:not([data-theme="light"])){
@@ -64,7 +65,7 @@ h2{font-size:19px;margin:0 0 4px}
 .popnote{color:var(--muted);font-size:12px}
 .split{display:grid;grid-template-columns:1.35fr 1fr;gap:16px;align-items:start}
 @media(max-width:860px){.split{grid-template-columns:1fr} h1{font-size:23px}}
-@media(max-width:600px){.wrap{padding:20px 16px 48px} .card{padding:12px}}
+@media(max-width:600px){.wrap{padding:20px 16px 48px} .card{padding:12px} :root{--gut:16px}}
 .chips{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px}
 .chip{border:1px solid var(--ring);background:var(--chip);color:var(--ink);border-radius:999px;padding:4px 11px;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;font-family:inherit}
 .chip.on{background:var(--ink);color:var(--surface);border-color:var(--ink)}
@@ -78,7 +79,9 @@ svg text{fill:var(--muted);font-size:11px;font-family:inherit}
 .axis path,.axis line{stroke:var(--axis)}
 .gridl line{stroke:var(--grid)}
 .gridl path{display:none}
-.map svg{background:var(--surface);border-radius:10px;cursor:grab;touch-action:none}
+.map svg{background:var(--surface);border-radius:10px;cursor:grab}
+/* maps on touch screens: one finger scrolls the page, two fingers move the map (NOLA.map / trees.js handle those) */
+.map svg,.stage.mapstage .plot canvas{touch-action:pan-x pan-y}
 .nbpath{fill:var(--land);stroke:var(--landline);stroke-width:.8;vector-effect:non-scaling-stroke}
 .nbpath.hot:hover{stroke:var(--ink);stroke-width:1.6}
 .streets{pointer-events:none}
@@ -108,19 +111,38 @@ tbody tr:hover td{background:var(--chip)}
 .halo{paint-order:stroke;stroke:var(--surface);stroke-width:5px;stroke-linejoin:round}
 .maplab{font-weight:600;letter-spacing:.02em}
 /* ---------- filters live on the chart: a panel of legend-style rows (see NOLA.stage / fsec / flist) ---------- */
-/* one section per chart, stacked down the page */
-.vsec{margin:0 0 44px;scroll-margin-top:16px}
-.vsec-h{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 14px;margin:0 0 10px}
-.vsec-h h2{font-size:21px;margin:0;flex:1 1 auto}
-.tools{display:flex;gap:6px}
+/* one tab per chart (NOLA.views): tabs and the open chart's Copy link / Download CSV in one row, the chart below */
+.vbar{display:flex;align-items:flex-start;gap:10px 18px;padding:0 0 12px;border-bottom:1px solid var(--grid);scroll-margin-top:12px}
+.vtabs{display:flex;flex-wrap:wrap;gap:4px;flex:1 1 auto;min-width:0}
+.vtabs button{font:inherit;font-size:13px;line-height:1.3;border:1px solid transparent;border-radius:999px;background:none;color:var(--ink2);padding:5px 12px;cursor:pointer;white-space:nowrap}
+.vtabs button:hover{background:var(--chip);color:var(--ink)}
+.vtabs button[aria-selected="true"]{background:var(--ink);color:var(--surface);font-weight:600}
+.vtabs button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.vsec{margin:26px 0 0}
+/* a page with one chart: its heading sits in the bar where the tabs would be */
+.vbar.one{align-items:center}
+.vbar.one h2{flex:1 1 auto;min-width:0;margin:0;font-family:"Young Serif",Georgia,"Times New Roman",serif;font-weight:400;font-size:21px}
+.vbar.one+.vsec{margin-top:14px}
+.vsec-h{margin:0 0 12px}
+.vsec-h h2{font-size:21px;margin:0}
+.tools{display:flex;gap:6px;flex:0 0 auto;padding-top:3px}
+@media(max-width:640px){
+  .vbar{flex-direction:column;gap:10px}
+  .vbar.one{flex-direction:row;flex-wrap:wrap;align-items:center}
+  .vtabs{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin:0 -16px;padding:0 16px;width:calc(100% + 32px)}
+  .vtabs::-webkit-scrollbar{display:none}
+  .tools{padding-top:0}
+}
 .stage{position:relative}
 .stage.chartstage{display:grid;grid-template-columns:260px minmax(0,1fr);gap:18px;align-items:start}
 .stage.chartstage>.fpanel{position:sticky;top:12px}
-.stage.mapstage{height:min(740px,80vh);padding:0;overflow:hidden}
+/* a section holding a map spans the window, less a small gutter; its heading stays in line with the page */
+.vsec.wide>.pane{--mw:min(calc(100vw - var(--sbw) - 2 * var(--gut)),2400px);width:var(--mw);max-width:none;margin-left:calc(50% - var(--mw) / 2)}
+.stage.mapstage{height:clamp(460px,78vh,900px);padding:0;overflow:hidden}
 .stage.mapstage .plot{position:absolute;inset:0}
 .stage.mapstage .plot .map,.stage.mapstage .plot svg{width:100%;height:100%}
 .stage.mapstage .map svg{border-radius:12px}
-.stage.mapstage>.fpanel{position:absolute;top:12px;left:12px;width:296px;max-height:calc(100% - 24px);overflow:auto;
+.stage.mapstage>.fpanel{position:absolute;top:12px;left:12px;width:296px;max-height:calc(100% - 24px);overflow:auto;overscroll-behavior:contain;
   background:var(--surface);border:1px solid var(--ring);border-radius:10px;box-shadow:0 6px 24px rgb(0 0 0 / .12);z-index:2}
 .fpanel{display:flex;flex-direction:column;gap:14px;padding:14px 14px 12px;font-size:13px}
 .stage.chartstage>.fpanel{padding:0}
@@ -165,6 +187,9 @@ tbody tr:hover td{background:var(--chip)}
 .scalebar{position:absolute;right:14px;bottom:12px;font-size:11px;color:var(--ink2);display:flex;flex-direction:column;align-items:flex-end;gap:3px;pointer-events:none;z-index:2}
 .scalebar i{display:block;height:5px;border:1.5px solid var(--ink2);border-top:0}
 .ftoggle{display:none}
+.maphint{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:3;pointer-events:none;opacity:0;transition:opacity .2s;
+  background:rgb(11 11 11 / .78);color:#fff;font-size:13px;font-weight:500;padding:8px 14px;border-radius:999px;white-space:nowrap}
+.maphint.on{opacity:1}
 .stlab{font-weight:500;pointer-events:none;paint-order:stroke;stroke:var(--surface);stroke-linejoin:round}
 .stlab.major{font-weight:650}
 /* stepped legend for equal-count classes (NOLA.stepLegend): the value under each boundary is where that color starts */
@@ -192,6 +217,25 @@ tbody tr:hover td{background:var(--chip)}
   .mlh{margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .fpanel.collapsed{display:none}
 }
+
+/* ---------- one page per dataset: data pages (drone, calls, trees) ---------- */
+/* tables whose rows don't do anything on click */
+table.static tbody tr{cursor:auto}
+/* on phones a wide table scrolls inside its card instead of widening the page */
+@media(max-width:760px){.stage.chartstage{grid-template-columns:minmax(0,1fr)}}
+
+/* ---------- CPC page (cpc.js): filing-date range in the map panel, and the case-type key under the map ---------- */
+.cpc-range{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.cpc-range label{display:flex;flex-direction:column;gap:3px;min-width:0}
+.cpc-range span{font-size:11px;color:var(--muted)}
+.cpc-range input{width:100%;min-width:0;font:inherit;font-size:12.5px;color:var(--ink);background:var(--chip);border:1px solid var(--ring);border-radius:7px;padding:5px 7px}
+.cpc-range input:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.cpc-key{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px 22px;margin-top:16px}
+.cpc-kt{display:flex;gap:9px;align-items:flex-start;font-size:13px;line-height:1.45}
+.cpc-kt i{flex:0 0 11px;height:11px;border-radius:50%;margin-top:4px}
+.cpc-kt b{font-weight:600}
+.cpc-kt p{margin:1px 0 0;color:var(--ink2)}
+@media(max-width:600px){.cpc-key{grid-template-columns:1fr;gap:10px}}
 
 .agenda{margin:0 -4px}
 .day{margin-bottom:10px}
@@ -287,10 +331,16 @@ const NOLA = (() => {
   // map(el, opts) -> {svg, layer, zoomTo, setFill, focus, k()}
   // The map fills el. It keeps clear of an on-map filter panel (o.panel) when fitting, and carries its own
   // zoom controls, scale bar and street-name labels.
+  // Input: the mouse wheel (or trackpad pinch) zooms and dragging pans; the page never scrolls under the map.
+  // On touch screens one finger scrolls the page and two fingers move and zoom the map (see stage()).
+  // The map follows its box when the page is resized: one unit is one CSS pixel once the map is over 1000px wide
+  // (narrower maps scale down, as before), so text and dots keep their size on wide screens.
   let mapN = 0;
   function map(el, o) {
     el.classList.add('map');
-    const W = 1000, H = Math.round(W * (el.clientHeight > 50 ? el.clientHeight / Math.max(1, el.clientWidth) : (o.height || 640) / 1000));
+    const dims = () => { const cw = el.clientWidth, ch = el.clientHeight, w = Math.max(1000, Math.round(cw));
+      return [w, Math.round(w * (ch > 50 && cw > 0 ? ch / cw : (o.height || 640) / 1000))]; };
+    let [W, H] = dims();
     const svg = d3.select(el).append('svg').attr('viewBox', `0 0 ${W} ${H}`).attr('role', 'img').attr('aria-label', o.label || 'Map of New Orleans');
     const root = svg.append('g');
     const base = root.append('g');
@@ -346,7 +396,7 @@ const NOLA = (() => {
     }
 
     // ---- zoom, controls, scale bar ----
-    let k = 1, lt = 0; const listeners = [];
+    let k = 1, lt = 0, moved = false, target = null; const listeners = [];
     const scaleEl = document.createElement('div'); scaleEl.className = 'scalebar'; scaleEl.innerHTML = '<span></span><i></i>'; el.appendChild(scaleEl);
     function drawScale() {
       const pxPerMile = 80.47 * k * (el.clientWidth || W) / W, opts = [0.05, 0.1, 0.25, 0.5, 1, 2, 5]; let m = opts[0];
@@ -355,16 +405,30 @@ const NOLA = (() => {
       scaleEl.firstChild.textContent = m < 1 ? (m * 5280 >= 1000 ? m + ' mi' : Math.round(m * 5280) + ' ft') : m + ' mi';
     }
     // the opening view is about k = 0.45; allow zooming out far enough to see the whole parish, east marsh included
-    const zoom = d3.zoom().scaleExtent([0.25, 40]).on('zoom', ev => {
-      root.attr('transform', ev.transform); k = ev.transform.k; streetZoom(k); drawScale();
-      stLabG.selectAll('text').style('font-size', d => (d.fs / k) + 'px').style('stroke-width', (3 / k) + 'px');
-      listeners.forEach(f => f(k)); clearTimeout(lt); lt = setTimeout(layoutLabels, 90);
-    });
+    const zoom = d3.zoom().scaleExtent([0.25, 40])
+      // touch: only two-finger gestures move the map, so one finger still scrolls the page (touch-action in lib.css)
+      .filter(ev => ev.type.startsWith('touch') ? ev.touches.length >= 2 : (!ev.ctrlKey || ev.type === 'wheel') && !ev.button)
+      .on('zoom', ev => {
+        if (ev.sourceEvent) moved = true; // the reader moved the map, so a resize keeps their view instead of refitting
+        root.attr('transform', ev.transform); k = ev.transform.k; streetZoom(k); drawScale();
+        stLabG.selectAll('text').style('font-size', d => (d.fs / k) + 'px').style('stroke-width', (3 / k) + 'px');
+        listeners.forEach(f => f(k)); clearTimeout(lt); lt = setTimeout(layoutLabels, 90);
+      });
     svg.call(zoom).on('dblclick.zoom', null);
+    // Safari's trackpad pinch arrives as gesture events rather than ctrl+wheel; zoom the map instead of the page
+    // (on iPhone/iPad the same events come with two-finger touches, which d3 already handles)
+    let gk = 1, touching = false;
+    el.addEventListener('touchstart', e => { touching = true; }, { passive: true });
+    const untouch = e => { touching = e.touches.length > 0; };
+    el.addEventListener('touchend', untouch, { passive: true }); el.addEventListener('touchcancel', untouch, { passive: true });
+    el.addEventListener('gesturestart', e => { e.preventDefault(); gk = k; });
+    el.addEventListener('gesturechange', e => { e.preventDefault(); if (touching) return; moved = true;
+      const r = svg.node().getBoundingClientRect(); svg.call(zoom.scaleTo, gk * e.scale, [(e.clientX - r.left) * W / r.width, (e.clientY - r.top) * H / r.height]); });
     // fit an extent into the part of the map the filter panel doesn't cover
     const inset = () => { if (!o.panel || getComputedStyle(o.panel).position !== 'absolute' || !o.panel.childElementCount) return 0;
       return (o.panel.offsetWidth + 24) * W / Math.max(1, el.clientWidth); };
-    function zoomTo([x0, y0, x1, y1], dur = 0) {
+    function zoomTo(ext, dur = 0) {
+      const [x0, y0, x1, y1] = ext; target = ext; moved = false;
       const L = inset(), s = Math.min((W - L) / (x1 - x0), H / (y1 - y0)) * 0.96;
       const tr = d3.zoomIdentity.translate(L + (W - L) / 2, H / 2).scale(s).translate(-(x0 + x1) / 2, -(y0 + y1) / 2);
       (dur ? svg.transition().duration(dur) : svg).call(zoom.transform, tr);
@@ -372,10 +436,24 @@ const NOLA = (() => {
     const home = o.extent || FULL;
     let focused = -1;
     const ctl = document.createElement('div'); ctl.className = 'mapctl';
-    [['+', 'Zoom in', () => svg.transition().duration(250).call(zoom.scaleBy, 1.7)], ['−', 'Zoom out', () => svg.transition().duration(250).call(zoom.scaleBy, 1 / 1.7)],
+    const by = f => () => { moved = true; svg.transition().duration(250).call(zoom.scaleBy, f); };
+    [['+', 'Zoom in', by(1.7)], ['−', 'Zoom out', by(1 / 1.7)],
      ['⤢', 'Reset view', () => api.focus(focused)]].forEach(([t, l, fn]) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = t; b.title = l; b.setAttribute('aria-label', l); b.onclick = fn; ctl.appendChild(b); });
     el.appendChild(ctl);
     zoomTo(home); drawScale(); layoutLabels();
+    // follow the map's box (window resizes, the page's scrollbar appearing, rotating a phone): an untouched map is
+    // refitted to what it was showing; one the reader has moved keeps its center and scale
+    const fit = () => {
+      if (!el.clientWidth || !el.clientHeight) return;
+      const [nw, nh] = dims(); if (nw === W && nh === H) return;
+      const t = d3.zoomTransform(svg.node()), c = t.invert([W / 2, H / 2]);
+      W = nw; H = nh; svg.interrupt().attr('viewBox', `0 0 ${W} ${H}`);
+      if (!moved && target) zoomTo(target);
+      else svg.call(zoom.transform, d3.zoomIdentity.translate(W / 2, H / 2).scale(t.k).translate(-c[0], -c[1]));
+      drawScale();
+    };
+    if (window.ResizeObserver) new ResizeObserver(fit).observe(el);
+    addEventListener('resize', fit);
     const api = {
       svg, layer, nbSel, zoomTo, k: () => k, onZoom: f => listeners.push(f), home,
       setFill(fn) { nbSel.attr('fill', f => fn(f.idx) || null).style('fill', f => fn(f.idx) || null); },
@@ -392,19 +470,50 @@ const NOLA = (() => {
   function mapButtons() {}
 
   // ---------- filters on the chart ----------
-  // stage(el, { map }) turns a view's pane into a filter panel + plot area. On maps the panel floats over the map.
+  // stage(el, { map }) turns a view's pane into a filter panel + plot area. On maps the panel floats over the map,
+  // and the section holding the map spans the window (see .vsec.wide in lib.css).
   function stage(el, { map: isMap = false, open = false } = {}) {
     el.classList.add('stage', isMap ? 'mapstage' : 'chartstage');
     el.innerHTML = '<div class="fpanel"></div><div class="plot"></div>';
-    const panel = el.firstChild;
+    const panel = el.firstChild, plot = el.lastChild;
     if (isMap) { // on phones the map's filters fold away behind a button, so the map shows first
       const b = document.createElement('button'); b.type = 'button'; b.className = 'btn ftoggle'; b.textContent = 'Filters';
       if (open) b.textContent = 'Hide filters'; else panel.classList.add('collapsed');
       b.onclick = () => { panel.classList.toggle('collapsed'); b.textContent = panel.classList.contains('collapsed') ? 'Filters' : 'Hide filters'; };
       el.insertBefore(b, panel);
+      const sec = el.closest('.vsec'); if (sec) sec.classList.add('wide');
+      lockInput(panel, plot);
     }
-    return { panel, plot: el.lastChild };
+    return { panel, plot };
   }
+  // Keep input over a map in the map. The wheel over the map belongs to the map (each map zooms on it), even at the
+  // zoom limits, where it would otherwise fall through and scroll the page. The floating filter panel scrolls itself
+  // and stops at its ends instead of handing the scroll on to the page. On touch screens one finger scrolls the page
+  // and two fingers move the map (each map does the moving); a one-finger swipe over the map shows a short hint.
+  function lockInput(panel, plot) {
+    plot.addEventListener('wheel', e => e.preventDefault(), { passive: false });
+    panel.addEventListener('wheel', e => {
+      if (e.ctrlKey || getComputedStyle(panel).position !== 'absolute') return; // page zoom; phones: the panel is part of the page
+      for (let n = e.target; n && n !== panel.parentNode; n = n.parentNode) {
+        if (n.nodeType !== 1 || n.scrollHeight <= n.clientHeight + 1 || !/auto|scroll/.test(getComputedStyle(n).overflowY)) continue;
+        if (e.deltaY < 0 ? n.scrollTop > 0 : n.scrollTop + n.clientHeight < n.scrollHeight - 1) return; // this box can still scroll
+      }
+      e.preventDefault();
+    }, { passive: false });
+    let y0 = null, two = false, ht = 0;
+    plot.addEventListener('touchstart', e => { two = e.touches.length > 1; y0 = two ? null : [e.touches[0].clientX, e.touches[0].clientY]; }, { passive: true });
+    plot.addEventListener('touchmove', e => {
+      if (two || !y0 || e.touches.length !== 1) return;
+      const t = e.touches[0]; if (Math.hypot(t.clientX - y0[0], t.clientY - y0[1]) < 12) return; y0 = null;
+      let h = plot.querySelector(':scope>.maphint');
+      if (!h) { h = document.createElement('div'); h.className = 'maphint'; h.setAttribute('aria-hidden', 'true'); h.textContent = 'Use two fingers to move the map'; plot.appendChild(h); }
+      h.classList.add('on'); clearTimeout(ht); ht = setTimeout(() => h.classList.remove('on'), 1400);
+    }, { passive: true });
+  }
+  // the page's scrollbar width, so full-width sections (lib.css) span the window without a sideways scroll
+  const setSbw = () => document.documentElement.style.setProperty('--sbw', Math.max(0, innerWidth - document.documentElement.clientWidth) + 'px');
+  if (window.ResizeObserver) new ResizeObserver(setSbw).observe(document.documentElement);
+  addEventListener('resize', setSbw); setSbw();
   // panel section with a small heading and an optional link-style action ("Show all")
   function fsec(panel, title, action) {
     const sec = document.createElement('div'); sec.className = 'fsec';
@@ -526,84 +635,116 @@ const NOLA = (() => {
   const setText = (id, s) => { const el = document.getElementById(id); if (el) el.textContent = s; };
   const setHTML = (id, s) => { const el = document.getElementById(id); if (el) el.innerHTML = s; };
 
-  // ---------- one subject per page: every chart stacked down the page ----------
-  // The URL hash holds the chart last used and the page's filters: #chartId&key=value&... so a link opens
-  // the page scrolled to that chart with exactly those filters.
+  // ---------- one subject per page: a row of tabs, one per chart ----------
+  // The URL hash holds the open chart and the page's filters: #chartId&key=value&... so a link opens
+  // that chart with exactly those filters.
   function hashState() {
     const [view, ...kv] = location.hash.slice(1).split('&'), o = { view };
     kv.forEach(p => { const [k, v] = p.split('='); if (k) o[k] = decodeURIComponent(v || ''); });
     return o;
   }
-  // views(list, { state, ds }) -- list: [{ id, label, cls, keep, draw(el, first), csv() -> rows, ds: [id, name] }]
-  // Each chart gets its own full-width section in #chart: a heading (label), its Copy link / Download CSV, then the chart.
-  // Filters are shared page state, so refresh() redraws every chart. state() returns the filters that differ from
-  // their defaults; they're written into the link. A page can jump to a chart with location.hash = 'chartId'.
+  // views(list, { state, ds }) -- list: [{ id, label, tab, cls, keep, draw(el, first), csv() -> rows, file() -> CSV name (default id), ds: [id, name] }]
+  // A bar at the top of #chart holds a tab per chart (`tab`, or `label`) and Copy link / Download CSV for the open one.
+  // Below it, each chart is its own section (heading `label`, then the chart); only the open one shows.
+  // With a single chart there are no tabs: its heading takes their place in the bar.
+  // Filters are shared page state: refresh() redraws the open chart, and the others redraw when next opened.
+  // state() returns the filters that differ from their defaults; they're written into the link.
+  // A page can open a chart with location.hash = 'chartId'.
   function views(list, opts = {}) {
     const host = document.getElementById('chart');
-    const panes = {}, secs = {}, drawn = new Set(); let cur = null;
+    const panes = {}, secs = {}, tabs = {}, drawn = new Set(), stale = new Set();
     const stateKV = () => {
       const st = opts.state ? opts.state() : {};
       return Object.entries(st).filter(([, v]) => v != null && v !== '').map(([k, v]) => `&${k}=${encodeURIComponent(v)}`).join('');
     };
-    const linkFor = id => location.href.split('#')[0] + '#' + id + stateKV();
-    const writeHash = () => { const kv = stateKV(); if (cur || kv) history.replaceState(null, '', '#' + (cur ? cur.id : '') + kv); };
+    const h0 = hashState().view;
+    let cur = list.find(v => v.id === h0) || list[0];
+    const linkFor = () => location.href.split('#')[0] + '#' + cur.id + stateKV();
+    const writeHash = () => history.replaceState(null, '', '#' + cur.id + stateKV());
     const btn = t => { const b = document.createElement('button'); b.className = 'btn'; b.type = 'button'; b.textContent = t; return b; };
+    // the bar: tabs, then the open chart's Copy link / Download CSV
+    const bar = document.createElement('div'); bar.className = 'vbar';
+    const tabRow = document.createElement('div'); tabRow.className = 'vtabs'; tabRow.setAttribute('role', 'tablist'); tabRow.setAttribute('aria-label', 'Charts');
+    const tools = document.createElement('div'); tools.className = 'tools';
+    const linkB = btn('Copy link'), csvB = btn('Download CSV');
+    linkB.onclick = async () => {
+      writeHash(); const url = linkFor();
+      try { await navigator.clipboard.writeText(url); linkB.textContent = 'Link copied'; }
+      catch (e) { prompt('Copy this link:', url); }
+      setTimeout(() => linkB.textContent = 'Copy link', 1600);
+    };
+    csvB.onclick = () => downloadCSV(cur);
+    tools.append(linkB, csvB);
+    // a page with a single chart has no tabs: the bar holds that chart's heading instead
+    const one = list.length === 1;
+    if (one) bar.classList.add('one');
+    bar.append(one ? document.createElement('h2') : tabRow, tools); host.appendChild(bar);
     list.forEach(v => {
+      const t = document.createElement('button'); t.type = 'button'; t.textContent = v.tab || v.label;
+      t.id = 'vt-' + v.id; t.setAttribute('role', 'tab'); t.setAttribute('aria-controls', 'v-' + v.id);
+      t.onclick = () => open(v.id); tabRow.appendChild(t); tabs[v.id] = t;
       const sec = document.createElement('section'); sec.className = 'vsec'; sec.id = 'v-' + v.id;
-      const head = document.createElement('div'); head.className = 'vsec-h';
-      const h = document.createElement('h2'); h.textContent = v.label;
-      const tools = document.createElement('div'); tools.className = 'tools';
-      const linkB = btn('Copy link');
-      linkB.onclick = async () => {
-        cur = v; writeHash(); const url = linkFor(v.id);
-        try { await navigator.clipboard.writeText(url); linkB.textContent = 'Link copied'; }
-        catch (e) { prompt('Copy this link:', url); }
-        setTimeout(() => linkB.textContent = 'Copy link', 1600);
-      };
-      tools.appendChild(linkB);
-      if (v.csv) { const csvB = btn('Download CSV'); csvB.onclick = () => downloadCSV(v); tools.appendChild(csvB); }
-      head.append(h, tools);
+      const h = one ? bar.firstChild : document.createElement('h2'); h.textContent = v.label;
       const p = document.createElement('div'); p.className = 'pane ' + (v.cls || 'card');
-      sec.append(head, p); host.appendChild(sec); panes[v.id] = p; secs[v.id] = sec;
-      // the chart last touched is the one a copied link (and the address bar) points to
-      sec.addEventListener('pointerdown', () => { if (cur !== v) { cur = v; writeHash(); } });
+      if (one) { h.id = 'vh-' + v.id; sec.setAttribute('aria-labelledby', h.id); sec.append(p); }
+      else {
+        sec.setAttribute('role', 'tabpanel'); sec.setAttribute('aria-labelledby', 'vt-' + v.id);
+        const head = document.createElement('div'); head.className = 'vsec-h'; head.appendChild(h); sec.append(head, p);
+      }
+      host.appendChild(sec); panes[v.id] = p; secs[v.id] = sec;
     });
     // footer "Data:" link goes to the page's City dataset
     const dataLink = document.getElementById('dataLink'), ds = opts.ds || (list.find(v => v.ds) || {}).ds;
     if (dataLink && ds) { dataLink.href = 'https://data.nola.gov/d/' + ds[0]; dataLink.textContent = ds[1] + ' on data.nola.gov'; }
-    const drawOne = v => { v.draw(panes[v.id], !drawn.has(v.id)); drawn.add(v.id); };
-    const draw = () => { tip.hide(); list.forEach(drawOne); writeHash(); };
-    const go = (id, smooth) => {
+    // charts are drawn only while shown (hidden ones have no size); a hidden chart whose filters changed redraws when opened
+    const drawOne = v => { v.draw(panes[v.id], !drawn.has(v.id)); drawn.add(v.id); stale.delete(v.id); };
+    const draw = () => { tip.hide(); list.forEach(v => { if (v !== cur && drawn.has(v.id)) stale.add(v.id); }); drawOne(cur); writeHash(); setSbw(); };
+    function show(v) {
+      cur = v;
+      list.forEach(x => { secs[x.id].hidden = x !== v; tabs[x.id].setAttribute('aria-selected', x === v); tabs[x.id].tabIndex = x === v ? 0 : -1; });
+      csvB.hidden = !v.csv;
+      if (!drawn.has(v.id) || stale.has(v.id)) drawOne(v);
+      // on phones the tab row scrolls sideways: bring the open tab into view
+      const r = tabRow.getBoundingClientRect(), t = tabs[v.id].getBoundingClientRect();
+      if (t.left < r.left || t.right > r.right) tabRow.scrollLeft += t.left - r.left - 16;
+    }
+    function open(id, focusTab) {
       const v = list.find(x => x.id === id); if (!v) return;
-      cur = v; secs[id].scrollIntoView({ behavior: smooth ? 'smooth' : 'auto', block: 'start' });
-    };
+      tip.hide(); if (v !== cur || !drawn.has(v.id)) show(v); writeHash();
+      if (focusTab) tabs[id].focus();
+      if (bar.getBoundingClientRect().top < 0) bar.scrollIntoView({ block: 'start' }); // jumped here from further down the page
+    }
+    // arrow keys move between tabs
+    tabRow.addEventListener('keydown', ev => {
+      const i = list.indexOf(cur), n = list.length;
+      const j = ev.key === 'ArrowRight' ? (i + 1) % n : ev.key === 'ArrowLeft' ? (i - 1 + n) % n : ev.key === 'Home' ? 0 : ev.key === 'End' ? n - 1 : -1;
+      if (j >= 0) { ev.preventDefault(); open(list[j].id, true); }
+    });
     // a link with filters opened on this same page (only the hash changes) reloads, so its filters apply;
     // the pages' own jumps to a chart set a bare chart id and keep the current filters
     addEventListener('hashchange', () => {
       const h = hashState(), st = opts.state ? opts.state() : {};
       const want = Object.entries(h).filter(([k]) => k !== 'view'), have = Object.entries(st).filter(([, v]) => v != null && v !== '');
       if (want.length && (want.length !== have.length || want.some(([k, v]) => String(st[k]) !== v))) return location.reload();
-      draw(); go(h.view, true);
+      if (list.some(v => v.id === h.view) && h.view !== cur.id) { list.forEach(x => { if (drawn.has(x.id)) stale.add(x.id); }); open(h.view); } else draw();
     });
     let rt, lastW = innerWidth;
     addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => {
       if (innerWidth === lastW) return; lastW = innerWidth; // phones fire resize on scroll (address bar); only width matters
-      list.forEach(v => { if (!v.keep) drawOne(v); });
+      list.forEach(v => { if (!v.keep && drawn.has(v.id)) { if (v === cur) drawOne(v); else stale.add(v.id); } });
     }, 150); });
     function downloadCSV(v) {
-      const rows = v.csv(); if (!rows || !rows.length) return;
+      const rows = v.csv && v.csv(); if (!rows || !rows.length) return;
       const keys = Object.keys(rows[0]);
       const cell = x => { x = x == null ? '' : String(x); return /[",\n]/.test(x) ? '"' + x.replace(/"/g, '""') + '"' : x; };
       const text = [keys.map(cell).join(','), ...rows.map(r => keys.map(k => cell(r[k])).join(','))].join('\n');
       const a = document.createElement('a');
       a.href = URL.createObjectURL(new Blob(['\ufeff' + text], { type: 'text/csv;charset=utf-8' }));
-      a.download = `${location.pathname.split('/').pop().replace('.html', '') || 'index'}-${v.id}.csv`;
+      a.download = `${location.pathname.split('/').pop().replace('.html', '') || 'index'}-${v.file ? v.file() : v.id}.csv`;
       document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
     }
-    const h0 = hashState().view;
-    draw();
-    if (list.some(v => v.id === h0)) requestAnimationFrame(() => go(h0, false));
-    return { refresh: draw, get id() { return cur ? cur.id : list[0].id; } };
+    show(cur); writeHash();
+    return { refresh: draw, open, get id() { return cur.id; } };
   }
   const legendHTML = items => '<div class="legend">' + items.map(([c, l, round]) => `<span><i style="background:${c}${round ? ';border-radius:50%' : ''}"></i>${l}</span>`).join('') + '</div>';
 
@@ -611,36 +752,62 @@ const NOLA = (() => {
     setYear, get YEAR() { return YEAR; }, monthTicks, doyTime, doyDate, doyISO, doyMonth, monthStarts, isoDate, share, numWord, cap, setText, setHTML, title };
 })();
 </script>
-<script>// City Planning Commission cases page
+<script>// City Planning Commission cases page: one map (upcoming hearings / cases filed), what each case type is,
+// filings per year by type, and cases per year by topic, stacked down the page
 (() => {
   const P = DATA.cpc; NOLA.setGeo(DATA.geo);
   const { fmt, tip, row } = NOLA;
   const PULLED = (DATA.meta && DATA.meta.pulled) || '2026-11-18';
   const YEAR = +PULLED.slice(0, 4);
   const lastFiled = P.lastFiled || PULLED;
+  // case types as colored on every chart; `about` paraphrases the City's own descriptions
+  // (Comprehensive Zoning Ordinance Articles 3-4, nola.gov application pages, CPC Subdivision Regulations)
   const FOLD = [
-    { n: 'Variance', t: [0] }, { n: 'Minor subdivision', t: [1] }, { n: 'Neighborhood notice (NPP)', t: [2] },
-    { n: 'Design review', t: [3] }, { n: 'Conditional use', t: [4] }, { n: 'Zoning, text & master plan changes', t: [5, 6, 9] },
-    { n: 'Appeals, major subdivisions & other', t: [7, 8, 10] }];
+    { n: 'Variance', t: [0], about: 'Permission to depart from a specific zoning rule, such as a setback, height or parking requirement, because of a hardship. Usually decided by the Board of Zoning Adjustments.' },
+    { n: 'Minor subdivision', t: [1], about: 'Dividing or redrawing property lines to create five or fewer lots, with no new street. Most are approved by CPC staff.' },
+    { n: 'Neighborhood notice (NPP)', t: [2], about: 'The notice and neighborhood meeting an applicant must hold before filing for things like a zoning change, conditional use or most variances. Nothing is decided.' },
+    { n: 'Design review', t: [3], about: 'CPC staff review of a project’s site plan and building design, required for larger projects and in some districts. Includes stormwater plan reviews.' },
+    { n: 'Conditional use', t: [4], about: 'A use allowed on a particular site only with City Council approval, often with conditions, after a CPC public hearing and recommendation.' },
+    { n: 'Zoning, text & master plan changes', t: [5, 6, 9], about: 'Changes to a property’s zoning district, to the wording of the zoning ordinance, or to the Master Plan. The CPC recommends; the City Council decides.' },
+    { n: 'Appeals, major subdivisions & other', t: [7, 8, 10], about: 'Appeals of planning and zoning decisions; subdivisions that create six or more lots or a new street, which need a CPC public hearing; and all other case types.' }];
   FOLD.forEach((f, i) => f.color = NOLA.S(i));
   const foldOf = t => FOLD.findIndex(f => f.t.includes(t));
   const TYPEIDX = Object.fromEntries(P.TYP.map((t, i) => [t, i]));
   const nbName = i => i >= 0 ? NOLA.GEO.nb[i].name : '—';
   const sw = c => `<i style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${c}"></i> `;
 
+  // ---------- filing dates: `pts` counts days from windowStart; the map can show any range the data holds ----------
+  const startDay = new Date((P.windowStart || '2025-11-18') + 'T00:00:00Z');
+  const dayOf = iso => Math.round((Date.parse(iso + 'T00:00:00Z') - startDay) / 864e5);
+  const isoOf = d => new Date(+startDay + d * 864e5).toISOString().slice(0, 10);
+  const pDate = d => NOLA.isoDate(isoOf(d));
+  const LAST = Math.max(dayOf(lastFiled.slice(0, 10)), d3.max(P.pts, p => p[0]) || 0);
+  const DEF_FROM = Math.max(0, LAST - 365); // the past 12 months
+  const clampD = d => Math.max(0, Math.min(LAST, d));
+  const hashDay = s => s && /^\d{4}-\d{2}-\d{2}$/.test(s) ? clampD(dayOf(s)) : null;
+
+  // older links pointed at the two separate maps; they open the matching tab of the one map now
+  { const [v, ...kv] = location.hash.slice(1).split('&');
+    if (v === 'upcoming' || v === 'recent') history.replaceState(null, '', '#map' + (v === 'recent' ? '&tab=filed' : '') + kv.map(s => '&' + s).join('')); }
   const H = NOLA.hashState();
-  const st = { fold: H.fold != null ? +H.fold : -1, theme: H.theme != null ? +H.theme : -1, nb: H.nb != null ? +H.nb : -1 };
+  const st = { tab: H.tab === 'filed' ? 'filed' : 'up', from: hashDay(H.from) ?? DEF_FROM, to: hashDay(H.to) ?? LAST,
+    fold: H.fold != null ? +H.fold : -1, theme: H.theme != null ? +H.theme : -1, nb: H.nb != null ? +H.nb : -1 };
+  if (st.from > st.to) [st.from, st.to] = [st.to, st.from];
+  const defRange = () => st.from === DEF_FROM && st.to === LAST;
+  const rangeTxt = () => defRange() ? 'past 12 months' : `${pDate(st.from)} – ${pDate(st.to)}`;
+  const mapTitle = () => st.tab === 'up' ? 'Upcoming hearings' : defRange() ? 'Cases filed in the past 12 months' : `Cases filed ${pDate(st.from)} – ${pDate(st.to)}`;
+
   const staged = (el, first, isMap, open) => { if (first) el._s = NOLA.stage(el, { map: isMap, open }); return el._s; };
   const set = (k, v) => { st[k] = v; V.refresh(); };
   const toggle = k => v => set(k, st[k] === v ? -1 : v);
   // shared filter sections
-  const nbSection = panel => NOLA.nbPick(NOLA.fsec(panel, 'Neighborhood'), st.nb, v => set('nb', v));
+  const nbSection = panel => { const s = NOLA.fsec(panel, 'Neighborhood'); NOLA.nbPick(s, st.nb, v => set('nb', v)); return s; };
   function typeSection(panel, counts) {
     NOLA.flist(NOLA.fsec(panel, 'Case type', st.fold >= 0 ? ['Show all', () => set('fold', -1)] : null),
       FOLD.map((f, i) => ({ key: i, name: f.n, color: f.color, count: counts[i] })), { pressed: i => st.fold === i, onClick: toggle('fold') });
   }
 
-  // ---------- upcoming hearings: map, with the agenda in the panel ----------
+  // ---------- upcoming hearings ----------
   const seen = new Set();
   const up = P.up.filter(u => { const k = u[0] + u[2]; if (seen.has(k)) return false; seen.add(k); return true; })
     .map(u => ({ when: u[0], body: u[1], cnum: u[2], type: u[3], fold: foldOf(TYPEIDX[u[3]]), addr: u[4].trim(), nb: u[5], x: u[6], y: u[7], desc: u[8] }));
@@ -653,35 +820,90 @@ const NOLA = (() => {
   const dayFmt = s => new Date(s.slice(0, 10) + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
   const timeFmt = s => { const h = +s.slice(11, 13), mi = s.slice(14, 16); return !h && mi === '00' ? '' : (h % 12 || 12) + ':' + mi + (h < 12 ? ' a.m.' : ' p.m.'); };
   const cleanDesc = s => s.replace(/^Zoning Docket \d+\/\d+\s*/, '').replace(/^Applicant\(s\):\s*/, '').replace(/^Request:\s*/, '') + (s.length >= 170 ? '…' : '');
+  const okFold = u => st.fold < 0 || u.fold === st.fold;
   const upNb = () => up.filter(u => st.nb < 0 || u.nb === st.nb);
-  const upF = () => upNb().filter(u => st.fold < 0 || u.fold === st.fold);
-  let um, ud;
-  function drawUpcoming(pane, first) {
-    const { panel, plot } = staged(pane, first, true, true); // the agenda lives in the panel, so phones show it open
+  const upF = () => upNb().filter(okFold);
+
+  // ---------- cases filed ----------
+  const mapped = P.pts.filter(p => NOLA.shown(p[4]));
+  const okType = p => st.fold < 0 || foldOf(p[1]) === st.fold, okTheme = p => st.theme < 0 || (p[5] >> st.theme) & 1, okNb = p => st.nb < 0 || p[4] === st.nb;
+  const okDate = p => p[0] >= st.from && p[0] <= st.to;
+  const inRange = () => mapped.filter(okDate);
+  const matching = () => inRange().filter(p => okType(p) && okTheme(p));
+
+  // ---------- the map: one section, tabs at the top of its panel ----------
+  let mp, ud, rg, rangeSec, nbCnt = [];
+  // the filing-date inputs stay in place across redraws, so typing a date isn't interrupted
+  function makeRange(panel) {
+    const sec = NOLA.fsec(panel, 'Filed', ['Past 12 months', () => { st.from = DEF_FROM; st.to = LAST; V.refresh(); }]);
+    const box = document.createElement('div'); box.className = 'cpc-range';
+    box.innerHTML = '<label><span>From</span><input type="date" aria-label="Filed from"></label><label><span>To</span><input type="date" aria-label="Filed to"></label>';
+    const [a, b] = box.querySelectorAll('input');
+    [a, b].forEach(i => { i.min = isoOf(0); i.max = isoOf(LAST); i.required = true; });
+    const apply = which => () => {
+      const i = which ? b : a; if (!i.value) return;
+      const d = clampD(dayOf(i.value));
+      if (which) { st.to = d; if (st.from > d) st.from = d; } else { st.from = d; if (st.to < d) st.to = d; }
+      V.refresh();
+    };
+    a.onchange = apply(0); b.onchange = apply(1);
+    sec.appendChild(box); sec._in = [a, b];
+    return sec;
+  }
+  function syncRange() {
+    const [a, b] = rangeSec._in;
+    if (document.activeElement !== a) a.value = isoOf(st.from);
+    if (document.activeElement !== b) b.value = isoOf(st.to);
+    rangeSec.querySelector('.linkbtn').hidden = defRange();
+  }
+  function drawMap(pane, first) {
+    const { panel, plot } = staged(pane, first, true, true); // the tabs and agenda live in the panel, so phones show it open
+    const filed = st.tab === 'filed';
+    pane.parentElement.querySelector('.vsec-h h2').textContent = mapTitle();
+    [...panel.children].forEach(c => { if (!(filed && c === rangeSec)) c.remove(); });
+    const nbSec = nbSection(panel);
+    if (filed) {
+      if (!rangeSec) rangeSec = makeRange(panel);
+      else if (rangeSec.parentNode !== panel) panel.appendChild(rangeSec);
+      else panel.insertBefore(nbSec, rangeSec);
+      syncRange();
+    }
+    if (first) {
+      mp = NOLA.map(plot, { panel, label: 'Map of City Planning Commission cases',
+        tip: i => `<b>${NOLA.GEO.nb[i].name}</b>` + row(st.tab === 'up' ? 'Upcoming hearings' : `Matching cases, ${rangeTxt()}`, fmt(nbCnt[i] || 0)) });
+      rg = mp.layer.append('g'); ud = mp.layer.append('g'); mp.lastNb = -1;
+      mp.onZoom(k => {
+        ud.selectAll('circle').attr('r', 7 / Math.sqrt(k)).attr('stroke-width', 2 / Math.sqrt(k));
+        rg.selectAll('circle').attr('r', 4 / Math.sqrt(k)).attr('stroke-width', 1 / Math.sqrt(k));
+      });
+      // what each color means, right under the map
+      const key = document.createElement('div'); key.className = 'cpc-key';
+      key.innerHTML = FOLD.map(f => `<div class="cpc-kt"><i style="background:${f.color}"></i><div><b>${f.n}</b><p>${f.about}</p></div></div>`).join('');
+      pane.after(key);
+    }
+    if (mp.lastNb !== st.nb) { mp.focus(st.nb, first ? 0 : 450); mp.lastNb = st.nb; }
+    ud.style('display', filed ? 'none' : null); rg.style('display', filed ? null : 'none');
+    if (filed) drawFiled(panel); else drawUpcoming(panel);
+    NOLA.ftabs(panel, [['up', 'Upcoming hearings'], ['filed', 'Cases filed']], st.tab, v => set('tab', v));
+  }
+
+  function drawUpcoming(panel) {
     const list = upF();
-    panel.innerHTML = '';
-    nbSection(panel);
+    nbCnt = []; up.filter(okFold).forEach(u => { if (u.nb >= 0) nbCnt[u.nb] = (nbCnt[u.nb] || 0) + 1; });
     typeSection(panel, FOLD.map((f, i) => upNb().filter(u => u.fold === i).length));
     const ag = NOLA.fsec(panel, `Agenda · ${fmt(list.length)} case${list.length === 1 ? '' : 's'}`);
     const box = document.createElement('div'); box.className = 'agenda'; ag.appendChild(box);
     box.innerHTML = list.length ? d3.groups(list, u => u.when.slice(0, 10)).map(([day, us]) => `<div class="day"><div class="dh">${dayFmt(day)} · ${[...new Set(us.map(u => u.body))].join(', ')}${offDay(day) ? ` <span class="offday" title="This is the next meeting date the City lists for these cases, but it falls on a ${offDay(day)}.">${offDay(day)}: date as listed</span>` : ''}</div>` +
       us.map(u => `<div class="ui" data-c="${u.cnum}${u.when}"><i style="background:${FOLD[u.fold].color}"></i><div><b>${u.addr}</b> <span class="ty">${u.type}</span><div class="ds">${cleanDesc(u.desc)}</div><div class="nb">${nbName(u.nb)} · ${u.cnum}</div></div></div>`).join('') + '</div>').join('')
       : `<div class="ds">No hearings scheduled${st.nb >= 0 ? ' in ' + nbName(st.nb) : ''}.</div>`;
-    if (first) {
-      um = NOLA.map(plot, { panel, label: 'Map of upcoming planning cases' });
-      ud = um.layer.append('g');
-      um.onZoom(k => ud.selectAll('circle').attr('r', 7 / Math.sqrt(k)).attr('stroke-width', 2 / Math.sqrt(k)));
-      um.lastNb = -1;
-    }
-    if (um.lastNb !== st.nb) { um.focus(st.nb, first ? 0 : 450); um.lastNb = st.nb; }
     const upTip = d => `<b>${d.addr}</b><div style="color:var(--ink2)">${d.type} · ${d.cnum}</div>` + row('Hearing', dayFmt(d.when) + (timeFmt(d.when) ? ', ' + timeFmt(d.when) : '') + (offDay(d.when) ? ` (${offDay(d.when)}, as listed)` : '')) + row('Body', d.body) + row('Neighborhood', nbName(d.nb)) + `<div style="margin-top:6px">${cleanDesc(d.desc)}</div>`;
-    const k = um.k();
+    const k = mp.k();
     const dots = ud.selectAll('circle').data(list.filter(u => (u.x || u.y) && NOLA.shown(u.nb)), d => d.cnum + d.when).join('circle')
       .attr('cx', d => d.x).attr('cy', d => d.y).attr('r', 7 / Math.sqrt(k)).attr('stroke-width', 2 / Math.sqrt(k))
-      .attr('fill', d => FOLD[d.fold].color).attr('stroke', 'var(--surface)')
+      .attr('fill', d => FOLD[d.fold].color).attr('stroke', 'var(--surface)').attr('opacity', 1)
       .on('mousemove', (ev, d) => { tip.show(upTip(d), ev); hi(d); }).on('mouseleave', () => { tip.hide(); hi(null); });
     const items = [...box.querySelectorAll('.ui')];
-    items.forEach(it => { const u = list.find(v => v.cnum + v.when === it.dataset.c); it.onmouseenter = () => hi(u); it.onmouseleave = () => hi(null); it.onclick = () => { if (u.x) um.zoomTo([u.x - 60, u.y - 45, u.x + 60, u.y + 45], 500); }; });
+    items.forEach(it => { const u = list.find(v => v.cnum + v.when === it.dataset.c); it.onmouseenter = () => hi(u); it.onmouseleave = () => hi(null); it.onclick = () => { if (u.x) mp.zoomTo([u.x - 60, u.y - 45, u.x + 60, u.y + 45], 500); }; });
     function hi(u) {
       dots.attr('opacity', d => !u || d === u ? 1 : .25);
       items.forEach(it => it.classList.toggle('on', !!u && it.dataset.c === u.cnum + u.when));
@@ -689,38 +911,20 @@ const NOLA = (() => {
     }
   }
 
-  // ---------- cases filed in the past 12 months ----------
-  const startDay = new Date((P.windowStart || '2025-11-18') + 'T00:00:00Z');
-  const pDate = d => { const t = new Date(+startDay + d * 864e5); return NOLA.months[t.getUTCMonth()] + ' ' + t.getUTCDate() + ', ' + t.getUTCFullYear(); };
-  const mapped = P.pts.filter(p => NOLA.shown(p[4]));
-  const okType = p => st.fold < 0 || foldOf(p[1]) === st.fold, okTheme = p => st.theme < 0 || (p[5] >> st.theme) & 1, okNb = p => st.nb < 0 || p[4] === st.nb;
-  const matching = () => mapped.filter(p => okType(p) && okTheme(p));
-  let rm, rg, recentNb = [];
-  function drawRecent(pane, first) {
-    const { panel, plot } = staged(pane, first, true);
-    const all = matching(), pts = all.filter(okNb);
-    recentNb = []; pts.forEach(p => { recentNb[p[4]] = (recentNb[p[4]] || 0) + 1; });
-    panel.innerHTML = '';
-    nbSection(panel);
-    typeSection(panel, FOLD.map((f, i) => mapped.filter(p => okTheme(p) && okNb(p) && foldOf(p[1]) === i).length));
+  function drawFiled(panel) {
+    const span = inRange(), all = matching(), pts = all.filter(okNb);
+    nbCnt = []; all.forEach(p => { nbCnt[p[4]] = (nbCnt[p[4]] || 0) + 1; });
+    typeSection(panel, FOLD.map((f, i) => span.filter(p => okTheme(p) && okNb(p) && foldOf(p[1]) === i).length));
     NOLA.flist(NOLA.fsec(panel, 'Topic in description', st.theme >= 0 ? ['Any topic', () => set('theme', -1)] : null),
-      P.TH.map((t, i) => ({ key: i, name: t, color: 'var(--ink2)', count: mapped.filter(p => okType(p) && okNb(p) && (p[5] >> i) & 1).length })),
+      P.TH.map((t, i) => ({ key: i, name: t, color: 'var(--ink2)', count: span.filter(p => okType(p) && okNb(p) && (p[5] >> i) & 1).length })),
       { pressed: i => st.theme === i, onClick: toggle('theme') });
     // where the matching cases are: neighborhoods ranked, the chosen one always listed with its rank
-    const cnt = []; all.forEach(p => { cnt[p[4]] = (cnt[p[4]] || 0) + 1; });
-    const ranked = NOLA.nbList().map(f => [f.idx, cnt[f.idx] || 0]).sort((a, b) => b[1] - a[1]).map((d, r) => [...d, r + 1]);
+    const ranked = NOLA.nbList().map(f => [f.idx, nbCnt[f.idx] || 0]).sort((a, b) => b[1] - a[1]).map((d, r) => [...d, r + 1]);
     const top = ranked.filter(d => d[1]).slice(0, 8), mine = ranked.find(d => d[0] === st.nb);
     if (mine && !top.includes(mine)) top.push(mine);
-    NOLA.flist(NOLA.fsec(panel, `Most cases · ${fmt(pts.length)} since ${pDate(0)}`),
+    NOLA.flist(NOLA.fsec(panel, `Most cases · ${fmt(pts.length)} shown`),
       top.map(([i, v, r]) => ({ key: i, name: `${r}. ${NOLA.GEO.nb[i].name}`, color: 'var(--s1)', count: v })), { pressed: i => st.nb === i, onClick: toggle('nb') });
-    if (first) {
-      rm = NOLA.map(plot, { panel, label: 'Map of planning cases filed in the past 12 months',
-        tip: i => `<b>${NOLA.GEO.nb[i].name}</b>` + row('Matching cases, past 12 months', recentNb[i] || 0) });
-      rg = rm.layer.append('g'); rm.lastNb = -1;
-      rm.onZoom(k => rg.selectAll('circle').attr('r', 4 / Math.sqrt(k)).attr('stroke-width', 1 / Math.sqrt(k)));
-    }
-    if (rm.lastNb !== st.nb) { rm.focus(st.nb, first ? 0 : 450); rm.lastNb = st.nb; }
-    const k = rm.k();
+    const k = mp.k();
     rg.selectAll('circle').data(pts, p => p.join()).join('circle').attr('cx', p => p[2]).attr('cy', p => p[3]).attr('r', 4 / Math.sqrt(k))
       .attr('fill', p => FOLD[foldOf(p[1])].color).attr('fill-opacity', .85).attr('stroke', 'var(--surface)').attr('stroke-width', 1 / Math.sqrt(k))
       .on('mousemove', (ev, p) => tip.show(`<b>${P.TYP[p[1]]}</b>` + row('Filed', pDate(p[0])) + row('Neighborhood', nbName(p[4])) + (p[5] ? row('Topics', P.TH.filter((t, i) => (p[5] >> i) & 1).join(', ')) : ''), ev)).on('mouseleave', tip.hide);
@@ -781,18 +985,18 @@ const NOLA = (() => {
 
   // ---------- CSV downloads ----------
   const csvUp = () => upF().map(u => ({ hearing: u.when.replace('T', ' '), body: u.body, case_number: u.cnum, type: u.type, address: u.addr, neighborhood: nbName(u.nb), description: u.desc }));
-  const csvRecent = () => matching().filter(okNb).map(p => { const [lon, lat] = p[2] || p[3] ? NOLA.lonlat(p[2], p[3]) : ['', ''];
-    return { filed: new Date(+startDay + p[0] * 864e5).toISOString().slice(0, 10), type: P.TYP[p[1]], neighborhood: nbName(p[4]), topics: P.TH.filter((t, i) => (p[5] >> i) & 1).join('; '), lon, lat }; });
+  const csvFiled = () => matching().filter(okNb).map(p => { const [lon, lat] = p[2] || p[3] ? NOLA.lonlat(p[2], p[3]) : ['', ''];
+    return { filed: isoOf(p[0]), type: P.TYP[p[1]], neighborhood: nbName(p[4]), topics: P.TH.filter((t, i) => (p[5] >> i) & 1).join('; '), lon, lat }; });
   const csvYears = () => Object.keys(P.typeY).sort().map(y => Object.assign({ year: y }, ...P.TYP.map((t, i) => ({ [t]: P.typeY[y][i] }))));
   const csvTopics = () => Object.keys(P.themeY).sort().map(y => Object.assign({ year: y }, ...P.TH.map((t, i) => ({ [t]: P.themeY[y][i] }))));
 
   const V = NOLA.views([
-    { id: 'upcoming', label: 'Upcoming hearings', keep: true, draw: drawUpcoming, csv: csvUp },
-    { id: 'recent', label: 'Cases filed in the past 12 months', keep: true, draw: drawRecent, csv: csvRecent },
+    { id: 'map', label: mapTitle(), tab: 'Map of cases', keep: true, draw: drawMap, csv: () => st.tab === 'up' ? csvUp() : csvFiled() },
     { id: 'years', label: 'Cases filed per year, by type', draw: drawYears, csv: csvYears },
     { id: 'topics', label: 'Cases per year mentioning each topic', draw: drawTopics, csv: csvTopics },
   ], { ds: ['xxb5-5azv', 'CPC Projects'],
-       state: () => ({ fold: st.fold >= 0 ? st.fold : null, theme: st.theme >= 0 ? st.theme : null, nb: st.nb >= 0 ? st.nb : null }) });
+       state: () => ({ tab: st.tab === 'filed' ? 'filed' : null, from: st.from !== DEF_FROM ? isoOf(st.from) : null, to: st.to !== LAST ? isoOf(st.to) : null,
+         fold: st.fold >= 0 ? st.fold : null, theme: st.theme >= 0 ? st.theme : null, nb: st.nb >= 0 ? st.nb : null }) });
 })();
 </script>
 </body></html>

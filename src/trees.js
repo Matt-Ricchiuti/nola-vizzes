@@ -38,21 +38,16 @@
 
   // ---------- neighborhoods ----------
   const hoods = D.hoods.map((h, hi) => {
-    const p = new Path2D(); let best = null, bestA = -1, area = 0, bx0 = 1e9, by0 = 1e9, bx1 = -1e9, by1 = -1e9;
+    const p = new Path2D(); let best = null, bestA = -1, bx0 = 1e9, by0 = 1e9, bx1 = -1e9, by1 = -1e9;
     for (const poly of h.p) {
       poly.forEach((ring, ri) => { const pts = ring.map(([lo, la]) => toW(lo, la)); pts.forEach(([x, y], k) => k ? p.lineTo(x, y) : p.moveTo(x, y)); p.closePath();
-        area += (ri ? -1 : 1) * Math.abs(d3.polygonArea(pts));
         if (!ri) pts.forEach(([x, y]) => { bx0 = Math.min(bx0, x); by0 = Math.min(by0, y); bx1 = Math.max(bx1, x); by1 = Math.max(by1, y); }); });
       const r = poly[0].map(([lo, la]) => toW(lo, la)), a = Math.abs(d3.polygonArea(r));
       if (a > bestA) { bestA = a; const c = d3.polygonCentroid(r); best = { x: c[0], y: c[1], w: d3.max(r, q => q[0]) - d3.min(r, q => q[0]) }; }
     }
-    return { name: NOLA.title(h.n), path: p, c: best, n: 0, sp: new Map(), sqmi: area * 69.05 * 69.05, bbox: [bx0, by0, bx1, by1], skip: hoodSkip[hi] };
+    return { name: NOLA.title(h.n), path: p, c: best, n: 0, sp: new Map(), bbox: [bx0, by0, bx1, by1], skip: hoodSkip[hi] };
   });
   for (let i = 0; i < N; i++) { if (!valid[i]) continue; const H = hoods[D.h[i]]; H.n++; H.sp.set(D.s[i], (H.sp.get(D.s[i]) || 0) + 1); }
-  hoods.forEach(h => h.dens = h.sqmi > 0 ? h.n / h.sqmi : 0);
-  // trees per sq mi in seven equal-count classes (same scheme as the calls map)
-  const densQ = d3.scaleQuantile().domain(hoods.filter(h => h.n > 0).map(h => h.dens)).range(d3.range(7));
-  const densEdges = [d3.min(densQ.domain()), ...densQ.quantiles(), d3.max(densQ.domain())];
   const hoodList = hoods.map((h, i) => [h, i]).filter(([h]) => h.n > 0).sort((a, b) => a[0].name.localeCompare(b[0].name));
   const shapePath = geoms => { const p = new Path2D(); for (const g of geoms) for (const part of g) for (const ring of part) { ring.forEach(([lo, la], k) => { const [x, y] = toW(lo, la); k ? p.lineTo(x, y) : p.moveTo(x, y); }); p.closePath(); } return p; };
   const landPath = shapePath(D.land), lakePath = shapePath(D.lakes), waterPath = shapePath(D.water);
@@ -110,7 +105,7 @@
 
   // ---------- state (kept in the link) ----------
   const H0 = NOLA.hashState();
-  let selSp = H0.sp != null ? +H0.sp : -1, selNb = H0.nb != null ? +H0.nb : -1, setF = H0.set != null ? +H0.set : -1, dens = H0.dens === '1';
+  let selSp = H0.sp != null ? +H0.sp : -1, selNb = H0.nb != null ? +H0.nb : -1, setF = H0.set != null ? +H0.set : -1;
   const inNb = i => selNb < 0 || D.h[i] === selNb;
   const setOk = i => setF < 0 || tset[i] === setF;
   const isVisible = i => valid[i] && inNb(i) && setOk(i) && (selSp >= 0 ? D.s[i] === selSp : groups[spGroup[D.s[i]]].on);
@@ -165,11 +160,6 @@
       groups.map((g, i) => ({ key: i, name: g.name, sub: g.bot, color: g.color, count: cnt[i] })),
       { mode: 'toggle', pressed: i => groups[i].on && selSp < 0, onClick: i => { selSp = -1; groups[i].on = !groups[i].on; refresh(); } });
   }
-  function shadeSection(panel) {
-    const sec = NOLA.fsec(panel, 'Neighborhood shading');
-    NOLA.seg(sec, [[0, 'None'], [1, 'Trees per sq. mi.']], dens ? 1 : 0, v => { dens = !!v; refresh(); });
-    if (dens) { const l = document.createElement('div'); l.className = 'legend'; sec.appendChild(l); NOLA.stepLegend(l, densEdges, NOLA.short); }
-  }
 
   // ---------- canvas map ----------
   let ctx, panelEl, W = 0, H = 0, DPR = 1, view = { s: 1, tx: 0, ty: 0 }, C = {}, raf = 0, hoverHood = -1, hoverTree = -1, hoverGS = -1, scaleEl = null;
@@ -179,11 +169,12 @@
     const L = insetL(), w = W - L - 2 * padPx, h = H - 2 * padPx, s = Math.min(w / (x1 - x0), h / (y1 - y0));
     view.s = s; view.tx = L + padPx + (w - (x1 - x0) * s) / 2 - x0 * s; view.ty = padPx + (h - (y1 - y0) * s) / 2 - y0 * s;
   }
-  function zoomToHood() { if (selNb < 0) fitBox(home, 16); else fitBox(hoods[selNb].bbox, 40); req(); }
+  let userView = false; // the reader has moved the map since it was last fitted (a resize then keeps their view)
+  function zoomToHood() { if (selNb < 0) fitBox(home, 16); else fitBox(hoods[selNb].bbox, 40); userView = false; req(); }
   function resize() { DPR = Math.min(devicePixelRatio || 1, 2); W = cv.clientWidth; H = cv.clientHeight; cv.width = W * DPR; cv.height = H * DPR; }
   function readColors() {
     const cs = getComputedStyle(document.documentElement);
-    for (const k of ['water', 't-land', 't-hood', 'landline', 't-dim', 'ink', 'ink2', 'muted', 'surface', 'road', 'road-major', 'road-fwy', 't-park', 't-park-line', 't-wild', 't-cem', 't-lot', 't-park-ink', 'q1', 'q2', 'q3', 'q4', 'q5', 'q6', 'q7'])
+    for (const k of ['water', 't-land', 't-hood', 'landline', 't-dim', 'ink', 'ink2', 'muted', 'surface', 'road', 'road-major', 'road-fwy', 't-park', 't-park-line', 't-wild', 't-cem', 't-lot', 't-park-ink'])
       C[k] = cs.getPropertyValue('--' + k).trim();
     groups.forEach(g => { if (g.colorVar) g.color = cs.getPropertyValue(g.colorVar).trim(); });
   }
@@ -193,8 +184,7 @@
     ctx.setTransform(DPR * s, 0, 0, DPR * s, DPR * view.tx, DPR * view.ty);
     ctx.fillStyle = C['t-land']; ctx.fill(landPath, 'evenodd');
     ctx.fillStyle = C.water; ctx.fill(lakePath, 'evenodd');
-    if (dens) hoods.forEach(h => { ctx.fillStyle = h.n ? C['q' + (1 + densQ(h.dens))] : C['t-hood']; ctx.fill(h.path); });
-    else { ctx.fillStyle = C['t-hood']; hoods.forEach(h => ctx.fill(h.path)); }
+    ctx.fillStyle = C['t-hood']; hoods.forEach(h => ctx.fill(h.path));
     GCAT.forEach(c => { if (c.on && s >= c.minS) { ctx.fillStyle = C[c.fill]; ctx.fill(c.path); } });
     if (s > 6000) { ctx.strokeStyle = C['t-park-line']; ctx.lineWidth = 0.8 / s; GCAT.forEach((c, ci) => { if (c.on && s >= c.minS && ci !== 4) ctx.stroke(c.path); }); }
     ctx.fillStyle = C.water; ctx.fill(waterPath);
@@ -309,7 +299,7 @@
       tip.show(`<b>${esc(gsName(g))}</b><div style="color:var(--ink2)">${esc(g.u)}${g.own ? ' · ' + esc(g.own) : ''}</div>` + row('Acres', a < 1 ? a.toFixed(2) : fmt(Math.round(a))) + row('Trees', fmt(g.n)) + (g.n ? '<div style="margin-top:4px"></div>' + topSp(g.sp, 4) : ''), ev);
     } else if (hh >= 0) {
       const Hd = hoods[hh];
-      tip.show(`<b>${esc(Hd.name)}</b>` + row('Trees', fmt(Hd.n)) + row('Per sq. mi.', fmt(Math.round(Hd.dens))) + row('Species', Hd.sp.size) + '<div style="margin-top:4px"></div>' + topSp(Hd.sp, 4), ev);
+      tip.show(`<b>${esc(Hd.name)}</b>` + row('Trees', fmt(Hd.n)) + row('Species', Hd.sp.size) + '<div style="margin-top:4px"></div>' + topSp(Hd.sp, 4), ev);
     } else tip.hide();
   }
   // left-click a neighborhood to select it (the "Most common" list follows); click it again, or outside any neighborhood, to clear.
@@ -325,100 +315,88 @@
   function initMap(plot) {
     plot.innerHTML = '<canvas class="tmap" aria-label="Map of street trees in New Orleans, colored by species"></canvas><div class="scalebar"><span></span><i></i></div><div class="mapctl"></div>';
     cv = plot.querySelector('canvas'); ctx = cv.getContext('2d'); scaleEl = plot.querySelector('.scalebar');
-    const zoomAt = (f, x, y) => { const ns = Math.max(700, Math.min(600000, view.s * f)); f = ns / view.s; view.tx = x - (x - view.tx) * f; view.ty = y - (y - view.ty) * f; view.s = ns; req(); };
+    const zoomAt = (f, x, y) => { const ns = Math.max(700, Math.min(600000, view.s * f)); f = ns / view.s; view.tx = x - (x - view.tx) * f; view.ty = y - (y - view.ty) * f; view.s = ns; userView = true; req(); };
     const ctl = plot.querySelector('.mapctl');
     [['+', 'Zoom in', () => zoomAt(1.8, (insetL() + W) / 2, H / 2)], ['−', 'Zoom out', () => zoomAt(1 / 1.8, (insetL() + W) / 2, H / 2)], ['⤢', 'Reset view', () => zoomToHood()]].forEach(([t, l, fn]) => {
       const b = document.createElement('button'); b.type = 'button'; b.textContent = t; b.title = l; b.setAttribute('aria-label', l); b.onclick = fn; ctl.appendChild(b); });
-    const pointers = new Map(); let last = null, pinch = null, moved = false;
-    cv.addEventListener('wheel', e => { e.preventDefault(); zoomAt(Math.exp(-e.deltaY * 0.0015), e.offsetX, e.offsetY); }, { passive: false });
-    cv.addEventListener('pointerdown', e => { cv.setPointerCapture(e.pointerId); pointers.set(e.pointerId, { x: e.offsetX, y: e.offsetY }); moved = false;
-      if (pointers.size === 2) { const [a, b] = [...pointers.values()]; pinch = { d: Math.hypot(a.x - b.x, a.y - b.y), cx: (a.x + b.x) / 2, cy: (a.y + b.y) / 2 }; }
-      last = { x: e.offsetX, y: e.offsetY }; cv.classList.add('drag'); });
+    // Input, as on the other maps: the wheel (or a trackpad pinch) zooms, dragging pans, and the page never scrolls
+    // under the map (NOLA.stage also stops the wheel on the zoom buttons). On touch screens one finger scrolls the
+    // page (touch-action in lib.css) and two fingers pan and pinch; once two are down, the gesture stays the map's
+    // until every finger lifts. A tap still picks a neighborhood.
+    const pointers = new Map(); let last = null, pinch = null, moved = false, twoFinger = false;
+    const isTouch = e => e.pointerType === 'touch';
+    cv.addEventListener('wheel', e => { e.preventDefault(); zoomAt(Math.exp(-e.deltaY * (e.deltaMode === 1 ? 0.05 : e.deltaMode === 2 ? 1 : 0.0015)), e.offsetX, e.offsetY); }, { passive: false });
+    // keep the browser from scrolling or zooming the page while two fingers are on the map
+    cv.addEventListener('touchstart', e => { if (e.touches.length > 1) twoFinger = true; }, { passive: true });
+    cv.addEventListener('touchmove', e => { if (twoFinger && e.cancelable) e.preventDefault(); }, { passive: false });
+    const touchEnd = e => { if (!e.touches.length) twoFinger = false; };
+    cv.addEventListener('touchend', touchEnd, { passive: true }); cv.addEventListener('touchcancel', touchEnd, { passive: true });
+    // Safari's trackpad pinch comes as gesture events (iPhone/iPad send them alongside touches, handled above)
+    let gLast = 1;
+    cv.addEventListener('gesturestart', e => { e.preventDefault(); gLast = 1; });
+    cv.addEventListener('gesturechange', e => { e.preventDefault(); if (twoFinger || pointers.size) return; const r = cv.getBoundingClientRect(); zoomAt(e.scale / gLast, e.clientX - r.left, e.clientY - r.top); gLast = e.scale; });
+    cv.addEventListener('pointerdown', e => { if (!isTouch(e)) cv.setPointerCapture(e.pointerId); pointers.set(e.pointerId, { x: e.offsetX, y: e.offsetY }); moved = false;
+      if (pointers.size === 2) { const [a, b] = [...pointers.values()]; pinch = { d: Math.hypot(a.x - b.x, a.y - b.y), cx: (a.x + b.x) / 2, cy: (a.y + b.y) / 2 }; twoFinger = twoFinger || isTouch(e); }
+      last = { x: e.offsetX, y: e.offsetY }; if (!isTouch(e)) cv.classList.add('drag'); });
     cv.addEventListener('pointermove', e => {
       if (!pointers.has(e.pointerId)) { hover(e, e.offsetX, e.offsetY); return; }
       pointers.set(e.pointerId, { x: e.offsetX, y: e.offsetY });
       if (pointers.size === 2 && pinch) { const [a, b] = [...pointers.values()]; const d = Math.hypot(a.x - b.x, a.y - b.y), cx = (a.x + b.x) / 2, cy = (a.y + b.y) / 2;
         view.tx += cx - pinch.cx; view.ty += cy - pinch.cy; zoomAt(d / pinch.d, cx, cy); pinch = { d, cx, cy }; moved = true; return; }
       const dx = e.offsetX - last.x, dy = e.offsetY - last.y; if (Math.abs(dx) + Math.abs(dy) > 2) moved = true;
-      view.tx += dx; view.ty += dy; last = { x: e.offsetX, y: e.offsetY }; tip.hide(); req(); });
-    const endPtr = e => { pointers.delete(e.pointerId); if (pointers.size < 2) pinch = null; if (!pointers.size) cv.classList.remove('drag');
+      last = { x: e.offsetX, y: e.offsetY };
+      if (isTouch(e) && !twoFinger) return; // one finger: the browser scrolls the page (or it's a tap)
+      view.tx += dx; view.ty += dy; userView = true; tip.hide(); req(); });
+    const endPtr = e => { pointers.delete(e.pointerId); if (pointers.size < 2) pinch = null; if (!pointers.size) { cv.classList.remove('drag'); twoFinger = false; }
       if (pointers.size === 1) { const p = [...pointers.values()][0]; last = { x: p.x, y: p.y }; }
       if (!moved && e.type === 'pointerup') { if (e.button === 0) clickHood(e.offsetX, e.offsetY); hover(e, e.offsetX, e.offsetY, true); } };
     cv.addEventListener('pointerup', endPtr); cv.addEventListener('pointercancel', endPtr);
     cv.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse') { tip.hide(); if (hoverHood >= 0 || hoverTree >= 0 || hoverGS >= 0) { hoverHood = hoverTree = hoverGS = -1; req(); } } });
     cv.addEventListener('dblclick', e => zoomAt(2, e.offsetX, e.offsetY));
-    addEventListener('resize', () => { if (!cv.offsetParent) return; const ow = W, oh = H; resize(); view.tx += (W - ow) / 2; view.ty += (H - oh) / 2; req(); });
+    // follow the canvas's box (window resizes, the page's scrollbar appearing, rotating a phone): an untouched map is
+    // refitted; one the reader has moved keeps its center and scale. Redrawn at once, since resizing clears the canvas.
+    const fit = () => {
+      if (!cv.clientWidth || !cv.clientHeight || (cv.clientWidth === W && cv.clientHeight === H)) return;
+      const ow = W, oh = H; resize();
+      if (userView) { view.tx += (W - ow) / 2; view.ty += (H - oh) / 2; } else zoomToHood();
+      draw();
+    };
+    if (window.ResizeObserver) new ResizeObserver(fit).observe(cv);
+    addEventListener('resize', fit);
     const reTheme = () => { readColors(); refresh(); };
     matchMedia('(prefers-color-scheme: dark)').addEventListener('change', reTheme);
     new MutationObserver(reTheme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
     resize(); zoomToHood();
   }
-  const staged = (el, first, isMap) => { if (first) el._s = NOLA.stage(el, { map: isMap }); return el._s; };
   let lastNb;
   function drawMap(pane, first) {
-    const { panel, plot } = staged(pane, first, true); panelEl = panel;
+    if (first) { pane._s = NOLA.stage(pane, { map: true }); fillHeight(pane); }
+    const { panel, plot } = pane._s; panelEl = panel;
     panel.innerHTML = '';
-    nbSection(panel); findSection(panel); settingSection(panel); speciesSection(panel); layerSection(panel); shadeSection(panel);
+    nbSection(panel); findSection(panel); settingSection(panel); speciesSection(panel); layerSection(panel);
     if (first) { initMap(plot); lastNb = selNb; }
     else if (W !== cv.clientWidth || H !== cv.clientHeight) { resize(); zoomToHood(); }
     if (lastNb !== selNb) { zoomToHood(); lastNb = selNb; }
     draw();
   }
-
-  // ---------- bar charts ----------
-  function hbars(el, items, { color = 'var(--s1)', label = 'Trees', caption = '' } = {}) {
-    el.innerHTML = caption ? `<div class="legend" style="margin:0 0 6px">${esc(caption)}</div>` : '';
-    const f = NOLA.frame(el, { h: 24 + items.length * 20, m: { t: 4, r: 56, b: 20, l: Math.min(230, el.clientWidth * 0.42) } });
-    const x = d3.scaleLinear().domain([0, d3.max(items, d => d.v) || 1]).range([0, f.iw]);
-    const y = d3.scaleBand().domain(items.map((d, i) => i)).range([0, f.ih]).paddingInner(.25);
-    f.g.selectAll('rect.b').data(items).join('rect').attr('class', 'b').attr('x', 0).attr('y', (d, i) => y(i)).attr('width', d => Math.max(1, x(d.v))).attr('height', y.bandwidth()).attr('rx', 2).attr('fill', d => d.color || color);
-    f.g.selectAll('text.l').data(items).join('text').attr('class', 'l').attr('x', -8).attr('y', (d, i) => y(i) + y.bandwidth() / 2 + 4).attr('text-anchor', 'end').style('fill', 'var(--ink2)')
-      .text(d => d.name)
-      .each(function () { // shorten names that don't fit the label margin (narrow screens)
-        const t = d3.select(this), full = t.text(); let n = full.length;
-        while (n > 4 && this.getComputedTextLength() > f.m.l - 10) t.text(full.slice(0, --n).trimEnd() + '…');
-      });
-    f.g.selectAll('text.v').data(items).join('text').attr('class', 'v').attr('x', d => x(d.v) + 5).attr('y', (d, i) => y(i) + y.bandwidth() / 2 + 4).text(d => fmt(d.v));
-    f.g.selectAll('rect.h').data(items).join('rect').attr('class', 'h').attr('x', -f.m.l).attr('y', (d, i) => y(i) - 2).attr('width', f.iw + f.m.l).attr('height', y.step()).attr('fill', 'transparent')
-      .style('cursor', d => d.onClick ? 'pointer' : null)
-      .on('mousemove', (ev, d) => tip.show(`<b>${esc(d.name)}</b>` + (d.sub ? `<div style="color:var(--ink2)"><i>${esc(d.sub)}</i></div>` : '') + row(label, fmt(d.v)) + (d.extra || ''), ev)).on('mouseleave', tip.hide)
-      .on('click', (ev, d) => { if (d.onClick) { tip.hide(); d.onClick(); } });
-  }
-  function drawSpecies(pane, first) {
-    const { panel, plot } = staged(pane, first);
-    panel.innerHTML = ''; nbSection(panel); settingSection(panel);
-    const cnt = new Map(); let tot = 0;
-    for (let i = 0; i < N; i++) if (valid[i] && inNb(i) && setOk(i)) { cnt.set(D.s[i], (cnt.get(D.s[i]) || 0) + 1); tot++; }
-    const items = [...cnt].map(([i, v]) => ({ name: D.species[i][0], sub: D.species[i][1], v, i })).sort((a, b) => b.v - a.v).slice(0, 30)
-      .map(d => ({ ...d, color: groups[spGroup[d.i]].color, extra: row('Share', (100 * d.v / tot).toFixed(1) + '%'), onClick: () => { selSp = d.i; location.hash = 'map'; } }));
-    hbars(plot, items);
-  }
-  function drawHoods(pane, first) {
-    const { panel, plot } = staged(pane, first);
-    panel.innerHTML = ''; findSection(panel); settingSection(panel);
-    NOLA.seg(NOLA.fsec(panel, 'Count'), [[0, 'Trees'], [1, 'Trees per sq. mi.']], dens ? 1 : 0, v => { dens = !!v; refresh(); });
-    const cnt = hoods.map(() => 0); for (let i = 0; i < N; i++) if (valid[i] && setOk(i) && (selSp < 0 || D.s[i] === selSp)) cnt[D.h[i]]++;
-    const items = hoodList.map(([h, hi]) => { const n = cnt[hi], v = dens ? Math.round(n / h.sqmi) : n;
-      return { name: h.name, v, color: hi === selNb ? 'var(--ink)' : null, extra: (dens ? row('Trees', fmt(n)) : row('Per sq. mi.', fmt(Math.round(n / h.sqmi)))) + row('All trees here', fmt(h.n)),
-        onClick: () => { selNb = hi; location.hash = 'map'; } }; }).filter(d => d.v > 0).sort((a, b) => b.v - a.v);
-    const col = selSp >= 0 ? (spGroup[selSp] < 9 ? groups[spGroup[selSp]].color : TOP_COLORS[0]) : 'var(--s3)';
-    const what = (selSp >= 0 ? D.species[selSp][0] : 'Trees') + (dens ? ' per sq. mi.' : '');
-    hbars(plot, items, { color: col, label: what, caption: what + (setF >= 0 ? ' · ' + SETTINGS[setF].name.toLowerCase() : '') });
+  // the map is the page: it fills the window below the page header (CSS in trees.html). --tt is where the map's
+  // own box starts on the page, under the "Filters" button on phones; it's measured with the filters folded, so
+  // opening them doesn't shrink the map.
+  function fillHeight(pane) {
+    pane.classList.add('tfill');
+    const set = () => { const tog = pane.querySelector('.ftoggle'), th = tog && tog.offsetHeight ? tog.offsetHeight + 8 : 0;
+      pane.style.setProperty('--tt', Math.round(pane.getBoundingClientRect().top + scrollY + th) + 'px'); };
+    set(); addEventListener('resize', set); if (document.fonts) document.fonts.ready.then(set);
   }
 
   // ---------- CSV downloads ----------
   const ll = i => [+(D.x[i] * 1e-5 + D.lon0).toFixed(6), +(D.y[i] * 1e-5 + D.lat0).toFixed(6)];
   const csvMap = () => { const o = []; for (let i = 0; i < N; i++) if (isVisible(i)) { const [lon, lat] = ll(i), sp = D.species[D.s[i]], gk = D.tg[i];
     o.push({ species: sp[0], botanical_name: sp[1], neighborhood: hoods[D.h[i]].name, setting: SETTINGS[tset[i]].name, green_space: gk >= 0 ? GS[gk].nm : '', near_street: D.near[i] >= 0 ? D.roadNames[D.near[i]] : '', lon, lat }); } return o; };
-  const csvSpecies = () => { const cnt = new Map(); for (let i = 0; i < N; i++) if (valid[i] && inNb(i) && setOk(i)) cnt.set(D.s[i], (cnt.get(D.s[i]) || 0) + 1);
-    return [...cnt].sort((a, b) => b[1] - a[1]).map(([i, v]) => ({ species: D.species[i][0], botanical_name: D.species[i][1], trees: v })); };
-  const csvHoods = () => hoodList.map(([h]) => ({ neighborhood: h.name, trees: h.n, sq_mi: +h.sqmi.toFixed(2), trees_per_sq_mi: Math.round(h.n / h.sqmi), species_count: h.sp.size }));
 
   readColors();
   const V = NOLA.views([
     { id: 'map', label: 'Map of every tree', keep: true, draw: drawMap, csv: csvMap },
-    { id: 'species', label: 'Most common species', draw: drawSpecies, csv: csvSpecies },
-    { id: 'hoods', label: 'Trees by neighborhood', draw: drawHoods, csv: csvHoods },
   ], { ds: ['3tyj-9x33', 'Tree Location'],
-       state: () => ({ sp: selSp >= 0 ? selSp : null, nb: selNb >= 0 ? selNb : null, set: setF >= 0 ? setF : null, dens: dens ? 1 : null }) });
+       state: () => ({ sp: selSp >= 0 ? selSp : null, nb: selNb >= 0 ? selNb : null, set: setF >= 0 ? setF : null }) });
 })();

@@ -39,10 +39,15 @@
 
   // ---------- filters ----------
   const H = NOLA.hashState();
-  const st = { cat: H.cat != null ? +H.cat : -1, period: SPLIT && H.period ? H.period : 'all', nb: H.nb != null ? +H.nb : -1 };
+  // tl: which chart the "over time" section shows (week: flights per week, hour: takeoffs by hour, drone: each drone's flights)
+  const st = { cat: H.cat != null ? +H.cat : -1, period: SPLIT && H.period ? H.period : 'all', nb: H.nb != null ? +H.nb : -1, tl: ['hour', 'drone'].includes(H.tl) ? H.tl : 'week' };
+  // links from before these charts were merged: #hour and #fleet are now tabs of #week
+  if (H.view === 'hour' || H.view === 'fleet') { st.tl = H.view === 'hour' ? 'hour' : 'drone'; history.replaceState(null, '', location.hash.replace(/^#\w+/, '#week')); }
   const inNb = f => st.nb < 0 || f.nb === st.nb;
   const inPeriod = f => (st.period === 'all' || (st.period === 'early' ? f.day < DFR : f.day >= DFR)) && inNb(f);
   const pass = f => (st.cat < 0 || f.cat === st.cat) && inPeriod(f);
+  // the week and drone timelines run across the whole year, so the period filter doesn't apply to them
+  const passT = f => (st.cat < 0 || f.cat === st.cat) && inNb(f);
   // the filter panel each chart carries; pass which filters apply to it
   function filters(panel, { purpose = true, period = true, nb = true } = {}) {
     panel.innerHTML = '';
@@ -59,10 +64,14 @@
   const nbName = i => i >= 0 ? NOLA.GEO.nb[i].name : '';
   const hm = h => String(Math.floor(h)).padStart(2, '0') + ':' + String(Math.round((h % 1) * 60) % 60).padStart(2, '0');
 
-  // ---------- flights per week ----------
-  function drawWeek(pane, first) {
-    const { panel, plot } = staged(pane, first); filters(panel, { period: false });
-    plot.innerHTML = '<div></div>'; const el = plot; // the purpose rows double as the color key
+  // ---------- over time: flights per week, takeoffs by hour, or each drone's flights (tabs) ----------
+  function drawTime(pane, first) {
+    const { panel, plot } = staged(pane, first); filters(panel, { period: st.tl === 'hour' }); // the purpose rows double as the color key
+    NOLA.ftabs(panel, [['week', 'Per week'], ['hour', 'By hour'], ['drone', 'By drone']], st.tl, v => { st.tl = v; V.refresh(); });
+    plot.innerHTML = '<div></div>';
+    ({ week: drawWeek, hour: drawHour, drone: drawFleet })[st.tl](plot);
+  }
+  function drawWeek(el) {
     const nW = Math.floor(LAST / 7) + 1;
     // the last week is drawn lighter when the data stops before it ends
     const partial = (LAST + 1) % 7 !== 0 ? nW - 1 : -1;
@@ -143,17 +152,15 @@
     const { panel, plot } = staged(pane, first); filters(panel, { purpose: false }); const el = plot;
     const rows = CATS.map((c, ci) => { const fs = flights.filter(f => f.cat === ci && inPeriod(f)); return { c, n: fs.length, h: d3.sum(fs, f => f.dur) / 3600, med: fs.length ? med(fs) : null }; });
     const mx = d3.max(rows, r => r.n) || 1;
-    el.innerHTML = `<table><thead><tr><th>Purpose</th><th class="num">Flights</th><th></th><th class="num">Hours</th><th class="num">Median flight</th></tr></thead><tbody>` +
+    el.innerHTML = `<table class="static"><thead><tr><th>Purpose</th><th class="num">Flights</th><th></th><th class="num">Hours</th><th class="num">Median flight</th></tr></thead><tbody>` +
       rows.map(r => `<tr><td>${sw(r.c.color)}${r.c.n}</td><td class="num">${fmt(r.n)}</td><td style="width:30%"><span class="bar" style="width:${100 * r.n / mx}%;background:${r.c.color}"></span></td><td class="num">${r.h.toFixed(1)}</td><td class="num">${r.med == null ? '—' : Math.round(r.med) + ' min'}</td></tr>`).join('') + '</tbody></table>';
   }
 
-  // ---------- hour of day ----------
-  function drawHour(pane, first) {
-    const { panel, plot } = staged(pane, first); filters(panel); const el = plot;
-    el.innerHTML = '';
+  // ---------- takeoffs by hour of day (Central time) ----------
+  function drawHour(el) {
     const fs = flights.filter(pass);
     const hrs = d3.range(24).map(h => fs.filter(f => Math.floor(f.hr) === h).length);
-    const f = NOLA.frame(el, { h: 300, m: { t: 10, r: 8, b: 26, l: 34 } });
+    const f = NOLA.frame(el.lastChild, { h: 300, m: { t: 10, r: 8, b: 42, l: 34 } });
     const x = d3.scaleBand().domain(d3.range(24)).range([0, f.iw]).paddingInner(.2);
     const y = d3.scaleLinear().domain([0, Math.max(4, d3.max(hrs))]).range([f.ih, 0]).nice();
     NOLA.yGrid(f, y, 4, d3.format('d'));
@@ -162,12 +169,11 @@
       .on('mousemove', (ev, i) => tip.show(`<b>${hrLab(i)} – ${hrLab(i + 1)}</b>` + row('Flights', hrs[i]), ev)).on('mouseleave', tip.hide);
     f.g.selectAll('text.x').data([0, 3, 6, 9, 12, 15, 18, 21]).join('text').attr('class', 'x').attr('x', d => x(d) + x.bandwidth() / 2).attr('y', f.ih + 17).attr('text-anchor', 'middle').text(hrLab);
     f.g.append('line').attr('x1', 0).attr('x2', f.iw).attr('y1', f.ih).attr('y2', f.ih).attr('stroke', 'var(--axis)');
+    f.g.append('text').attr('x', f.iw / 2).attr('y', f.ih + 36).attr('text-anchor', 'middle').style('fill', 'var(--ink2)').text('Takeoff hour, Central time');
   }
 
-  // ---------- fleet ----------
-  function drawFleet(pane, first) {
-    const { panel, plot } = staged(pane, first); filters(panel);
-    plot.innerHTML = '<div></div>'; const el = plot; // the purpose filter buttons double as the color key
+  // ---------- each drone's flights ----------
+  function drawFleet(el) {
     const firstDay = d => d3.min(flights.filter(f => f.drone === d), f => f.day);
     const order = d3.range(D.drones.length).sort((a, b) => firstDay(a) - firstDay(b));
     const f = NOLA.frame(el.lastChild, { h: 34 + order.length * 24, m: { t: 8, r: 10, b: 22, l: 112 } });
@@ -179,7 +185,7 @@
       f.g.append('text').attr('x', -8).attr('y', y(d) + y.bandwidth() / 2 + 4).attr('text-anchor', 'end').style('fill', 'var(--ink2)').text(`X10-${D.drones[d]} · ${fs.length}`);
       f.g.append('line').attr('x1', 0).attr('x2', f.iw).attr('y1', y(d) + y.bandwidth() / 2).attr('y2', y(d) + y.bandwidth() / 2).attr('stroke', 'var(--grid)');
       f.g.append('g').selectAll('rect').data(fs).join('rect').attr('x', fl => x(fl.day) - 1).attr('width', 2.5).attr('y', y(d)).attr('height', y.bandwidth()).attr('rx', 1)
-        .attr('fill', fl => CATS[fl.cat].color).attr('opacity', fl => pass(fl) ? .9 : .12);
+        .attr('fill', fl => CATS[fl.cat].color).attr('opacity', fl => passT(fl) ? .9 : .12);
     });
     f.g.append('g').selectAll('text').data(NOLA.monthTicks(mStarts, x, f.iw)).join('text').attr('x', d => d.x).attr('y', f.ih + 16).text(d => d.label);
     f.svg.on('mousemove', ev => {
@@ -196,13 +202,12 @@
     return Object.assign({ week_of: NOLA.doyISO(w * 7), flights: fs.length }, ...CATS.map((c, ci) => ({ [c.n]: fs.filter(f => f.cat === ci).length }))); });
   const csvPurpose = () => CATS.map((c, ci) => { const fs = flights.filter(f => f.cat === ci && inPeriod(f)); return { purpose: c.n, flights: fs.length, hours: +(d3.sum(fs, f => f.dur) / 3600).toFixed(1), median_minutes: fs.length ? Math.round(med(fs)) : '' }; });
   const csvHour = () => { const fs = flights.filter(pass); return d3.range(24).map(h => ({ hour_central: hrLab(h), flights: fs.filter(f => Math.floor(f.hr) === h).length })); };
-  const csvFleet = () => D.drones.map((dn, d) => { const fs = flights.filter(f => f.drone === d && pass(f)); return { drone: 'X10-' + dn, flights: fs.length, first: fs.length ? NOLA.doyISO(d3.min(fs, f => f.day)) : '', last: fs.length ? NOLA.doyISO(d3.max(fs, f => f.day)) : '' }; });
+  const csvFleet = () => D.drones.map((dn, d) => { const fs = flights.filter(f => f.drone === d && passT(f)); return { drone: 'X10-' + dn, flights: fs.length, first: fs.length ? NOLA.doyISO(d3.min(fs, f => f.day)) : '', last: fs.length ? NOLA.doyISO(d3.max(fs, f => f.day)) : '' }; });
 
   const V = NOLA.views([
-    { id: 'week', label: 'Flights per week, by purpose', draw: drawWeek, csv: csvWeek },
     { id: 'map', label: 'Launch points', keep: true, draw: drawMap, csv: () => flightRows(flights.filter(f => NOLA.shown(f.nb) && pass(f))) },
+    { id: 'week', label: 'Flights over time', draw: drawTime, csv: () => ({ week: csvWeek, hour: csvHour, drone: csvFleet })[st.tl](), file: () => ({ week: 'week', hour: 'hour', drone: 'fleet' })[st.tl] },
     { id: 'purpose', label: 'Flights by purpose', draw: drawPurpose, csv: csvPurpose },
-    { id: 'hour', label: 'Takeoffs by hour (Central time)', draw: drawHour, csv: csvHour },
-    { id: 'fleet', label: 'Flights by drone', draw: drawFleet, csv: csvFleet },
-  ], { ds: ['ay9z-ynxz', 'NOPD Drone Flights'], state: () => ({ cat: st.cat >= 0 ? st.cat : null, period: st.period !== 'all' ? st.period : null, nb: st.nb >= 0 ? st.nb : null }) });
+  ], { ds: ['ay9z-ynxz', 'NOPD Drone Flights'],
+       state: () => ({ cat: st.cat >= 0 ? st.cat : null, period: st.period !== 'all' ? st.period : null, nb: st.nb >= 0 ? st.nb : null, tl: st.tl !== 'week' ? st.tl : null }) });
 })();

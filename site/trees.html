@@ -10,6 +10,7 @@
   --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100; --s5:#e87ba4; --s6:#008300; --s7:#6250d6; --s8:#e34948;
   --q1:#cde2fb; --q2:#9ec5f4; --q3:#6da7ec; --q4:#3987e5; --q5:#256abf; --q6:#184f95; --q7:#0d366b;
   --none:#d9d8d2; --accent:#2a78d6; --chip:#efeee9;
+  --sbw:0px; --gut:24px; /* scrollbar width (set by lib.js) and side gutter of full-width map sections */
 }
 @media (prefers-color-scheme: dark){
   :root:where(:not([data-theme="light"])){
@@ -64,7 +65,7 @@ h2{font-size:19px;margin:0 0 4px}
 .popnote{color:var(--muted);font-size:12px}
 .split{display:grid;grid-template-columns:1.35fr 1fr;gap:16px;align-items:start}
 @media(max-width:860px){.split{grid-template-columns:1fr} h1{font-size:23px}}
-@media(max-width:600px){.wrap{padding:20px 16px 48px} .card{padding:12px}}
+@media(max-width:600px){.wrap{padding:20px 16px 48px} .card{padding:12px} :root{--gut:16px}}
 .chips{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px}
 .chip{border:1px solid var(--ring);background:var(--chip);color:var(--ink);border-radius:999px;padding:4px 11px;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;font-family:inherit}
 .chip.on{background:var(--ink);color:var(--surface);border-color:var(--ink)}
@@ -78,7 +79,9 @@ svg text{fill:var(--muted);font-size:11px;font-family:inherit}
 .axis path,.axis line{stroke:var(--axis)}
 .gridl line{stroke:var(--grid)}
 .gridl path{display:none}
-.map svg{background:var(--surface);border-radius:10px;cursor:grab;touch-action:none}
+.map svg{background:var(--surface);border-radius:10px;cursor:grab}
+/* maps on touch screens: one finger scrolls the page, two fingers move the map (NOLA.map / trees.js handle those) */
+.map svg,.stage.mapstage .plot canvas{touch-action:pan-x pan-y}
 .nbpath{fill:var(--land);stroke:var(--landline);stroke-width:.8;vector-effect:non-scaling-stroke}
 .nbpath.hot:hover{stroke:var(--ink);stroke-width:1.6}
 .streets{pointer-events:none}
@@ -108,19 +111,38 @@ tbody tr:hover td{background:var(--chip)}
 .halo{paint-order:stroke;stroke:var(--surface);stroke-width:5px;stroke-linejoin:round}
 .maplab{font-weight:600;letter-spacing:.02em}
 /* ---------- filters live on the chart: a panel of legend-style rows (see NOLA.stage / fsec / flist) ---------- */
-/* one section per chart, stacked down the page */
-.vsec{margin:0 0 44px;scroll-margin-top:16px}
-.vsec-h{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 14px;margin:0 0 10px}
-.vsec-h h2{font-size:21px;margin:0;flex:1 1 auto}
-.tools{display:flex;gap:6px}
+/* one tab per chart (NOLA.views): tabs and the open chart's Copy link / Download CSV in one row, the chart below */
+.vbar{display:flex;align-items:flex-start;gap:10px 18px;padding:0 0 12px;border-bottom:1px solid var(--grid);scroll-margin-top:12px}
+.vtabs{display:flex;flex-wrap:wrap;gap:4px;flex:1 1 auto;min-width:0}
+.vtabs button{font:inherit;font-size:13px;line-height:1.3;border:1px solid transparent;border-radius:999px;background:none;color:var(--ink2);padding:5px 12px;cursor:pointer;white-space:nowrap}
+.vtabs button:hover{background:var(--chip);color:var(--ink)}
+.vtabs button[aria-selected="true"]{background:var(--ink);color:var(--surface);font-weight:600}
+.vtabs button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.vsec{margin:26px 0 0}
+/* a page with one chart: its heading sits in the bar where the tabs would be */
+.vbar.one{align-items:center}
+.vbar.one h2{flex:1 1 auto;min-width:0;margin:0;font-family:"Young Serif",Georgia,"Times New Roman",serif;font-weight:400;font-size:21px}
+.vbar.one+.vsec{margin-top:14px}
+.vsec-h{margin:0 0 12px}
+.vsec-h h2{font-size:21px;margin:0}
+.tools{display:flex;gap:6px;flex:0 0 auto;padding-top:3px}
+@media(max-width:640px){
+  .vbar{flex-direction:column;gap:10px}
+  .vbar.one{flex-direction:row;flex-wrap:wrap;align-items:center}
+  .vtabs{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin:0 -16px;padding:0 16px;width:calc(100% + 32px)}
+  .vtabs::-webkit-scrollbar{display:none}
+  .tools{padding-top:0}
+}
 .stage{position:relative}
 .stage.chartstage{display:grid;grid-template-columns:260px minmax(0,1fr);gap:18px;align-items:start}
 .stage.chartstage>.fpanel{position:sticky;top:12px}
-.stage.mapstage{height:min(740px,80vh);padding:0;overflow:hidden}
+/* a section holding a map spans the window, less a small gutter; its heading stays in line with the page */
+.vsec.wide>.pane{--mw:min(calc(100vw - var(--sbw) - 2 * var(--gut)),2400px);width:var(--mw);max-width:none;margin-left:calc(50% - var(--mw) / 2)}
+.stage.mapstage{height:clamp(460px,78vh,900px);padding:0;overflow:hidden}
 .stage.mapstage .plot{position:absolute;inset:0}
 .stage.mapstage .plot .map,.stage.mapstage .plot svg{width:100%;height:100%}
 .stage.mapstage .map svg{border-radius:12px}
-.stage.mapstage>.fpanel{position:absolute;top:12px;left:12px;width:296px;max-height:calc(100% - 24px);overflow:auto;
+.stage.mapstage>.fpanel{position:absolute;top:12px;left:12px;width:296px;max-height:calc(100% - 24px);overflow:auto;overscroll-behavior:contain;
   background:var(--surface);border:1px solid var(--ring);border-radius:10px;box-shadow:0 6px 24px rgb(0 0 0 / .12);z-index:2}
 .fpanel{display:flex;flex-direction:column;gap:14px;padding:14px 14px 12px;font-size:13px}
 .stage.chartstage>.fpanel{padding:0}
@@ -165,6 +187,9 @@ tbody tr:hover td{background:var(--chip)}
 .scalebar{position:absolute;right:14px;bottom:12px;font-size:11px;color:var(--ink2);display:flex;flex-direction:column;align-items:flex-end;gap:3px;pointer-events:none;z-index:2}
 .scalebar i{display:block;height:5px;border:1.5px solid var(--ink2);border-top:0}
 .ftoggle{display:none}
+.maphint{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:3;pointer-events:none;opacity:0;transition:opacity .2s;
+  background:rgb(11 11 11 / .78);color:#fff;font-size:13px;font-weight:500;padding:8px 14px;border-radius:999px;white-space:nowrap}
+.maphint.on{opacity:1}
 .stlab{font-weight:500;pointer-events:none;paint-order:stroke;stroke:var(--surface);stroke-linejoin:round}
 .stlab.major{font-weight:650}
 /* stepped legend for equal-count classes (NOLA.stepLegend): the value under each boundary is where that color starts */
@@ -193,12 +218,37 @@ tbody tr:hover td{background:var(--chip)}
   .fpanel.collapsed{display:none}
 }
 
+/* ---------- one page per dataset: data pages (drone, calls, trees) ---------- */
+/* tables whose rows don't do anything on click */
+table.static tbody tr{cursor:auto}
+/* on phones a wide table scrolls inside its card instead of widening the page */
+@media(max-width:760px){.stage.chartstage{grid-template-columns:minmax(0,1fr)}}
+
+/* ---------- CPC page (cpc.js): filing-date range in the map panel, and the case-type key under the map ---------- */
+.cpc-range{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.cpc-range label{display:flex;flex-direction:column;gap:3px;min-width:0}
+.cpc-range span{font-size:11px;color:var(--muted)}
+.cpc-range input{width:100%;min-width:0;font:inherit;font-size:12.5px;color:var(--ink);background:var(--chip);border:1px solid var(--ring);border-radius:7px;padding:5px 7px}
+.cpc-range input:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.cpc-key{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px 22px;margin-top:16px}
+.cpc-kt{display:flex;gap:9px;align-items:flex-start;font-size:13px;line-height:1.45}
+.cpc-kt i{flex:0 0 11px;height:11px;border-radius:50%;margin-top:4px}
+.cpc-kt b{font-weight:600}
+.cpc-kt p{margin:1px 0 0;color:var(--ink2)}
+@media(max-width:600px){.cpc-key{grid-template-columns:1fr;gap:10px}}
+
 :root{--water:#c7d6dd;--t-land:#e6e8e1;--t-hood:#f5f6f1;--t-dim:#c9cfc8;--t-other:#aab3ad;--t-stump:#7d837f;
   --t-park:#dbe8d0;--t-park-line:#b5cba4;--t-wild:#e2eadb;--t-cem:#dfe2d8;--t-lot:#e9e7dc;--t-park-ink:#3d6a47}
 @media (prefers-color-scheme: dark){:root:where(:not([data-theme="light"])){--water:#0d1820;--t-land:#151e1d;--t-hood:#1c2826;--t-dim:#2c3836;--t-other:#55635d;--t-stump:#8d948f;
   --t-park:#1d3128;--t-park-line:#2d4a3a;--t-wild:#1b2b24;--t-cem:#232d29;--t-lot:#272a24;--t-park-ink:#93c29d}}
 .tmap{position:absolute;inset:0;display:block;width:100%;height:100%;touch-action:none;cursor:grab;border-radius:12px}
 .tmap.drag{cursor:grabbing}
+/* the map is the page: it runs from under the header to the bottom of the window (--tt set by trees.js) */
+.tfill.stage.mapstage{height:max(460px,calc(100vh - var(--tt,0px) - var(--gut)))}
+@media(max-width:760px){
+  .tfill.stage.mapstage{height:auto}
+  .tfill.stage.mapstage .plot{height:max(380px,calc(100vh - var(--tt,0px) - var(--gut)));height:max(380px,calc(100svh - var(--tt,0px) - var(--gut)))}
+}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script><script src="streets.js"></script>
 </head><body><div class="wrap">
@@ -279,10 +329,16 @@ const NOLA = (() => {
   // map(el, opts) -> {svg, layer, zoomTo, setFill, focus, k()}
   // The map fills el. It keeps clear of an on-map filter panel (o.panel) when fitting, and carries its own
   // zoom controls, scale bar and street-name labels.
+  // Input: the mouse wheel (or trackpad pinch) zooms and dragging pans; the page never scrolls under the map.
+  // On touch screens one finger scrolls the page and two fingers move and zoom the map (see stage()).
+  // The map follows its box when the page is resized: one unit is one CSS pixel once the map is over 1000px wide
+  // (narrower maps scale down, as before), so text and dots keep their size on wide screens.
   let mapN = 0;
   function map(el, o) {
     el.classList.add('map');
-    const W = 1000, H = Math.round(W * (el.clientHeight > 50 ? el.clientHeight / Math.max(1, el.clientWidth) : (o.height || 640) / 1000));
+    const dims = () => { const cw = el.clientWidth, ch = el.clientHeight, w = Math.max(1000, Math.round(cw));
+      return [w, Math.round(w * (ch > 50 && cw > 0 ? ch / cw : (o.height || 640) / 1000))]; };
+    let [W, H] = dims();
     const svg = d3.select(el).append('svg').attr('viewBox', `0 0 ${W} ${H}`).attr('role', 'img').attr('aria-label', o.label || 'Map of New Orleans');
     const root = svg.append('g');
     const base = root.append('g');
@@ -338,7 +394,7 @@ const NOLA = (() => {
     }
 
     // ---- zoom, controls, scale bar ----
-    let k = 1, lt = 0; const listeners = [];
+    let k = 1, lt = 0, moved = false, target = null; const listeners = [];
     const scaleEl = document.createElement('div'); scaleEl.className = 'scalebar'; scaleEl.innerHTML = '<span></span><i></i>'; el.appendChild(scaleEl);
     function drawScale() {
       const pxPerMile = 80.47 * k * (el.clientWidth || W) / W, opts = [0.05, 0.1, 0.25, 0.5, 1, 2, 5]; let m = opts[0];
@@ -347,16 +403,30 @@ const NOLA = (() => {
       scaleEl.firstChild.textContent = m < 1 ? (m * 5280 >= 1000 ? m + ' mi' : Math.round(m * 5280) + ' ft') : m + ' mi';
     }
     // the opening view is about k = 0.45; allow zooming out far enough to see the whole parish, east marsh included
-    const zoom = d3.zoom().scaleExtent([0.25, 40]).on('zoom', ev => {
-      root.attr('transform', ev.transform); k = ev.transform.k; streetZoom(k); drawScale();
-      stLabG.selectAll('text').style('font-size', d => (d.fs / k) + 'px').style('stroke-width', (3 / k) + 'px');
-      listeners.forEach(f => f(k)); clearTimeout(lt); lt = setTimeout(layoutLabels, 90);
-    });
+    const zoom = d3.zoom().scaleExtent([0.25, 40])
+      // touch: only two-finger gestures move the map, so one finger still scrolls the page (touch-action in lib.css)
+      .filter(ev => ev.type.startsWith('touch') ? ev.touches.length >= 2 : (!ev.ctrlKey || ev.type === 'wheel') && !ev.button)
+      .on('zoom', ev => {
+        if (ev.sourceEvent) moved = true; // the reader moved the map, so a resize keeps their view instead of refitting
+        root.attr('transform', ev.transform); k = ev.transform.k; streetZoom(k); drawScale();
+        stLabG.selectAll('text').style('font-size', d => (d.fs / k) + 'px').style('stroke-width', (3 / k) + 'px');
+        listeners.forEach(f => f(k)); clearTimeout(lt); lt = setTimeout(layoutLabels, 90);
+      });
     svg.call(zoom).on('dblclick.zoom', null);
+    // Safari's trackpad pinch arrives as gesture events rather than ctrl+wheel; zoom the map instead of the page
+    // (on iPhone/iPad the same events come with two-finger touches, which d3 already handles)
+    let gk = 1, touching = false;
+    el.addEventListener('touchstart', e => { touching = true; }, { passive: true });
+    const untouch = e => { touching = e.touches.length > 0; };
+    el.addEventListener('touchend', untouch, { passive: true }); el.addEventListener('touchcancel', untouch, { passive: true });
+    el.addEventListener('gesturestart', e => { e.preventDefault(); gk = k; });
+    el.addEventListener('gesturechange', e => { e.preventDefault(); if (touching) return; moved = true;
+      const r = svg.node().getBoundingClientRect(); svg.call(zoom.scaleTo, gk * e.scale, [(e.clientX - r.left) * W / r.width, (e.clientY - r.top) * H / r.height]); });
     // fit an extent into the part of the map the filter panel doesn't cover
     const inset = () => { if (!o.panel || getComputedStyle(o.panel).position !== 'absolute' || !o.panel.childElementCount) return 0;
       return (o.panel.offsetWidth + 24) * W / Math.max(1, el.clientWidth); };
-    function zoomTo([x0, y0, x1, y1], dur = 0) {
+    function zoomTo(ext, dur = 0) {
+      const [x0, y0, x1, y1] = ext; target = ext; moved = false;
       const L = inset(), s = Math.min((W - L) / (x1 - x0), H / (y1 - y0)) * 0.96;
       const tr = d3.zoomIdentity.translate(L + (W - L) / 2, H / 2).scale(s).translate(-(x0 + x1) / 2, -(y0 + y1) / 2);
       (dur ? svg.transition().duration(dur) : svg).call(zoom.transform, tr);
@@ -364,10 +434,24 @@ const NOLA = (() => {
     const home = o.extent || FULL;
     let focused = -1;
     const ctl = document.createElement('div'); ctl.className = 'mapctl';
-    [['+', 'Zoom in', () => svg.transition().duration(250).call(zoom.scaleBy, 1.7)], ['−', 'Zoom out', () => svg.transition().duration(250).call(zoom.scaleBy, 1 / 1.7)],
+    const by = f => () => { moved = true; svg.transition().duration(250).call(zoom.scaleBy, f); };
+    [['+', 'Zoom in', by(1.7)], ['−', 'Zoom out', by(1 / 1.7)],
      ['⤢', 'Reset view', () => api.focus(focused)]].forEach(([t, l, fn]) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = t; b.title = l; b.setAttribute('aria-label', l); b.onclick = fn; ctl.appendChild(b); });
     el.appendChild(ctl);
     zoomTo(home); drawScale(); layoutLabels();
+    // follow the map's box (window resizes, the page's scrollbar appearing, rotating a phone): an untouched map is
+    // refitted to what it was showing; one the reader has moved keeps its center and scale
+    const fit = () => {
+      if (!el.clientWidth || !el.clientHeight) return;
+      const [nw, nh] = dims(); if (nw === W && nh === H) return;
+      const t = d3.zoomTransform(svg.node()), c = t.invert([W / 2, H / 2]);
+      W = nw; H = nh; svg.interrupt().attr('viewBox', `0 0 ${W} ${H}`);
+      if (!moved && target) zoomTo(target);
+      else svg.call(zoom.transform, d3.zoomIdentity.translate(W / 2, H / 2).scale(t.k).translate(-c[0], -c[1]));
+      drawScale();
+    };
+    if (window.ResizeObserver) new ResizeObserver(fit).observe(el);
+    addEventListener('resize', fit);
     const api = {
       svg, layer, nbSel, zoomTo, k: () => k, onZoom: f => listeners.push(f), home,
       setFill(fn) { nbSel.attr('fill', f => fn(f.idx) || null).style('fill', f => fn(f.idx) || null); },
@@ -384,19 +468,50 @@ const NOLA = (() => {
   function mapButtons() {}
 
   // ---------- filters on the chart ----------
-  // stage(el, { map }) turns a view's pane into a filter panel + plot area. On maps the panel floats over the map.
+  // stage(el, { map }) turns a view's pane into a filter panel + plot area. On maps the panel floats over the map,
+  // and the section holding the map spans the window (see .vsec.wide in lib.css).
   function stage(el, { map: isMap = false, open = false } = {}) {
     el.classList.add('stage', isMap ? 'mapstage' : 'chartstage');
     el.innerHTML = '<div class="fpanel"></div><div class="plot"></div>';
-    const panel = el.firstChild;
+    const panel = el.firstChild, plot = el.lastChild;
     if (isMap) { // on phones the map's filters fold away behind a button, so the map shows first
       const b = document.createElement('button'); b.type = 'button'; b.className = 'btn ftoggle'; b.textContent = 'Filters';
       if (open) b.textContent = 'Hide filters'; else panel.classList.add('collapsed');
       b.onclick = () => { panel.classList.toggle('collapsed'); b.textContent = panel.classList.contains('collapsed') ? 'Filters' : 'Hide filters'; };
       el.insertBefore(b, panel);
+      const sec = el.closest('.vsec'); if (sec) sec.classList.add('wide');
+      lockInput(panel, plot);
     }
-    return { panel, plot: el.lastChild };
+    return { panel, plot };
   }
+  // Keep input over a map in the map. The wheel over the map belongs to the map (each map zooms on it), even at the
+  // zoom limits, where it would otherwise fall through and scroll the page. The floating filter panel scrolls itself
+  // and stops at its ends instead of handing the scroll on to the page. On touch screens one finger scrolls the page
+  // and two fingers move the map (each map does the moving); a one-finger swipe over the map shows a short hint.
+  function lockInput(panel, plot) {
+    plot.addEventListener('wheel', e => e.preventDefault(), { passive: false });
+    panel.addEventListener('wheel', e => {
+      if (e.ctrlKey || getComputedStyle(panel).position !== 'absolute') return; // page zoom; phones: the panel is part of the page
+      for (let n = e.target; n && n !== panel.parentNode; n = n.parentNode) {
+        if (n.nodeType !== 1 || n.scrollHeight <= n.clientHeight + 1 || !/auto|scroll/.test(getComputedStyle(n).overflowY)) continue;
+        if (e.deltaY < 0 ? n.scrollTop > 0 : n.scrollTop + n.clientHeight < n.scrollHeight - 1) return; // this box can still scroll
+      }
+      e.preventDefault();
+    }, { passive: false });
+    let y0 = null, two = false, ht = 0;
+    plot.addEventListener('touchstart', e => { two = e.touches.length > 1; y0 = two ? null : [e.touches[0].clientX, e.touches[0].clientY]; }, { passive: true });
+    plot.addEventListener('touchmove', e => {
+      if (two || !y0 || e.touches.length !== 1) return;
+      const t = e.touches[0]; if (Math.hypot(t.clientX - y0[0], t.clientY - y0[1]) < 12) return; y0 = null;
+      let h = plot.querySelector(':scope>.maphint');
+      if (!h) { h = document.createElement('div'); h.className = 'maphint'; h.setAttribute('aria-hidden', 'true'); h.textContent = 'Use two fingers to move the map'; plot.appendChild(h); }
+      h.classList.add('on'); clearTimeout(ht); ht = setTimeout(() => h.classList.remove('on'), 1400);
+    }, { passive: true });
+  }
+  // the page's scrollbar width, so full-width sections (lib.css) span the window without a sideways scroll
+  const setSbw = () => document.documentElement.style.setProperty('--sbw', Math.max(0, innerWidth - document.documentElement.clientWidth) + 'px');
+  if (window.ResizeObserver) new ResizeObserver(setSbw).observe(document.documentElement);
+  addEventListener('resize', setSbw); setSbw();
   // panel section with a small heading and an optional link-style action ("Show all")
   function fsec(panel, title, action) {
     const sec = document.createElement('div'); sec.className = 'fsec';
@@ -518,84 +633,116 @@ const NOLA = (() => {
   const setText = (id, s) => { const el = document.getElementById(id); if (el) el.textContent = s; };
   const setHTML = (id, s) => { const el = document.getElementById(id); if (el) el.innerHTML = s; };
 
-  // ---------- one subject per page: every chart stacked down the page ----------
-  // The URL hash holds the chart last used and the page's filters: #chartId&key=value&... so a link opens
-  // the page scrolled to that chart with exactly those filters.
+  // ---------- one subject per page: a row of tabs, one per chart ----------
+  // The URL hash holds the open chart and the page's filters: #chartId&key=value&... so a link opens
+  // that chart with exactly those filters.
   function hashState() {
     const [view, ...kv] = location.hash.slice(1).split('&'), o = { view };
     kv.forEach(p => { const [k, v] = p.split('='); if (k) o[k] = decodeURIComponent(v || ''); });
     return o;
   }
-  // views(list, { state, ds }) -- list: [{ id, label, cls, keep, draw(el, first), csv() -> rows, ds: [id, name] }]
-  // Each chart gets its own full-width section in #chart: a heading (label), its Copy link / Download CSV, then the chart.
-  // Filters are shared page state, so refresh() redraws every chart. state() returns the filters that differ from
-  // their defaults; they're written into the link. A page can jump to a chart with location.hash = 'chartId'.
+  // views(list, { state, ds }) -- list: [{ id, label, tab, cls, keep, draw(el, first), csv() -> rows, file() -> CSV name (default id), ds: [id, name] }]
+  // A bar at the top of #chart holds a tab per chart (`tab`, or `label`) and Copy link / Download CSV for the open one.
+  // Below it, each chart is its own section (heading `label`, then the chart); only the open one shows.
+  // With a single chart there are no tabs: its heading takes their place in the bar.
+  // Filters are shared page state: refresh() redraws the open chart, and the others redraw when next opened.
+  // state() returns the filters that differ from their defaults; they're written into the link.
+  // A page can open a chart with location.hash = 'chartId'.
   function views(list, opts = {}) {
     const host = document.getElementById('chart');
-    const panes = {}, secs = {}, drawn = new Set(); let cur = null;
+    const panes = {}, secs = {}, tabs = {}, drawn = new Set(), stale = new Set();
     const stateKV = () => {
       const st = opts.state ? opts.state() : {};
       return Object.entries(st).filter(([, v]) => v != null && v !== '').map(([k, v]) => `&${k}=${encodeURIComponent(v)}`).join('');
     };
-    const linkFor = id => location.href.split('#')[0] + '#' + id + stateKV();
-    const writeHash = () => { const kv = stateKV(); if (cur || kv) history.replaceState(null, '', '#' + (cur ? cur.id : '') + kv); };
+    const h0 = hashState().view;
+    let cur = list.find(v => v.id === h0) || list[0];
+    const linkFor = () => location.href.split('#')[0] + '#' + cur.id + stateKV();
+    const writeHash = () => history.replaceState(null, '', '#' + cur.id + stateKV());
     const btn = t => { const b = document.createElement('button'); b.className = 'btn'; b.type = 'button'; b.textContent = t; return b; };
+    // the bar: tabs, then the open chart's Copy link / Download CSV
+    const bar = document.createElement('div'); bar.className = 'vbar';
+    const tabRow = document.createElement('div'); tabRow.className = 'vtabs'; tabRow.setAttribute('role', 'tablist'); tabRow.setAttribute('aria-label', 'Charts');
+    const tools = document.createElement('div'); tools.className = 'tools';
+    const linkB = btn('Copy link'), csvB = btn('Download CSV');
+    linkB.onclick = async () => {
+      writeHash(); const url = linkFor();
+      try { await navigator.clipboard.writeText(url); linkB.textContent = 'Link copied'; }
+      catch (e) { prompt('Copy this link:', url); }
+      setTimeout(() => linkB.textContent = 'Copy link', 1600);
+    };
+    csvB.onclick = () => downloadCSV(cur);
+    tools.append(linkB, csvB);
+    // a page with a single chart has no tabs: the bar holds that chart's heading instead
+    const one = list.length === 1;
+    if (one) bar.classList.add('one');
+    bar.append(one ? document.createElement('h2') : tabRow, tools); host.appendChild(bar);
     list.forEach(v => {
+      const t = document.createElement('button'); t.type = 'button'; t.textContent = v.tab || v.label;
+      t.id = 'vt-' + v.id; t.setAttribute('role', 'tab'); t.setAttribute('aria-controls', 'v-' + v.id);
+      t.onclick = () => open(v.id); tabRow.appendChild(t); tabs[v.id] = t;
       const sec = document.createElement('section'); sec.className = 'vsec'; sec.id = 'v-' + v.id;
-      const head = document.createElement('div'); head.className = 'vsec-h';
-      const h = document.createElement('h2'); h.textContent = v.label;
-      const tools = document.createElement('div'); tools.className = 'tools';
-      const linkB = btn('Copy link');
-      linkB.onclick = async () => {
-        cur = v; writeHash(); const url = linkFor(v.id);
-        try { await navigator.clipboard.writeText(url); linkB.textContent = 'Link copied'; }
-        catch (e) { prompt('Copy this link:', url); }
-        setTimeout(() => linkB.textContent = 'Copy link', 1600);
-      };
-      tools.appendChild(linkB);
-      if (v.csv) { const csvB = btn('Download CSV'); csvB.onclick = () => downloadCSV(v); tools.appendChild(csvB); }
-      head.append(h, tools);
+      const h = one ? bar.firstChild : document.createElement('h2'); h.textContent = v.label;
       const p = document.createElement('div'); p.className = 'pane ' + (v.cls || 'card');
-      sec.append(head, p); host.appendChild(sec); panes[v.id] = p; secs[v.id] = sec;
-      // the chart last touched is the one a copied link (and the address bar) points to
-      sec.addEventListener('pointerdown', () => { if (cur !== v) { cur = v; writeHash(); } });
+      if (one) { h.id = 'vh-' + v.id; sec.setAttribute('aria-labelledby', h.id); sec.append(p); }
+      else {
+        sec.setAttribute('role', 'tabpanel'); sec.setAttribute('aria-labelledby', 'vt-' + v.id);
+        const head = document.createElement('div'); head.className = 'vsec-h'; head.appendChild(h); sec.append(head, p);
+      }
+      host.appendChild(sec); panes[v.id] = p; secs[v.id] = sec;
     });
     // footer "Data:" link goes to the page's City dataset
     const dataLink = document.getElementById('dataLink'), ds = opts.ds || (list.find(v => v.ds) || {}).ds;
     if (dataLink && ds) { dataLink.href = 'https://data.nola.gov/d/' + ds[0]; dataLink.textContent = ds[1] + ' on data.nola.gov'; }
-    const drawOne = v => { v.draw(panes[v.id], !drawn.has(v.id)); drawn.add(v.id); };
-    const draw = () => { tip.hide(); list.forEach(drawOne); writeHash(); };
-    const go = (id, smooth) => {
+    // charts are drawn only while shown (hidden ones have no size); a hidden chart whose filters changed redraws when opened
+    const drawOne = v => { v.draw(panes[v.id], !drawn.has(v.id)); drawn.add(v.id); stale.delete(v.id); };
+    const draw = () => { tip.hide(); list.forEach(v => { if (v !== cur && drawn.has(v.id)) stale.add(v.id); }); drawOne(cur); writeHash(); setSbw(); };
+    function show(v) {
+      cur = v;
+      list.forEach(x => { secs[x.id].hidden = x !== v; tabs[x.id].setAttribute('aria-selected', x === v); tabs[x.id].tabIndex = x === v ? 0 : -1; });
+      csvB.hidden = !v.csv;
+      if (!drawn.has(v.id) || stale.has(v.id)) drawOne(v);
+      // on phones the tab row scrolls sideways: bring the open tab into view
+      const r = tabRow.getBoundingClientRect(), t = tabs[v.id].getBoundingClientRect();
+      if (t.left < r.left || t.right > r.right) tabRow.scrollLeft += t.left - r.left - 16;
+    }
+    function open(id, focusTab) {
       const v = list.find(x => x.id === id); if (!v) return;
-      cur = v; secs[id].scrollIntoView({ behavior: smooth ? 'smooth' : 'auto', block: 'start' });
-    };
+      tip.hide(); if (v !== cur || !drawn.has(v.id)) show(v); writeHash();
+      if (focusTab) tabs[id].focus();
+      if (bar.getBoundingClientRect().top < 0) bar.scrollIntoView({ block: 'start' }); // jumped here from further down the page
+    }
+    // arrow keys move between tabs
+    tabRow.addEventListener('keydown', ev => {
+      const i = list.indexOf(cur), n = list.length;
+      const j = ev.key === 'ArrowRight' ? (i + 1) % n : ev.key === 'ArrowLeft' ? (i - 1 + n) % n : ev.key === 'Home' ? 0 : ev.key === 'End' ? n - 1 : -1;
+      if (j >= 0) { ev.preventDefault(); open(list[j].id, true); }
+    });
     // a link with filters opened on this same page (only the hash changes) reloads, so its filters apply;
     // the pages' own jumps to a chart set a bare chart id and keep the current filters
     addEventListener('hashchange', () => {
       const h = hashState(), st = opts.state ? opts.state() : {};
       const want = Object.entries(h).filter(([k]) => k !== 'view'), have = Object.entries(st).filter(([, v]) => v != null && v !== '');
       if (want.length && (want.length !== have.length || want.some(([k, v]) => String(st[k]) !== v))) return location.reload();
-      draw(); go(h.view, true);
+      if (list.some(v => v.id === h.view) && h.view !== cur.id) { list.forEach(x => { if (drawn.has(x.id)) stale.add(x.id); }); open(h.view); } else draw();
     });
     let rt, lastW = innerWidth;
     addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => {
       if (innerWidth === lastW) return; lastW = innerWidth; // phones fire resize on scroll (address bar); only width matters
-      list.forEach(v => { if (!v.keep) drawOne(v); });
+      list.forEach(v => { if (!v.keep && drawn.has(v.id)) { if (v === cur) drawOne(v); else stale.add(v.id); } });
     }, 150); });
     function downloadCSV(v) {
-      const rows = v.csv(); if (!rows || !rows.length) return;
+      const rows = v.csv && v.csv(); if (!rows || !rows.length) return;
       const keys = Object.keys(rows[0]);
       const cell = x => { x = x == null ? '' : String(x); return /[",\n]/.test(x) ? '"' + x.replace(/"/g, '""') + '"' : x; };
       const text = [keys.map(cell).join(','), ...rows.map(r => keys.map(k => cell(r[k])).join(','))].join('\n');
       const a = document.createElement('a');
       a.href = URL.createObjectURL(new Blob(['\ufeff' + text], { type: 'text/csv;charset=utf-8' }));
-      a.download = `${location.pathname.split('/').pop().replace('.html', '') || 'index'}-${v.id}.csv`;
+      a.download = `${location.pathname.split('/').pop().replace('.html', '') || 'index'}-${v.file ? v.file() : v.id}.csv`;
       document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
     }
-    const h0 = hashState().view;
-    draw();
-    if (list.some(v => v.id === h0)) requestAnimationFrame(() => go(h0, false));
-    return { refresh: draw, get id() { return cur ? cur.id : list[0].id; } };
+    show(cur); writeHash();
+    return { refresh: draw, open, get id() { return cur.id; } };
   }
   const legendHTML = items => '<div class="legend">' + items.map(([c, l, round]) => `<span><i style="background:${c}${round ? ';border-radius:50%' : ''}"></i>${l}</span>`).join('') + '</div>';
 
@@ -643,21 +790,16 @@ const NOLA = (() => {
 
   // ---------- neighborhoods ----------
   const hoods = D.hoods.map((h, hi) => {
-    const p = new Path2D(); let best = null, bestA = -1, area = 0, bx0 = 1e9, by0 = 1e9, bx1 = -1e9, by1 = -1e9;
+    const p = new Path2D(); let best = null, bestA = -1, bx0 = 1e9, by0 = 1e9, bx1 = -1e9, by1 = -1e9;
     for (const poly of h.p) {
       poly.forEach((ring, ri) => { const pts = ring.map(([lo, la]) => toW(lo, la)); pts.forEach(([x, y], k) => k ? p.lineTo(x, y) : p.moveTo(x, y)); p.closePath();
-        area += (ri ? -1 : 1) * Math.abs(d3.polygonArea(pts));
         if (!ri) pts.forEach(([x, y]) => { bx0 = Math.min(bx0, x); by0 = Math.min(by0, y); bx1 = Math.max(bx1, x); by1 = Math.max(by1, y); }); });
       const r = poly[0].map(([lo, la]) => toW(lo, la)), a = Math.abs(d3.polygonArea(r));
       if (a > bestA) { bestA = a; const c = d3.polygonCentroid(r); best = { x: c[0], y: c[1], w: d3.max(r, q => q[0]) - d3.min(r, q => q[0]) }; }
     }
-    return { name: NOLA.title(h.n), path: p, c: best, n: 0, sp: new Map(), sqmi: area * 69.05 * 69.05, bbox: [bx0, by0, bx1, by1], skip: hoodSkip[hi] };
+    return { name: NOLA.title(h.n), path: p, c: best, n: 0, sp: new Map(), bbox: [bx0, by0, bx1, by1], skip: hoodSkip[hi] };
   });
   for (let i = 0; i < N; i++) { if (!valid[i]) continue; const H = hoods[D.h[i]]; H.n++; H.sp.set(D.s[i], (H.sp.get(D.s[i]) || 0) + 1); }
-  hoods.forEach(h => h.dens = h.sqmi > 0 ? h.n / h.sqmi : 0);
-  // trees per sq mi in seven equal-count classes (same scheme as the calls map)
-  const densQ = d3.scaleQuantile().domain(hoods.filter(h => h.n > 0).map(h => h.dens)).range(d3.range(7));
-  const densEdges = [d3.min(densQ.domain()), ...densQ.quantiles(), d3.max(densQ.domain())];
   const hoodList = hoods.map((h, i) => [h, i]).filter(([h]) => h.n > 0).sort((a, b) => a[0].name.localeCompare(b[0].name));
   const shapePath = geoms => { const p = new Path2D(); for (const g of geoms) for (const part of g) for (const ring of part) { ring.forEach(([lo, la], k) => { const [x, y] = toW(lo, la); k ? p.lineTo(x, y) : p.moveTo(x, y); }); p.closePath(); } return p; };
   const landPath = shapePath(D.land), lakePath = shapePath(D.lakes), waterPath = shapePath(D.water);
@@ -715,7 +857,7 @@ const NOLA = (() => {
 
   // ---------- state (kept in the link) ----------
   const H0 = NOLA.hashState();
-  let selSp = H0.sp != null ? +H0.sp : -1, selNb = H0.nb != null ? +H0.nb : -1, setF = H0.set != null ? +H0.set : -1, dens = H0.dens === '1';
+  let selSp = H0.sp != null ? +H0.sp : -1, selNb = H0.nb != null ? +H0.nb : -1, setF = H0.set != null ? +H0.set : -1;
   const inNb = i => selNb < 0 || D.h[i] === selNb;
   const setOk = i => setF < 0 || tset[i] === setF;
   const isVisible = i => valid[i] && inNb(i) && setOk(i) && (selSp >= 0 ? D.s[i] === selSp : groups[spGroup[D.s[i]]].on);
@@ -770,11 +912,6 @@ const NOLA = (() => {
       groups.map((g, i) => ({ key: i, name: g.name, sub: g.bot, color: g.color, count: cnt[i] })),
       { mode: 'toggle', pressed: i => groups[i].on && selSp < 0, onClick: i => { selSp = -1; groups[i].on = !groups[i].on; refresh(); } });
   }
-  function shadeSection(panel) {
-    const sec = NOLA.fsec(panel, 'Neighborhood shading');
-    NOLA.seg(sec, [[0, 'None'], [1, 'Trees per sq. mi.']], dens ? 1 : 0, v => { dens = !!v; refresh(); });
-    if (dens) { const l = document.createElement('div'); l.className = 'legend'; sec.appendChild(l); NOLA.stepLegend(l, densEdges, NOLA.short); }
-  }
 
   // ---------- canvas map ----------
   let ctx, panelEl, W = 0, H = 0, DPR = 1, view = { s: 1, tx: 0, ty: 0 }, C = {}, raf = 0, hoverHood = -1, hoverTree = -1, hoverGS = -1, scaleEl = null;
@@ -784,11 +921,12 @@ const NOLA = (() => {
     const L = insetL(), w = W - L - 2 * padPx, h = H - 2 * padPx, s = Math.min(w / (x1 - x0), h / (y1 - y0));
     view.s = s; view.tx = L + padPx + (w - (x1 - x0) * s) / 2 - x0 * s; view.ty = padPx + (h - (y1 - y0) * s) / 2 - y0 * s;
   }
-  function zoomToHood() { if (selNb < 0) fitBox(home, 16); else fitBox(hoods[selNb].bbox, 40); req(); }
+  let userView = false; // the reader has moved the map since it was last fitted (a resize then keeps their view)
+  function zoomToHood() { if (selNb < 0) fitBox(home, 16); else fitBox(hoods[selNb].bbox, 40); userView = false; req(); }
   function resize() { DPR = Math.min(devicePixelRatio || 1, 2); W = cv.clientWidth; H = cv.clientHeight; cv.width = W * DPR; cv.height = H * DPR; }
   function readColors() {
     const cs = getComputedStyle(document.documentElement);
-    for (const k of ['water', 't-land', 't-hood', 'landline', 't-dim', 'ink', 'ink2', 'muted', 'surface', 'road', 'road-major', 'road-fwy', 't-park', 't-park-line', 't-wild', 't-cem', 't-lot', 't-park-ink', 'q1', 'q2', 'q3', 'q4', 'q5', 'q6', 'q7'])
+    for (const k of ['water', 't-land', 't-hood', 'landline', 't-dim', 'ink', 'ink2', 'muted', 'surface', 'road', 'road-major', 'road-fwy', 't-park', 't-park-line', 't-wild', 't-cem', 't-lot', 't-park-ink'])
       C[k] = cs.getPropertyValue('--' + k).trim();
     groups.forEach(g => { if (g.colorVar) g.color = cs.getPropertyValue(g.colorVar).trim(); });
   }
@@ -798,8 +936,7 @@ const NOLA = (() => {
     ctx.setTransform(DPR * s, 0, 0, DPR * s, DPR * view.tx, DPR * view.ty);
     ctx.fillStyle = C['t-land']; ctx.fill(landPath, 'evenodd');
     ctx.fillStyle = C.water; ctx.fill(lakePath, 'evenodd');
-    if (dens) hoods.forEach(h => { ctx.fillStyle = h.n ? C['q' + (1 + densQ(h.dens))] : C['t-hood']; ctx.fill(h.path); });
-    else { ctx.fillStyle = C['t-hood']; hoods.forEach(h => ctx.fill(h.path)); }
+    ctx.fillStyle = C['t-hood']; hoods.forEach(h => ctx.fill(h.path));
     GCAT.forEach(c => { if (c.on && s >= c.minS) { ctx.fillStyle = C[c.fill]; ctx.fill(c.path); } });
     if (s > 6000) { ctx.strokeStyle = C['t-park-line']; ctx.lineWidth = 0.8 / s; GCAT.forEach((c, ci) => { if (c.on && s >= c.minS && ci !== 4) ctx.stroke(c.path); }); }
     ctx.fillStyle = C.water; ctx.fill(waterPath);
@@ -914,7 +1051,7 @@ const NOLA = (() => {
       tip.show(`<b>${esc(gsName(g))}</b><div style="color:var(--ink2)">${esc(g.u)}${g.own ? ' · ' + esc(g.own) : ''}</div>` + row('Acres', a < 1 ? a.toFixed(2) : fmt(Math.round(a))) + row('Trees', fmt(g.n)) + (g.n ? '<div style="margin-top:4px"></div>' + topSp(g.sp, 4) : ''), ev);
     } else if (hh >= 0) {
       const Hd = hoods[hh];
-      tip.show(`<b>${esc(Hd.name)}</b>` + row('Trees', fmt(Hd.n)) + row('Per sq. mi.', fmt(Math.round(Hd.dens))) + row('Species', Hd.sp.size) + '<div style="margin-top:4px"></div>' + topSp(Hd.sp, 4), ev);
+      tip.show(`<b>${esc(Hd.name)}</b>` + row('Trees', fmt(Hd.n)) + row('Species', Hd.sp.size) + '<div style="margin-top:4px"></div>' + topSp(Hd.sp, 4), ev);
     } else tip.hide();
   }
   // left-click a neighborhood to select it (the "Most common" list follows); click it again, or outside any neighborhood, to clear.
@@ -930,102 +1067,90 @@ const NOLA = (() => {
   function initMap(plot) {
     plot.innerHTML = '<canvas class="tmap" aria-label="Map of street trees in New Orleans, colored by species"></canvas><div class="scalebar"><span></span><i></i></div><div class="mapctl"></div>';
     cv = plot.querySelector('canvas'); ctx = cv.getContext('2d'); scaleEl = plot.querySelector('.scalebar');
-    const zoomAt = (f, x, y) => { const ns = Math.max(700, Math.min(600000, view.s * f)); f = ns / view.s; view.tx = x - (x - view.tx) * f; view.ty = y - (y - view.ty) * f; view.s = ns; req(); };
+    const zoomAt = (f, x, y) => { const ns = Math.max(700, Math.min(600000, view.s * f)); f = ns / view.s; view.tx = x - (x - view.tx) * f; view.ty = y - (y - view.ty) * f; view.s = ns; userView = true; req(); };
     const ctl = plot.querySelector('.mapctl');
     [['+', 'Zoom in', () => zoomAt(1.8, (insetL() + W) / 2, H / 2)], ['−', 'Zoom out', () => zoomAt(1 / 1.8, (insetL() + W) / 2, H / 2)], ['⤢', 'Reset view', () => zoomToHood()]].forEach(([t, l, fn]) => {
       const b = document.createElement('button'); b.type = 'button'; b.textContent = t; b.title = l; b.setAttribute('aria-label', l); b.onclick = fn; ctl.appendChild(b); });
-    const pointers = new Map(); let last = null, pinch = null, moved = false;
-    cv.addEventListener('wheel', e => { e.preventDefault(); zoomAt(Math.exp(-e.deltaY * 0.0015), e.offsetX, e.offsetY); }, { passive: false });
-    cv.addEventListener('pointerdown', e => { cv.setPointerCapture(e.pointerId); pointers.set(e.pointerId, { x: e.offsetX, y: e.offsetY }); moved = false;
-      if (pointers.size === 2) { const [a, b] = [...pointers.values()]; pinch = { d: Math.hypot(a.x - b.x, a.y - b.y), cx: (a.x + b.x) / 2, cy: (a.y + b.y) / 2 }; }
-      last = { x: e.offsetX, y: e.offsetY }; cv.classList.add('drag'); });
+    // Input, as on the other maps: the wheel (or a trackpad pinch) zooms, dragging pans, and the page never scrolls
+    // under the map (NOLA.stage also stops the wheel on the zoom buttons). On touch screens one finger scrolls the
+    // page (touch-action in lib.css) and two fingers pan and pinch; once two are down, the gesture stays the map's
+    // until every finger lifts. A tap still picks a neighborhood.
+    const pointers = new Map(); let last = null, pinch = null, moved = false, twoFinger = false;
+    const isTouch = e => e.pointerType === 'touch';
+    cv.addEventListener('wheel', e => { e.preventDefault(); zoomAt(Math.exp(-e.deltaY * (e.deltaMode === 1 ? 0.05 : e.deltaMode === 2 ? 1 : 0.0015)), e.offsetX, e.offsetY); }, { passive: false });
+    // keep the browser from scrolling or zooming the page while two fingers are on the map
+    cv.addEventListener('touchstart', e => { if (e.touches.length > 1) twoFinger = true; }, { passive: true });
+    cv.addEventListener('touchmove', e => { if (twoFinger && e.cancelable) e.preventDefault(); }, { passive: false });
+    const touchEnd = e => { if (!e.touches.length) twoFinger = false; };
+    cv.addEventListener('touchend', touchEnd, { passive: true }); cv.addEventListener('touchcancel', touchEnd, { passive: true });
+    // Safari's trackpad pinch comes as gesture events (iPhone/iPad send them alongside touches, handled above)
+    let gLast = 1;
+    cv.addEventListener('gesturestart', e => { e.preventDefault(); gLast = 1; });
+    cv.addEventListener('gesturechange', e => { e.preventDefault(); if (twoFinger || pointers.size) return; const r = cv.getBoundingClientRect(); zoomAt(e.scale / gLast, e.clientX - r.left, e.clientY - r.top); gLast = e.scale; });
+    cv.addEventListener('pointerdown', e => { if (!isTouch(e)) cv.setPointerCapture(e.pointerId); pointers.set(e.pointerId, { x: e.offsetX, y: e.offsetY }); moved = false;
+      if (pointers.size === 2) { const [a, b] = [...pointers.values()]; pinch = { d: Math.hypot(a.x - b.x, a.y - b.y), cx: (a.x + b.x) / 2, cy: (a.y + b.y) / 2 }; twoFinger = twoFinger || isTouch(e); }
+      last = { x: e.offsetX, y: e.offsetY }; if (!isTouch(e)) cv.classList.add('drag'); });
     cv.addEventListener('pointermove', e => {
       if (!pointers.has(e.pointerId)) { hover(e, e.offsetX, e.offsetY); return; }
       pointers.set(e.pointerId, { x: e.offsetX, y: e.offsetY });
       if (pointers.size === 2 && pinch) { const [a, b] = [...pointers.values()]; const d = Math.hypot(a.x - b.x, a.y - b.y), cx = (a.x + b.x) / 2, cy = (a.y + b.y) / 2;
         view.tx += cx - pinch.cx; view.ty += cy - pinch.cy; zoomAt(d / pinch.d, cx, cy); pinch = { d, cx, cy }; moved = true; return; }
       const dx = e.offsetX - last.x, dy = e.offsetY - last.y; if (Math.abs(dx) + Math.abs(dy) > 2) moved = true;
-      view.tx += dx; view.ty += dy; last = { x: e.offsetX, y: e.offsetY }; tip.hide(); req(); });
-    const endPtr = e => { pointers.delete(e.pointerId); if (pointers.size < 2) pinch = null; if (!pointers.size) cv.classList.remove('drag');
+      last = { x: e.offsetX, y: e.offsetY };
+      if (isTouch(e) && !twoFinger) return; // one finger: the browser scrolls the page (or it's a tap)
+      view.tx += dx; view.ty += dy; userView = true; tip.hide(); req(); });
+    const endPtr = e => { pointers.delete(e.pointerId); if (pointers.size < 2) pinch = null; if (!pointers.size) { cv.classList.remove('drag'); twoFinger = false; }
       if (pointers.size === 1) { const p = [...pointers.values()][0]; last = { x: p.x, y: p.y }; }
       if (!moved && e.type === 'pointerup') { if (e.button === 0) clickHood(e.offsetX, e.offsetY); hover(e, e.offsetX, e.offsetY, true); } };
     cv.addEventListener('pointerup', endPtr); cv.addEventListener('pointercancel', endPtr);
     cv.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse') { tip.hide(); if (hoverHood >= 0 || hoverTree >= 0 || hoverGS >= 0) { hoverHood = hoverTree = hoverGS = -1; req(); } } });
     cv.addEventListener('dblclick', e => zoomAt(2, e.offsetX, e.offsetY));
-    addEventListener('resize', () => { if (!cv.offsetParent) return; const ow = W, oh = H; resize(); view.tx += (W - ow) / 2; view.ty += (H - oh) / 2; req(); });
+    // follow the canvas's box (window resizes, the page's scrollbar appearing, rotating a phone): an untouched map is
+    // refitted; one the reader has moved keeps its center and scale. Redrawn at once, since resizing clears the canvas.
+    const fit = () => {
+      if (!cv.clientWidth || !cv.clientHeight || (cv.clientWidth === W && cv.clientHeight === H)) return;
+      const ow = W, oh = H; resize();
+      if (userView) { view.tx += (W - ow) / 2; view.ty += (H - oh) / 2; } else zoomToHood();
+      draw();
+    };
+    if (window.ResizeObserver) new ResizeObserver(fit).observe(cv);
+    addEventListener('resize', fit);
     const reTheme = () => { readColors(); refresh(); };
     matchMedia('(prefers-color-scheme: dark)').addEventListener('change', reTheme);
     new MutationObserver(reTheme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
     resize(); zoomToHood();
   }
-  const staged = (el, first, isMap) => { if (first) el._s = NOLA.stage(el, { map: isMap }); return el._s; };
   let lastNb;
   function drawMap(pane, first) {
-    const { panel, plot } = staged(pane, first, true); panelEl = panel;
+    if (first) { pane._s = NOLA.stage(pane, { map: true }); fillHeight(pane); }
+    const { panel, plot } = pane._s; panelEl = panel;
     panel.innerHTML = '';
-    nbSection(panel); findSection(panel); settingSection(panel); speciesSection(panel); layerSection(panel); shadeSection(panel);
+    nbSection(panel); findSection(panel); settingSection(panel); speciesSection(panel); layerSection(panel);
     if (first) { initMap(plot); lastNb = selNb; }
     else if (W !== cv.clientWidth || H !== cv.clientHeight) { resize(); zoomToHood(); }
     if (lastNb !== selNb) { zoomToHood(); lastNb = selNb; }
     draw();
   }
-
-  // ---------- bar charts ----------
-  function hbars(el, items, { color = 'var(--s1)', label = 'Trees', caption = '' } = {}) {
-    el.innerHTML = caption ? `<div class="legend" style="margin:0 0 6px">${esc(caption)}</div>` : '';
-    const f = NOLA.frame(el, { h: 24 + items.length * 20, m: { t: 4, r: 56, b: 20, l: Math.min(230, el.clientWidth * 0.42) } });
-    const x = d3.scaleLinear().domain([0, d3.max(items, d => d.v) || 1]).range([0, f.iw]);
-    const y = d3.scaleBand().domain(items.map((d, i) => i)).range([0, f.ih]).paddingInner(.25);
-    f.g.selectAll('rect.b').data(items).join('rect').attr('class', 'b').attr('x', 0).attr('y', (d, i) => y(i)).attr('width', d => Math.max(1, x(d.v))).attr('height', y.bandwidth()).attr('rx', 2).attr('fill', d => d.color || color);
-    f.g.selectAll('text.l').data(items).join('text').attr('class', 'l').attr('x', -8).attr('y', (d, i) => y(i) + y.bandwidth() / 2 + 4).attr('text-anchor', 'end').style('fill', 'var(--ink2)')
-      .text(d => d.name)
-      .each(function () { // shorten names that don't fit the label margin (narrow screens)
-        const t = d3.select(this), full = t.text(); let n = full.length;
-        while (n > 4 && this.getComputedTextLength() > f.m.l - 10) t.text(full.slice(0, --n).trimEnd() + '…');
-      });
-    f.g.selectAll('text.v').data(items).join('text').attr('class', 'v').attr('x', d => x(d.v) + 5).attr('y', (d, i) => y(i) + y.bandwidth() / 2 + 4).text(d => fmt(d.v));
-    f.g.selectAll('rect.h').data(items).join('rect').attr('class', 'h').attr('x', -f.m.l).attr('y', (d, i) => y(i) - 2).attr('width', f.iw + f.m.l).attr('height', y.step()).attr('fill', 'transparent')
-      .style('cursor', d => d.onClick ? 'pointer' : null)
-      .on('mousemove', (ev, d) => tip.show(`<b>${esc(d.name)}</b>` + (d.sub ? `<div style="color:var(--ink2)"><i>${esc(d.sub)}</i></div>` : '') + row(label, fmt(d.v)) + (d.extra || ''), ev)).on('mouseleave', tip.hide)
-      .on('click', (ev, d) => { if (d.onClick) { tip.hide(); d.onClick(); } });
-  }
-  function drawSpecies(pane, first) {
-    const { panel, plot } = staged(pane, first);
-    panel.innerHTML = ''; nbSection(panel); settingSection(panel);
-    const cnt = new Map(); let tot = 0;
-    for (let i = 0; i < N; i++) if (valid[i] && inNb(i) && setOk(i)) { cnt.set(D.s[i], (cnt.get(D.s[i]) || 0) + 1); tot++; }
-    const items = [...cnt].map(([i, v]) => ({ name: D.species[i][0], sub: D.species[i][1], v, i })).sort((a, b) => b.v - a.v).slice(0, 30)
-      .map(d => ({ ...d, color: groups[spGroup[d.i]].color, extra: row('Share', (100 * d.v / tot).toFixed(1) + '%'), onClick: () => { selSp = d.i; location.hash = 'map'; } }));
-    hbars(plot, items);
-  }
-  function drawHoods(pane, first) {
-    const { panel, plot } = staged(pane, first);
-    panel.innerHTML = ''; findSection(panel); settingSection(panel);
-    NOLA.seg(NOLA.fsec(panel, 'Count'), [[0, 'Trees'], [1, 'Trees per sq. mi.']], dens ? 1 : 0, v => { dens = !!v; refresh(); });
-    const cnt = hoods.map(() => 0); for (let i = 0; i < N; i++) if (valid[i] && setOk(i) && (selSp < 0 || D.s[i] === selSp)) cnt[D.h[i]]++;
-    const items = hoodList.map(([h, hi]) => { const n = cnt[hi], v = dens ? Math.round(n / h.sqmi) : n;
-      return { name: h.name, v, color: hi === selNb ? 'var(--ink)' : null, extra: (dens ? row('Trees', fmt(n)) : row('Per sq. mi.', fmt(Math.round(n / h.sqmi)))) + row('All trees here', fmt(h.n)),
-        onClick: () => { selNb = hi; location.hash = 'map'; } }; }).filter(d => d.v > 0).sort((a, b) => b.v - a.v);
-    const col = selSp >= 0 ? (spGroup[selSp] < 9 ? groups[spGroup[selSp]].color : TOP_COLORS[0]) : 'var(--s3)';
-    const what = (selSp >= 0 ? D.species[selSp][0] : 'Trees') + (dens ? ' per sq. mi.' : '');
-    hbars(plot, items, { color: col, label: what, caption: what + (setF >= 0 ? ' · ' + SETTINGS[setF].name.toLowerCase() : '') });
+  // the map is the page: it fills the window below the page header (CSS in trees.html). --tt is where the map's
+  // own box starts on the page, under the "Filters" button on phones; it's measured with the filters folded, so
+  // opening them doesn't shrink the map.
+  function fillHeight(pane) {
+    pane.classList.add('tfill');
+    const set = () => { const tog = pane.querySelector('.ftoggle'), th = tog && tog.offsetHeight ? tog.offsetHeight + 8 : 0;
+      pane.style.setProperty('--tt', Math.round(pane.getBoundingClientRect().top + scrollY + th) + 'px'); };
+    set(); addEventListener('resize', set); if (document.fonts) document.fonts.ready.then(set);
   }
 
   // ---------- CSV downloads ----------
   const ll = i => [+(D.x[i] * 1e-5 + D.lon0).toFixed(6), +(D.y[i] * 1e-5 + D.lat0).toFixed(6)];
   const csvMap = () => { const o = []; for (let i = 0; i < N; i++) if (isVisible(i)) { const [lon, lat] = ll(i), sp = D.species[D.s[i]], gk = D.tg[i];
     o.push({ species: sp[0], botanical_name: sp[1], neighborhood: hoods[D.h[i]].name, setting: SETTINGS[tset[i]].name, green_space: gk >= 0 ? GS[gk].nm : '', near_street: D.near[i] >= 0 ? D.roadNames[D.near[i]] : '', lon, lat }); } return o; };
-  const csvSpecies = () => { const cnt = new Map(); for (let i = 0; i < N; i++) if (valid[i] && inNb(i) && setOk(i)) cnt.set(D.s[i], (cnt.get(D.s[i]) || 0) + 1);
-    return [...cnt].sort((a, b) => b[1] - a[1]).map(([i, v]) => ({ species: D.species[i][0], botanical_name: D.species[i][1], trees: v })); };
-  const csvHoods = () => hoodList.map(([h]) => ({ neighborhood: h.name, trees: h.n, sq_mi: +h.sqmi.toFixed(2), trees_per_sq_mi: Math.round(h.n / h.sqmi), species_count: h.sp.size }));
 
   readColors();
   const V = NOLA.views([
     { id: 'map', label: 'Map of every tree', keep: true, draw: drawMap, csv: csvMap },
-    { id: 'species', label: 'Most common species', draw: drawSpecies, csv: csvSpecies },
-    { id: 'hoods', label: 'Trees by neighborhood', draw: drawHoods, csv: csvHoods },
   ], { ds: ['3tyj-9x33', 'Tree Location'],
-       state: () => ({ sp: selSp >= 0 ? selSp : null, nb: selNb >= 0 ? selNb : null, set: setF >= 0 ? setF : null, dens: dens ? 1 : null }) });
+       state: () => ({ sp: selSp >= 0 ? selSp : null, nb: selNb >= 0 ? selNb : null, set: setF >= 0 ? setF : null }) });
 })();
 </script>
 </body></html>
