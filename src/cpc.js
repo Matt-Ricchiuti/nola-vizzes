@@ -37,7 +37,7 @@
     if (v === 'upcoming' || v === 'recent') history.replaceState(null, '', '#map' + (v === 'recent' ? '&tab=filed' : '') + kv.map(s => '&' + s).join('')); }
   const H = NOLA.hashState();
   const st = { tab: H.tab === 'filed' ? 'filed' : 'up', from: hashDay(H.from) ?? DEF_FROM, to: hashDay(H.to) ?? LAST,
-    fold: H.fold != null ? +H.fold : -1, theme: H.theme != null ? +H.theme : -1, nb: H.nb != null ? +H.nb : -1 };
+    fold: H.fold != null ? +H.fold : -1, theme: H.theme != null ? +H.theme : -1, nb: H.nb != null ? +H.nb : -1, heat: H.heat === '1' };
   if (st.from > st.to) [st.from, st.to] = [st.to, st.from];
   const defRange = () => st.from === DEF_FROM && st.to === LAST;
   const rangeTxt = () => defRange() ? 'past 12 months' : `${pDate(st.from)} – ${pDate(st.to)}`;
@@ -142,6 +142,12 @@
     if (mp.lastNb !== st.nb) { mp.focus(st.nb, first ? 0 : 450); mp.lastNb = st.nb; }
     ud.style('display', filed ? 'none' : null); rg.style('display', filed ? null : 'none');
     if (filed) drawFiled(panel); else drawUpcoming(panel);
+    // the heatmap (a checkbox on the map): the cases shown, counted by neighborhood (every neighborhood stays shaded
+    // when one is picked, for comparison)
+    NOLA.heatToggle(plot, st.heat, on => set('heat', on), null);
+    const cnt = d3.range(72).map(i => nbCnt[i] || 0), cl = st.heat ? NOLA.classes(cnt) : null;
+    mp.setFill(cl ? i => cl.color(cnt[i]) : () => null);
+    NOLA.heatKey(panel, plot, cl, filed ? 'Cases filed, by neighborhood' : 'Upcoming hearings, by neighborhood');
     NOLA.ftabs(panel, [['up', 'Upcoming hearings'], ['filed', 'Cases filed']], st.tab, v => set('tab', v));
     if (!first) { panel.scrollTop = keep[0]; if (scrollY !== keep[2]) scrollTo(keep[1], keep[2]); }
   }
@@ -272,5 +278,5 @@
     { id: 'topics', label: 'Cases per year mentioning each topic', draw: drawTopics },
   ], { ds: ['xxb5-5azv', 'CPC Projects'],
        state: () => ({ tab: st.tab === 'filed' ? 'filed' : null, date: st.day !== NEXT ? st.day : null, from: st.from !== DEF_FROM ? isoOf(st.from) : null, to: st.to !== LAST ? isoOf(st.to) : null,
-         fold: st.fold >= 0 ? st.fold : null, theme: st.theme >= 0 ? st.theme : null, nb: st.nb >= 0 ? st.nb : null }) });
+         fold: st.fold >= 0 ? st.fold : null, theme: st.theme >= 0 ? st.theme : null, nb: st.nb >= 0 ? st.nb : null, heat: st.heat ? 1 : null }) });
 })();

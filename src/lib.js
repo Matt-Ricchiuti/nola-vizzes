@@ -349,6 +349,49 @@ const NOLA = (() => {
     });
     panel.prepend(d); return d;
   }
+  // ---------- the map's switches: one box at the bottom right, just above the scale bar ----------
+  // Dots are every map's base; the neighborhood shading is an optional layer under them. mapCheck(plot, key, label,
+  // checked, onChange, { disabled, title }) adds or updates one checkbox in the box (made once per map, kept across
+  // redraws); label null hides it. heatToggle() is the usual pair: "Heatmap", and under it the per-resident or
+  // per-home version of the shading, which only applies while the heatmap is on.
+  function toggleBox(plot) {
+    let b = plot.querySelector(':scope>.maptoggles');
+    if (!b) { b = document.createElement('div'); b.className = 'maptoggles'; plot.appendChild(b); }
+    return b;
+  }
+  function mapCheck(plot, key, label, checked, onChange, { disabled = false, title = '', sub = false } = {}) {
+    const box = toggleBox(plot); let el = box.querySelector(`:scope>[data-k="${key}"]`);
+    if (label && !el) {
+      el = document.createElement('label'); el.className = 'mapcheck' + (sub ? ' sub' : ''); el.dataset.k = key;
+      el.innerHTML = '<input type="checkbox"><span></span>';
+      const after = [...box.children].find(c => (+c.dataset.o || 0) > (sub ? 1 : 0)); el.dataset.o = sub ? 1 : 0;
+      box.insertBefore(el, after || null);
+    }
+    if (el) {
+      el.hidden = !label;
+      if (label) { const cb = el.firstChild; el.lastChild.textContent = label; cb.checked = !!checked; cb.disabled = !!disabled; el.classList.toggle('off', !!disabled); el.title = title; cb.onchange = () => onChange(cb.checked); }
+    }
+    box.hidden = ![...box.children].some(c => !c.hidden);
+    plot.classList.toggle('has-toggles', !box.hidden);
+    return el;
+  }
+  // heatToggle(plot, on, onChange, per): per = { label: 'Per 1k residents', checked, onChange } or null (a count that
+  // isn't shown per person or per home)
+  function heatToggle(plot, on, onChange, per) {
+    mapCheck(plot, 'heat', 'Heatmap', on, onChange, { title: 'Shade each neighborhood by how many of the dots shown are in it' });
+    mapCheck(plot, 'per', per ? per.label : null, per && per.checked, per && per.onChange, { sub: true, disabled: !on, title: on ? '' : 'Applies to the heatmap' });
+  }
+  // heatKey(panel, plot, cl, label, fmtf, none): the heatmap's key, as a panel section and, on phones, a legend on the
+  // map (.maplegend). cl is what classes() returned; null (heatmap off) leaves the panel without it and hides the legend.
+  function heatKey(panel, plot, cl, label, fmtf = short, none = null) {
+    let ml = plot.querySelector(':scope>.maplegend');
+    if (!ml) { ml = document.createElement('div'); ml.className = 'maplegend'; plot.appendChild(ml); }
+    ml.hidden = !cl; if (!cl) return null;
+    const arg = cl.shades ? cl : cl.edges, leg = document.createElement('div'); leg.className = 'legend';
+    fsec(panel, label).appendChild(leg); stepLegend(leg, arg, fmtf, none);
+    stepLegend(ml, arg, fmtf, none); ml.insertAdjacentHTML('afterbegin', `<div class="mlh">${label}</div>`);
+    return leg;
+  }
   // neighborhood picker inside a panel section
   function nbPick(sec, value, onSel, label = 'All neighborhoods') {
     const s = document.createElement('select'); s.className = 'fsel'; s.setAttribute('aria-label', 'Neighborhood'); sec.appendChild(s);
@@ -540,6 +583,6 @@ const NOLA = (() => {
   }
   const legendHTML = items => '<div class="legend">' + items.map(([c, l, round]) => `<span><i style="background:${c}${round ? ';border-radius:50%' : ''}"></i>${l}</span>`).join('') + '</div>';
 
-  return { css, S, fmt, pct, tip, row, setGeo, views, hashState, legendHTML, stage, fsec, flist, seg, ftabs, nbPick, phoneToggle, popOf, perK, fmtRate, POP_NOTE, basisChips, shown, nbList, nbSelect, get FULL() { return FULL; }, get GEO() { return GEO; }, map, mapButtons, panelInset, seqVar, seqLegend, classes, stepLegend, short, frame, yGrid, chips, months, monthsLong,
+  return { css, S, fmt, pct, tip, row, setGeo, views, hashState, legendHTML, stage, fsec, flist, seg, ftabs, nbPick, mapCheck, heatToggle, heatKey, phoneToggle, popOf, perK, fmtRate, POP_NOTE, basisChips, shown, nbList, nbSelect, get FULL() { return FULL; }, get GEO() { return GEO; }, map, mapButtons, panelInset, seqVar, seqLegend, classes, stepLegend, short, frame, yGrid, chips, months, monthsLong,
     setYear, get YEAR() { return YEAR; }, monthTicks, doyTime, doyDate, doyISO, doyMonth, monthStarts, isoDate, share, numWord, cap, setText, setHTML, title };
 })();

@@ -40,11 +40,12 @@
   // ---------- filters ----------
   const H = NOLA.hashState();
   // tl: which chart the "over time" section shows (week: flights per week, hour: takeoffs by hour, drone: each drone's flights)
-  const st = { cat: H.cat != null ? +H.cat : -1, period: SPLIT && H.period ? H.period : 'all', nb: H.nb != null ? +H.nb : -1, tl: ['hour', 'drone'].includes(H.tl) ? H.tl : 'week' };
+  const st = { cat: H.cat != null ? +H.cat : -1, period: SPLIT && H.period ? H.period : 'all', nb: H.nb != null ? +H.nb : -1, tl: ['hour', 'drone'].includes(H.tl) ? H.tl : 'week', heat: H.heat === '1' };
   // links from before these charts were merged: #hour and #fleet are now tabs of #week
   if (H.view === 'hour' || H.view === 'fleet') { st.tl = H.view === 'hour' ? 'hour' : 'drone'; history.replaceState(null, '', location.hash.replace(/^#\w+/, '#week')); }
   const inNb = f => st.nb < 0 || f.nb === st.nb;
-  const inPeriod = f => (st.period === 'all' || (st.period === 'early' ? f.day < DFR : f.day >= DFR)) && inNb(f);
+  const inPer = f => st.period === 'all' || (st.period === 'early' ? f.day < DFR : f.day >= DFR);
+  const inPeriod = f => inPer(f) && inNb(f);
   const pass = f => (st.cat < 0 || f.cat === st.cat) && inPeriod(f);
   // the week and drone timelines run across the whole year, so the period filter doesn't apply to them
   const passT = f => (st.cat < 0 || f.cat === st.cat) && inNb(f);
@@ -132,6 +133,15 @@
       const counts = CATS.map((c, ci) => fs.filter(f => f.cat === ci).length);
       return { fs, x: d3.mean(fs, f => f.x), y: d3.mean(fs, f => f.y), n: fs.length, cat: counts.indexOf(d3.max(counts)), counts };
     }).sort((a, b) => b.n - a.n);
+    // the heatmap (a checkbox on the map): flights per neighborhood, following the purpose and period filters (every
+    // neighborhood stays shaded when one is picked, for comparison)
+    NOLA.heatToggle(plot, st.heat, on => { st.heat = on; V.refresh(); }, null);
+    let cl = null;
+    if (st.heat) {
+      const cnt = d3.range(72).map(() => 0); flights.forEach(f => { if (f.hasLoc && f.nb >= 0 && (st.cat < 0 || f.cat === st.cat) && inPer(f)) cnt[f.nb]++; });
+      cl = NOLA.classes(cnt); m.setFill(i => cl.color(cnt[i]));
+    } else m.setFill(() => null);
+    NOLA.heatKey(panel, plot, cl, 'Flights launched, by neighborhood');
     const k = m.k();
     dots.selectAll('circle').data(data, d => d.x + ',' + d.y).join('circle')
       .attr('cx', d => d.x).attr('cy', d => d.y).attr('r', d => (3 + Math.sqrt(d.n) * 2.2) / k)
@@ -198,5 +208,5 @@
     { id: 'week', label: 'Flights over time', draw: drawTime },
     { id: 'purpose', label: 'Flights by purpose', draw: drawPurpose },
   ], { ds: ['ay9z-ynxz', 'NOPD Drone Flights'],
-       state: () => ({ cat: st.cat >= 0 ? st.cat : null, period: st.period !== 'all' ? st.period : null, nb: st.nb >= 0 ? st.nb : null, tl: st.tl !== 'week' ? st.tl : null }) });
+       state: () => ({ cat: st.cat >= 0 ? st.cat : null, period: st.period !== 'all' ? st.period : null, nb: st.nb >= 0 ? st.nb : null, tl: st.tl !== 'week' ? st.tl : null, heat: st.heat ? 1 : null }) });
 })();
