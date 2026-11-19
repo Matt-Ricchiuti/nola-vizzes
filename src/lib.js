@@ -71,6 +71,10 @@ const NOLA = (() => {
   // On touch screens one finger scrolls the page and two fingers move and zoom the map (see stage()).
   // The map follows its box when the page is resized: one unit is one CSS pixel once the map is over 1000px wide
   // (narrower maps scale down, as before), so text and dots keep their size on wide screens.
+  // light/dark changes: canvases read colors from CSS, so they redraw
+  const themeFns = [];
+  const onTheme = f => { if (!themeFns.length) { const run = () => themeFns.forEach(g => g()); matchMedia('(prefers-color-scheme: dark)').addEventListener('change', run);
+    new MutationObserver(run).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] }); } themeFns.push(f); };
   let mapN = 0;
   function map(el, o) {
     el.classList.add('map');
@@ -95,18 +99,37 @@ const NOLA = (() => {
       sg.append('path').attr('class', 'st st0').attr('d', ST.d[0]);
     }
     const streetZoom = k => { if (localSt) localSt.style('opacity', Math.max(0.35, Math.min(1, (k - 0.6) / 2.4))); };
-    // the hovered neighborhood's outline, drawn over the streets and its neighbors' fills (an outline only, so the
-    // streets and shading underneath stay visible)
-    const hoverP = root.append('path').attr('class', 'nbhover').style('pointer-events', 'none').attr('d', null);
-    const focusG = root.append('g').style('pointer-events', 'none');
-    if (o.districts) root.append('g').selectAll('path').data(GEO.pd).join('path').attr('d', f => f.d)
-      .attr('fill', 'none').attr('stroke', 'var(--ink2)').attr('stroke-width', 1.4).attr('vector-effect', 'non-scaling-stroke').attr('opacity', .55).style('pointer-events', 'none');
-    const stLabG = root.append('g').attr('aria-hidden', 'true');
+    // pages' own SVG marks (a few hundred at most; larger sets use the dot layer below)
     const layer = root.append('g');
-    // o.tip(i) can return nothing (a map whose own marks carry the tooltips): then hovering a neighborhood shows nothing
-    const unhover = () => { tip.hide(); hoverP.datum(null).attr('d', null); };
-    if (o.tip) nbSel.on('mousemove', (ev, f) => { const h = o.tip(f.idx); if (!h) return unhover(); tip.show(h, ev); if (hoverP.datum() !== f) hoverP.datum(f).attr('d', f.d); })
-      .on('mouseleave', unhover);
+    // Layers, bottom to top: this svg (neighborhood fills, streets, the page's layer), a canvas of dots (api.dots, made
+    // when a page asks for it), then a second svg that takes no input, with the hover and focus outlines, district
+    // lines, street names and the hovered dot's ring, so outlines and names stay on top of the dots.
+    const top = d3.select(el).append('svg').attr('class', 'maptop').attr('viewBox', `0 0 ${W} ${H}`).attr('aria-hidden', 'true');
+    const troot = top.append('g');
+    // the hovered neighborhood's outline (an outline only, so the streets and shading underneath stay visible)
+    const hoverP = troot.append('path').attr('class', 'nbhover').attr('d', null);
+    const focusG = troot.append('g');
+    if (o.districts) troot.append('g').selectAll('path').data(GEO.pd).join('path').attr('d', f => f.d)
+      .attr('fill', 'none').attr('stroke', 'var(--ink2)').attr('stroke-width', 1.4).attr('vector-effect', 'non-scaling-stroke').attr('opacity', .55);
+    const stLabG = troot.append('g');
+    const ringG = troot.append('g'); // the hovered dot
+    let DL = null, hot = -1; // the dot layer (made by api.dots) and the hovered dot
+    // Hover: the nearest dot under the pointer shows its own tooltip; otherwise the neighborhood's (o.tip(i), which can
+    // return nothing to show none). The page's own SVG marks handle their own hover.
+    const unhover = () => { tip.hide(); hoverP.datum(null).attr('d', null); setHot(-1); };
+    let ptrType = 'mouse';
+    svg.on('pointerdown.hover', ev => { ptrType = ev.pointerType || 'mouse'; });
+    function hover(ev, tap) {
+      if (layer.node().contains(ev.target)) return;
+      const d = DL && DL.hit(ev, tap);
+      if (d >= 0) { hoverP.datum(null).attr('d', null); setHot(d); tip.show(DL.o.tip(d), ev); return; }
+      setHot(-1);
+      const f = ev.target.classList && ev.target.classList.contains('nbpath') ? ev.target.__data__ : null, h = f && o.tip && o.tip(f.idx);
+      if (!h) return unhover();
+      tip.show(h, ev); if (hoverP.datum() !== f) hoverP.datum(f).attr('d', f.d);
+    }
+    svg.on('mousemove.hover', ev => hover(ev, false)).on('mouseleave.hover', unhover)
+      .on('click.hover', ev => { if (ptrType !== 'mouse') hover(ev, true); }); // a tap on a touch screen
 
     // ---- street names, placed after each zoom so they never overlap; longer streets first ----
     const SL = ST && ST.lab, q = ST ? ST.q : 1;
@@ -153,7 +176,7 @@ const NOLA = (() => {
       .filter(ev => ev.type.startsWith('touch') ? ev.touches.length >= 2 || !!el.closest('.mapfs') : (!ev.ctrlKey || ev.type === 'wheel') && !ev.button)
       .on('zoom', ev => {
         if (ev.sourceEvent) moved = true; // the reader moved the map, so a resize keeps their view instead of refitting
-        root.attr('transform', ev.transform); k = ev.transform.k; streetZoom(k); drawScale();
+        root.attr('transform', ev.transform); troot.attr('transform', ev.transform); k = ev.transform.k; streetZoom(k); drawScale(); if (DL) DL.req(); placeRing();
         stLabG.selectAll('text').style('font-size', d => (d.fs / k) + 'px').style('stroke-width', (3 / k) + 'px');
         listeners.forEach(f => f(k)); clearTimeout(lt); lt = setTimeout(layoutLabels, 90);
       });
@@ -184,21 +207,103 @@ const NOLA = (() => {
     // follow the map's box (window resizes, the page's scrollbar appearing, rotating a phone): an untouched map is
     // refitted to what it was showing; one the reader has moved keeps its center and scale
     const fit = () => {
+      if (DL) DL.req(); // the canvas follows the box's size in CSS pixels, which can change while W and H don't
       if (!el.clientWidth || !el.clientHeight) return;
       const [nw, nh] = dims(); if (nw === W && nh === H) return;
       const t = d3.zoomTransform(svg.node()), c = t.invert([W / 2, H / 2]);
-      W = nw; H = nh; svg.interrupt().attr('viewBox', `0 0 ${W} ${H}`);
+      W = nw; H = nh; svg.interrupt().attr('viewBox', `0 0 ${W} ${H}`); top.attr('viewBox', `0 0 ${W} ${H}`);
       if (!moved && target) zoomTo(target);
       else svg.call(zoom.transform, d3.zoomIdentity.translate(W / 2, H / 2).scale(t.k).translate(-c[0], -c[1]));
       drawScale();
     };
     if (window.ResizeObserver) new ResizeObserver(fit).observe(el);
     addEventListener('resize', fit);
+    // ---- dots: one per record, drawn on a canvas (tens of thousands are too many for SVG) ----
+    function setHot(i) { if (i === hot) return; hot = i; placeRing(); }
+    function placeRing() {
+      const on = DL && hot >= 0, s = el.clientWidth / W || 1;
+      ringG.selectAll('circle').data(on ? [hot] : []).join('circle').attr('class', 'dothot')
+        .attr('cx', i => DL.o.x[i]).attr('cy', i => DL.o.y[i]).attr('r', on ? (DL.o.r(k) + 3) / (k * s) : 0);
+    }
+    function dotLayer() {
+      const cv = document.createElement('canvas'); cv.className = 'mapdots'; cv.setAttribute('aria-hidden', 'true');
+      el.insertBefore(cv, top.node());
+      const ctx = cv.getContext('2d');
+      let raf = 0, buckets = [], cols = [], grid = null, gridOf = null;
+      const L = { o: null, cv };
+      const GC = 8; // grid cell, in map units (about 160 m)
+      function buildGrid(x, y, n) {
+        let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+        for (let i = 0; i < n; i++) { if (x[i] < x0) x0 = x[i]; if (x[i] > x1) x1 = x[i]; if (y[i] < y0) y0 = y[i]; if (y[i] > y1) y1 = y[i]; }
+        if (!n) { x0 = y0 = 0; x1 = y1 = 1; }
+        const gw = Math.floor((x1 - x0) / GC) + 1, gh = Math.floor((y1 - y0) / GC) + 1, start = new Uint32Array(gw * gh + 1), cell = new Uint32Array(n);
+        for (let i = 0; i < n; i++) { const c = Math.floor((y[i] - y0) / GC) * gw + Math.floor((x[i] - x0) / GC); cell[i] = c; start[c + 1]++; }
+        for (let c = 0; c < gw * gh; c++) start[c + 1] += start[c];
+        const items = new Uint32Array(n), f = start.slice(); for (let i = 0; i < n; i++) items[f[cell[i]]++] = i;
+        return { x0, y0, gw, gh, start, items };
+      }
+      L.resolve = () => { cols = L.o.colors.map(c => { const [cc, a] = Array.isArray(c) ? c : [c, 1]; return [/^var\(/.test(cc) ? css(cc.slice(4, -1)) : cc, a]; }); };
+      // set(o): { x, y: map-unit arrays; n; colors: [css color or [color, alpha]], drawn in this order (later on top);
+      // color(i) -> index into colors; visible(i); r(k) -> radius in CSS px at zoom k; tip(i) -> html }
+      L.set = opts => { L.o = opts; if (gridOf !== opts.x) { grid = buildGrid(opts.x, opts.y, opts.n); gridOf = opts.x; } L.resolve(); L.update(); };
+      // after the filters change: which dots show, grouped by color
+      L.update = () => {
+        const o2 = L.o, b = o2.colors.map(() => []);
+        for (let i = 0; i < o2.n; i++) if (o2.visible(i)) b[o2.color(i)].push(i);
+        buckets = b.map(a => Uint32Array.from(a)); L.shown = b.reduce((t, a) => t + a.length, 0);
+        if (hot >= 0 && !(o2.visible(hot))) setHot(-1);
+        draw();
+      };
+      L.req = () => { if (!raf) raf = requestAnimationFrame(draw); };
+      function draw() {
+        raf = 0; if (!L.o) return;
+        const DPR = Math.min(devicePixelRatio || 1, 2), cw = el.clientWidth, ch = el.clientHeight, pw = Math.round(cw * DPR), ph = Math.round(ch * DPR);
+        if (cv.width !== pw || cv.height !== ph) { cv.width = pw; cv.height = ph; }
+        ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, pw, ph);
+        const t = d3.zoomTransform(svg.node()), s = cw / W, a = t.k * s * DPR, bx = t.x * s * DPR, by = t.y * s * DPR;
+        const r = L.o.r(t.k) * DPR, pad = r + 2, X = L.o.x, Y = L.o.y, round = r >= 1.6 * DPR;
+        // an outline in the page's color keeps dots apart when they're big, and off the heatmap's shades of the same hue
+        const edge = r >= 3.2 * DPR || svg.classed('shaded');
+        for (let c = 0; c < buckets.length; c++) {
+          const B = buckets[c]; if (!B.length) continue;
+          ctx.fillStyle = cols[c][0]; ctx.globalAlpha = cols[c][1]; ctx.beginPath();
+          for (let j = 0; j < B.length; j++) {
+            const i = B[j], px = X[i] * a + bx, py = Y[i] * a + by;
+            if (px < -pad || py < -pad || px > pw + pad || py > ph + pad) continue;
+            if (round) { ctx.moveTo(px + r, py); ctx.arc(px, py, r, 0, 6.2832); } else ctx.rect(px - r, py - r, 2 * r, 2 * r);
+          }
+          ctx.fill();
+          if (edge) { ctx.globalAlpha = Math.min(1, cols[c][1] + .2); ctx.strokeStyle = surf; ctx.lineWidth = DPR * (r >= 3.2 * DPR ? .8 : .6); ctx.stroke(); }
+        }
+        ctx.globalAlpha = 1;
+      }
+      let surf = css('--surface');
+      L.theme = () => { surf = css('--surface'); if (L.o) { L.resolve(); draw(); } };
+      // the visible dot nearest the pointer, within a few pixels (more for a finger), or -1
+      L.hit = (ev, tap) => {
+        if (!L.o || !L.shown) return -1;
+        const rc = el.getBoundingClientRect(), s = rc.width / W, t = d3.zoomTransform(svg.node());
+        const mx = ((ev.clientX - rc.left) / s - t.x) / t.k, my = ((ev.clientY - rc.top) / s - t.y) / t.k;
+        const rad = Math.max(L.o.r(t.k) + 2, tap ? 14 : 5) / (t.k * s), g = grid;
+        const c0 = Math.floor((mx - rad - g.x0) / GC), c1 = Math.floor((mx + rad - g.x0) / GC), r0 = Math.floor((my - rad - g.y0) / GC), r1 = Math.floor((my + rad - g.y0) / GC);
+        let best = -1, bd = rad * rad;
+        for (let rr = Math.max(0, r0); rr <= Math.min(g.gh - 1, r1); rr++) for (let cc = Math.max(0, c0); cc <= Math.min(g.gw - 1, c1); cc++) {
+          const cell = rr * g.gw + cc;
+          for (let q = g.start[cell]; q < g.start[cell + 1]; q++) { const i = g.items[q]; const d = (L.o.x[i] - mx) ** 2 + (L.o.y[i] - my) ** 2; if (d < bd && L.o.visible(i)) { bd = d; best = i; } }
+        }
+        return best;
+      };
+      onTheme(L.theme);
+      return L;
+    }
     const api = {
       svg, layer, nbSel, zoomTo, k: () => k, onZoom: f => listeners.push(f), home,
+      // dots(opts): the map's dot layer (see dotLayer.set); returns it, with update() to call after filters change and
+      // shown (how many are drawn). dots(null) clears it.
+      dots(opts) { if (!opts) { if (DL) { DL.o = null; DL.req(); setHot(-1); } return DL; } if (!DL) DL = dotLayer(); DL.set(opts); placeRing(); return DL; },
       // shade neighborhoods (fn(i) -> a color, or null for the plain land color); on a shaded map the streets are
       // drawn in the page's surface color, so they stay visible over the darkest and lightest shades alike
-      setFill(fn) { let any = false; nbSel.each(function (f) { const c = fn(f.idx) || null; if (c) any = true; this.style.fill = c || ''; if (c) this.setAttribute('fill', c); else this.removeAttribute('fill'); }); svg.classed('shaded', any); },
+      setFill(fn) { let any = false; nbSel.each(function (f) { const c = fn(f.idx) || null; if (c) any = true; this.style.fill = c || ''; if (c) this.setAttribute('fill', c); else this.removeAttribute('fill'); }); svg.classed('shaded', any); if (DL) DL.req(); },
       // outline one neighborhood and zoom to it (-1: clear and go back to the whole mapped city)
       focus(i, dur = 450) {
         focused = i;
@@ -397,6 +502,26 @@ const NOLA = (() => {
     return mapChecks(plot, [{ key: 'heat', label: 'Heatmap', checked: on, onChange, title: 'Shade each neighborhood by how many of the dots shown are in it' },
       per && { key: 'per', label: per.label, checked: per.checked, onChange: per.onChange, disabled: !on, title: on ? '' : 'Applies to the heatmap', sub: true }, ...extra]);
   }
+  // ---------- dot data (the `dots` objects the pipeline writes; see pipeline/REFERENCE.md) ----------
+  // dotData(d) -> { n, x, y (map units), nb, day (days since d.epoch; -1 when the record has no date), every other
+  // column as an Int32Array, iso(day) -> 'YYYY-MM-DD', dayOf(iso) }, plus the lookup lists (R, T, ...) as they are
+  function dotData(d) {
+    const n = d.n, out = { n, x: new Float32Array(n), y: new Float32Array(n), nb: Int16Array.from(d.nb), day: new Int32Array(n).fill(-1) };
+    for (let i = 0; i < n; i++) { out.x[i] = d.x[i] / d.q; out.y[i] = d.y[i] / d.q; }
+    if (d.d) { let cur = d.d0; for (let i = 0; i < n; i++) { const v = d.d[i]; if (v >= 0) { cur += v; out.day[i] = cur; } } } // -1: no date (those come first)
+    const e = Date.parse(d.epoch + 'T12:00:00Z');
+    out.iso = v => new Date(e + v * 864e5).toISOString().slice(0, 10);
+    out.dayOf = iso => Math.round((Date.parse(iso.slice(0, 10) + 'T12:00:00Z') - e) / 864e5);
+    Object.keys(d).forEach(k => { if (!(k in out) && !['q', 'epoch', 'd', 'd0'].includes(k)) out[k] = Array.isArray(d[k]) && d[k].length === n && typeof d[k][0] === 'number' ? Int32Array.from(d[k]) : d[k]; });
+    return out;
+  }
+  // the time-period switch on dot maps: records from the last month, 6 months, year, or all the map holds.
+  // inPeriod(day, last, p): day and last as day numbers
+  const PERIODS = [['1', 'Month'], ['6', '6 months'], ['12', 'Year'], ['all', 'All']], PER_DAYS = { 1: 30, 6: 182, 12: 365 };
+  const inPeriod = (day, last, p) => p === 'all' || (day >= 0 && day > last - PER_DAYS[p]);
+  function periodSeg(sec, value, onChange, opts = PERIODS) { return seg(sec, opts, value, onChange); }
+  // dot radius in CSS px at zoom k: small at the opening view (k about .45), larger as you zoom in
+  const dotR = k => Math.max(1.3, Math.min(6, 2.2 * Math.sqrt(k)));
   // heatKey(panel, plot, cl, label, fmtf, none): the heatmap's key, as a panel section and, on phones, a legend on the
   // map (.maplegend). cl is what classes() returned; null (heatmap off) leaves the panel without it and hides the legend.
   function heatKey(panel, plot, cl, label, fmtf = short, none = null) {
@@ -654,6 +779,6 @@ const NOLA = (() => {
   }
   const legendHTML = items => '<div class="legend">' + items.map(([c, l, round]) => `<span><i style="background:${c}${round ? ';border-radius:50%' : ''}"></i>${l}</span>`).join('') + '</div>';
 
-  return { css, S, fmt, pct, tip, row, setGeo, views, hashState, legendHTML, stage, fsec, flist, seg, ftabs, nbPick, kv, mapChecks, heatToggle, heatKey, phoneToggle, popOf, perK, fmtRate, POP_NOTE, basisChips, shown, nbList, nbSelect, get FULL() { return FULL; }, get GEO() { return GEO; }, map, mapButtons, panelInset, seqVar, seqLegend, classes, stepLegend, short, frame, yGrid, chips, months, monthsLong,
+  return { css, S, fmt, pct, tip, row, setGeo, views, hashState, legendHTML, stage, fsec, flist, seg, ftabs, nbPick, kv, mapChecks, heatToggle, heatKey, dotData, PERIODS, inPeriod, periodSeg, dotR, phoneToggle, popOf, perK, fmtRate, POP_NOTE, basisChips, shown, nbList, nbSelect, get FULL() { return FULL; }, get GEO() { return GEO; }, map, mapButtons, panelInset, seqVar, seqLegend, classes, stepLegend, short, frame, yGrid, chips, months, monthsLong,
     setYear, get YEAR() { return YEAR; }, monthTicks, doyTime, doyDate, doyISO, doyMonth, monthStarts, isoDate, share, numWord, cap, setText, setHTML, title };
 })();

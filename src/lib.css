@@ -81,6 +81,10 @@ svg text{fill:var(--muted);font-size:11px;font-family:inherit}
 .map>svg,.stage.mapstage .plot canvas{touch-action:pan-x pan-y}
 .nbpath{fill:var(--land);stroke:var(--landline);stroke-width:.8;vector-effect:non-scaling-stroke}
 .nbhover{fill:none;stroke:var(--ink);stroke-width:1.6;vector-effect:non-scaling-stroke}
+/* NOLA.map layers over the base svg: the dot canvas, then outlines and street names (neither takes input) */
+.map{position:relative}
+.map>canvas.mapdots,.map>svg.maptop{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;background:none}
+.dothot{fill:none;stroke:var(--ink);stroke-width:1.6;vector-effect:non-scaling-stroke}
 .streets{pointer-events:none}
 .st{fill:none;vector-effect:non-scaling-stroke;stroke-linecap:round;stroke-linejoin:round}
 .st3{stroke:var(--road);stroke-width:.5}
