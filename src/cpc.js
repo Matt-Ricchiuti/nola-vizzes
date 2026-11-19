@@ -65,7 +65,9 @@
     return ''; };
   const dayFmt = s => new Date(s.slice(0, 10) + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
   const timeFmt = s => { const h = +s.slice(11, 13), mi = s.slice(14, 16); return !h && mi === '00' ? '' : (h % 12 || 12) + ':' + mi + (h < 12 ? ' a.m.' : ' p.m.'); };
-  const cleanDesc = s => s.replace(/^Zoning Docket \d+\/\d+\s*/, '').replace(/^Applicant\(s\):\s*/, '').replace(/^Request:\s*/, '') + (s.length >= 170 ? '…' : '');
+  // (the pipeline already leaves out the docket number and the applicant, who is often a private person; a description
+  // cut short gets an ellipsis)
+  const cleanDesc = s => { s = s.replace(/^Zoning Docket \S+\s*/, '').replace(/^Applicant\(s\):.*?(Request:|$)/, '$1').replace(/^Request:\s*/, '').trim(); return s + (s && !/[.!?)]$/.test(s) ? '…' : ''); };
   // meeting dates: past ones drop off (unless the data has nothing newer); the next one starts selected
   const dayOf_ = u => u.when.slice(0, 10);
   const TODAY = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Chicago' });
@@ -213,8 +215,9 @@
     NOLA.flist(NOLA.fsec(panel, 'Topic in description', st.theme >= 0 ? ['Any topic', () => set('theme', -1)] : null),
       P.TH.map((t, i) => ({ key: i, name: t, color: 'var(--ink2)', count: span.filter(p => okType(p) && okNb(p) && (p[5] >> i) & 1).length })),
       { pressed: i => st.theme === i, onClick: toggle('theme') });
-    // where the matching cases are: neighborhoods ranked, the chosen one always listed with its rank
-    const ranked = NOLA.nbList().map(f => [f.idx, nbCnt[f.idx] || 0]).sort((a, b) => b[1] - a[1]).map((d, r) => [...d, r + 1]);
+    // where the matching cases are: neighborhoods by count (ties by name, sharing a rank), the chosen one always listed
+    const ranked = NOLA.nbList().map(f => [f.idx, nbCnt[f.idx] || 0]).sort((a, b) => b[1] - a[1]);
+    ranked.forEach((d, r) => d.push(r && d[1] === ranked[r - 1][1] ? ranked[r - 1][2] : r + 1));
     const top = ranked.filter(d => d[1]).slice(0, 8), mine = ranked.find(d => d[0] === st.nb);
     if (mine && !top.includes(mine)) top.push(mine);
     NOLA.flist(NOLA.fsec(panel, `Most cases · ${fmt(pts.length)} shown`),

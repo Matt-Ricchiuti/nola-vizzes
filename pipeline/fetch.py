@@ -731,6 +731,17 @@ CPC_TH_RX = [re.compile(p, re.I) for p in [r'short[- ]term rental|\bstr\b', r'ho
                                            r'restaurant', r'demoli', r'day ?care|child ?care|school']]
 
 
+def cpc_desc(s):
+    """A hearing's description for the agenda, without the docket number or the applicant: applicants are often
+    private people, and the site names no private person."""
+    s = re.sub(r'\s+', ' ', s or '').strip()
+    s = re.sub(r'^Zoning Docket \S+\s*', '', s)
+    if s.startswith('Applicant'):
+        m = re.search(r'Request:', s)
+        s = s[m.start():] if m else ''
+    return re.sub(r'^Request:\s*', '', s)[:170]
+
+
 def cpc_type(ct):
     ct = ct or ''
     for idx, s in [(5, 'Zoning Change'), (9, 'Master Plan'), (6, 'Text Amendment'), (8, 'Major Subdivision'), (4, 'Conditional Use')]:
@@ -812,7 +823,7 @@ def build_cpc(api, nbp, today):
         nmd = parse_ts(r.get('next_meeting_date'))
         if nmd and nmd.date() >= today:
             up.append([nmd.strftime('%Y-%m-%dT%H:%M'), r.get('next_meeting') or '', r.get('case_num') or '', CPC_TYP[t],
-                       (r.get('address') or '').split(',')[0][:40], nb, x, y, re.sub(r'\s+', ' ', desc).strip()[:170]])
+                       (r.get('address') or '').split(',')[0][:40], nb, x, y, cpc_desc(desc)])
     up.sort(key=lambda u: u[0])
     return {'TYP': CPC_TYP, 'TH': CPC_TH, 'typeY': dict(sorted(typeY.items())), 'themeY': dict(sorted(themeY.items())),
             'openByType': openByType, 'dec': dec, 'nbRecent': nbRecent, 'up': up, 'pts': pts,
