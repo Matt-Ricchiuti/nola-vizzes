@@ -8,6 +8,12 @@
   --t-park:#1d3128;--t-park-line:#2d4a3a;--t-wild:#1b2b24;--t-cem:#232d29;--t-lot:#272a24;--t-park-ink:#93c29d}}
 .tmap{position:absolute;inset:0;display:block;width:100%;height:100%;touch-action:none;cursor:grab;border-radius:12px}
 .tmap.drag{cursor:grabbing}
+/* the map is the page: it runs from under the header to the bottom of the window (--tt set by trees.js) */
+.tfill.stage.mapstage{height:max(460px,calc(100vh - var(--tt,0px) - var(--gut)))}
+@media(max-width:760px){
+  .tfill.stage.mapstage{height:auto}
+  .tfill.stage.mapstage .plot{height:max(380px,calc(100vh - var(--tt,0px) - var(--gut)));height:max(380px,calc(100svh - var(--tt,0px) - var(--gut)))}
+}
 </style>
 {{D3}}
 </head><body><div class="wrap">

@@ -383,6 +383,7 @@ const NOLA = (() => {
   // views(list, { state, ds }) -- list: [{ id, label, tab, cls, keep, draw(el, first), csv() -> rows, file() -> CSV name (default id), ds: [id, name] }]
   // A bar at the top of #chart holds a tab per chart (`tab`, or `label`) and Copy link / Download CSV for the open one.
   // Below it, each chart is its own section (heading `label`, then the chart); only the open one shows.
+  // With a single chart there are no tabs: its heading takes their place in the bar.
   // Filters are shared page state: refresh() redraws the open chart, and the others redraw when next opened.
   // state() returns the filters that differ from their defaults; they're written into the link.
   // A page can open a chart with location.hash = 'chartId'.
@@ -410,17 +411,24 @@ const NOLA = (() => {
       setTimeout(() => linkB.textContent = 'Copy link', 1600);
     };
     csvB.onclick = () => downloadCSV(cur);
-    tools.append(linkB, csvB); bar.append(tabRow, tools); host.appendChild(bar);
+    tools.append(linkB, csvB);
+    // a page with a single chart has no tabs: the bar holds that chart's heading instead
+    const one = list.length === 1;
+    if (one) bar.classList.add('one');
+    bar.append(one ? document.createElement('h2') : tabRow, tools); host.appendChild(bar);
     list.forEach(v => {
       const t = document.createElement('button'); t.type = 'button'; t.textContent = v.tab || v.label;
       t.id = 'vt-' + v.id; t.setAttribute('role', 'tab'); t.setAttribute('aria-controls', 'v-' + v.id);
       t.onclick = () => open(v.id); tabRow.appendChild(t); tabs[v.id] = t;
       const sec = document.createElement('section'); sec.className = 'vsec'; sec.id = 'v-' + v.id;
-      sec.setAttribute('role', 'tabpanel'); sec.setAttribute('aria-labelledby', 'vt-' + v.id);
-      const head = document.createElement('div'); head.className = 'vsec-h';
-      const h = document.createElement('h2'); h.textContent = v.label; head.appendChild(h);
+      const h = one ? bar.firstChild : document.createElement('h2'); h.textContent = v.label;
       const p = document.createElement('div'); p.className = 'pane ' + (v.cls || 'card');
-      sec.append(head, p); host.appendChild(sec); panes[v.id] = p; secs[v.id] = sec;
+      if (one) { h.id = 'vh-' + v.id; sec.setAttribute('aria-labelledby', h.id); sec.append(p); }
+      else {
+        sec.setAttribute('role', 'tabpanel'); sec.setAttribute('aria-labelledby', 'vt-' + v.id);
+        const head = document.createElement('div'); head.className = 'vsec-h'; head.appendChild(h); sec.append(head, p);
+      }
+      host.appendChild(sec); panes[v.id] = p; secs[v.id] = sec;
     });
     // footer "Data:" link goes to the page's City dataset
     const dataLink = document.getElementById('dataLink'), ds = opts.ds || (list.find(v => v.ds) || {}).ds;
