@@ -83,13 +83,17 @@ svg text{fill:var(--muted);font-size:11px;font-family:inherit}
 /* maps on touch screens: one finger scrolls the page, two fingers move the map (NOLA.map / trees.js handle those) */
 .map>svg,.stage.mapstage .plot canvas{touch-action:pan-x pan-y}
 .nbpath{fill:var(--land);stroke:var(--landline);stroke-width:.8;vector-effect:non-scaling-stroke}
-.nbpath.hot:hover{stroke:var(--ink);stroke-width:1.6}
+.nbhover{fill:none;stroke:var(--ink);stroke-width:1.6;vector-effect:non-scaling-stroke}
 .streets{pointer-events:none}
 .st{fill:none;vector-effect:non-scaling-stroke;stroke-linecap:round;stroke-linejoin:round}
 .st3{stroke:var(--road);stroke-width:.5}
 .st2{stroke:var(--road-major);stroke-width:.9}
 .st1{stroke:var(--road-major);stroke-width:.8}
 .st0{stroke:var(--road-fwy);stroke-width:1.7}
+/* shaded maps (map.setFill): streets in the surface color show over every shade, light or dark */
+svg.shaded .st3{stroke:color-mix(in srgb,var(--surface) 45%,transparent)}
+svg.shaded .st2,svg.shaded .st1{stroke:color-mix(in srgb,var(--surface) 70%,transparent)}
+svg.shaded .st0{stroke:color-mix(in srgb,var(--surface) 85%,transparent)}
 .tip{position:fixed;pointer-events:none;background:var(--surface);color:var(--ink);border:1px solid var(--ring);box-shadow:0 6px 24px rgba(0,0,0,.14);border-radius:10px;padding:9px 11px;font-size:12.5px;max-width:300px;z-index:20;opacity:0;transition:opacity .08s}
 .tip b{font-size:13px}
 .tip .r{display:flex;justify-content:space-between;gap:14px;color:var(--ink2)}
@@ -152,14 +156,14 @@ a.btn{text-decoration:none;display:inline-block}
 .eyebrow{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
 .fsec{display:flex;flex-direction:column;gap:6px}
 .fsec-h{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
-.linkbtn{background:none;border:0;padding:2px 0;color:var(--accent);font:500 12px inherit;font-family:inherit;cursor:pointer}
+.linkbtn{flex:none;white-space:nowrap;background:none;border:0;padding:2px 0;color:var(--accent);font:500 12px inherit;font-family:inherit;cursor:pointer}
 .flist{display:flex;flex-direction:column;gap:1px;margin:0;padding:0;list-style:none}
 .flist button{all:unset;box-sizing:border-box;width:100%;display:grid;grid-template-columns:12px minmax(0,1fr) auto;gap:9px;align-items:center;padding:5px 6px;border-radius:6px;cursor:pointer}
 .flist button:hover{background:var(--chip)}
 .flist button:focus-visible,.seg button:focus-visible,.mapctl button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .flist .sw{width:11px;height:11px;border-radius:50%}
 .flist .nm{min-width:0;display:flex;flex-direction:column;gap:3px}
-.flist .nm>span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.flist .nm>span:first-child{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden;line-height:1.3} /* long names wrap to a second line */
 .flist .nm em{font-style:normal;font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .flist .fb{height:3px;border-radius:2px;background:var(--grid);overflow:hidden}
 .flist .fb i{display:block;height:100%}
@@ -171,7 +175,8 @@ a.btn{text-decoration:none;display:inline-block}
 .flist.toggles button[aria-pressed="true"]{background:none;box-shadow:none}
 /* tabs at the top of a filter panel: switch one section between related charts */
 .ftabs{display:flex;gap:2px;padding:3px;background:var(--chip);border-radius:9px}
-.ftabs button{flex:1 1 0;font:inherit;font-size:12.5px;line-height:1.25;border:0;border-radius:7px;background:none;color:var(--ink2);padding:6px 8px;cursor:pointer}
+.ftabs button{flex:1 1 auto;font:inherit;font-size:12.5px;line-height:1.25;border:0;border-radius:7px;background:none;color:var(--ink2);padding:6px 8px;cursor:pointer}
+.ftabs.grid{display:grid;grid-template-columns:1fr 1fr}
 .ftabs button[aria-selected="true"]{background:var(--surface);color:var(--ink);font-weight:600;box-shadow:0 1px 3px rgb(0 0 0 / .12)}
 .ftabs button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .seg{display:flex;border:1px solid var(--ring);border-radius:8px;overflow:hidden;width:max-content;max-width:100%}
@@ -188,6 +193,15 @@ a.btn{text-decoration:none;display:inline-block}
 .mapctl button:hover{background:var(--chip)}
 .scalebar{position:absolute;right:14px;bottom:12px;font-size:11px;color:var(--ink2);display:flex;flex-direction:column;align-items:flex-end;gap:3px;pointer-events:none;z-index:2}
 .scalebar i{display:block;height:5px;border:1.5px solid var(--ink2);border-top:0}
+/* map options (NOLA.mapChecks): a small box of checkboxes just above the scale bar */
+.mapchecks{position:absolute;right:12px;bottom:42px;z-index:2;display:flex;flex-direction:column;padding:2px;
+  background:var(--surface);border:1px solid var(--ring);border-radius:8px;font-size:12px;line-height:1.3;color:var(--ink)}
+.mapchecks label{display:flex;align-items:center;gap:6px;padding:3px 8px 3px 6px;border-radius:6px;cursor:pointer;user-select:none;white-space:nowrap}
+.mapchecks label:hover{background:var(--chip)}
+.mapchecks label.off{color:var(--muted);cursor:default}
+.mapchecks label.off:hover{background:none}
+.mapchecks input{margin:0;width:13px;height:13px;accent-color:var(--accent);cursor:inherit}
+.mapchecks label:has(input:focus-visible){outline:2px solid var(--accent);outline-offset:-1px}
 .ftoggle{display:none}
 .maphint{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:3;pointer-events:none;opacity:0;transition:opacity .2s;
   background:rgb(11 11 11 / .78);color:#fff;font-size:13px;font-weight:500;padding:8px 14px;border-radius:999px;white-space:nowrap}
@@ -195,14 +209,14 @@ a.btn{text-decoration:none;display:inline-block}
 .stlab{font-weight:500;pointer-events:none;paint-order:stroke;stroke:var(--surface);stroke-linejoin:round}
 .stlab.major{font-weight:650}
 /* stepped legend for equal-count classes (NOLA.stepLegend): the value under each boundary is where that color starts */
-.legend .steps{flex:1 1 100%;display:flex;max-width:290px;padding:0 14px 0 0}
+.legend .steps{flex:1 1 100%;display:flex;max-width:290px;padding:0 22px 0 0}
 .legend .steps span,.steps span{flex:1;display:flex;flex-direction:column;align-items:stretch;gap:3px;min-width:0}
 .steps i{width:auto!important;height:10px;border-radius:0!important}
 .steps span:first-child i{border-radius:3px 0 0 3px!important}
-.steps span:nth-child(7) i{border-radius:0 3px 3px 0!important}
+.steps span:last-child i{border-radius:0 3px 3px 0!important}
+.steps span:only-child i{border-radius:3px!important}
 .steps em{align-self:flex-start;font-style:normal;font-size:10.5px;color:var(--ink2);white-space:nowrap;font-variant-numeric:tabular-nums;transform:translateX(-50%)}
 .steps span:first-child em{transform:none}
-.steps .end{flex:0 0 0;padding-top:13px}
 .nonekey{font-size:11.5px}
 .maplegend{display:none}
 @media(max-width:760px){
@@ -217,6 +231,7 @@ a.btn{text-decoration:none;display:inline-block}
   .maplegend .nonekey{display:flex;align-items:center;gap:5px;margin-top:3px}
   .maplegend .nonekey i{width:10px;height:10px;border-radius:3px;display:inline-block}
   .mlh{margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .mapchecks{top:162px;bottom:auto} /* phones: the map's own legend fills the bottom left, so the options sit under the map controls */
   .fpanel.collapsed{display:none}
 }
 
@@ -267,15 +282,14 @@ table.static tbody tr{cursor:auto}
 .cpc-days button[aria-pressed="true"]{background:var(--ink);color:var(--surface);border-color:var(--ink)}
 .cpc-days button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 
-/* ===================== 311 service requests page (src/311.js) ===================== */
+/* ---------- a key that isn't a filter (NOLA.kv): swatch, label, value; lines up with .flist rows ---------- */
+.kvl{display:flex;flex-direction:column;gap:5px;font-size:12.5px;color:var(--ink2);padding:0 6px}
+.kvl span{display:grid;grid-template-columns:12px minmax(0,1fr) auto;gap:9px;align-items:center}
+.kvl i{width:11px;height:11px;border-radius:3px}
+.kvl i.tick{width:2px;height:14px;border-radius:0;justify-self:center}
+.kvl b{font:400 12px "IBM Plex Mono",ui-monospace,monospace;color:var(--muted);font-variant-numeric:tabular-nums}
+/* small yearly bars inside a map's panel (311) */
 .srmini svg text{fill:var(--ink2)}
-.srages{display:flex;flex-direction:column;gap:5px;font-size:12.5px;color:var(--ink2)}
-.srages span{display:grid;grid-template-columns:12px 1fr auto;gap:8px;align-items:center}
-.srages i{width:11px;height:11px;border-radius:3px}
-.srages b{font:400 12px "IBM Plex Mono",ui-monospace,monospace;color:var(--muted)}
-/* ===================== short-term rentals page (src/str.js): uses the 311 page's .srages lists ===================== */
-/* ===================== blight and code enforcement page (src/blight.js); also uses .srages ===================== */
-.srages i.tickkey{width:2px;height:14px;border-radius:0;background:var(--ink);margin-left:4px}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script><script src="streets.js"></script>
 </head><body><div class="wrap">
@@ -303,6 +317,7 @@ const NOLA = (() => {
       let x = ev.clientX + 14, y = ev.clientY + 14;
       if (x + w > innerWidth - 8) x = ev.clientX - w - 14;
       if (y + h > innerHeight - 8) y = ev.clientY - h - 14;
+      x = Math.max(8, x); y = Math.max(8, Math.min(y, innerHeight - h - 8)); // a tall tooltip stays on screen
       tipEl.style.left = x + 'px'; tipEl.style.top = y + 'px';
     },
     hide() { tipEl.style.opacity = 0; }
@@ -319,7 +334,7 @@ const NOLA = (() => {
   const MIN_POP = 1000; // rates for neighborhoods smaller than this swing wildly, so they're left out
   const popOf = i => GEO.pop ? GEO.pop[i] : null;
   const perK = (n, pop) => n != null && pop >= MIN_POP ? 1000 * n / pop : null;
-  const fmtRate = v => v == null ? '—' : v >= 100 ? d3.format(',')(Math.round(v)) : v >= 10 ? v.toFixed(0) : v.toFixed(1);
+  const fmtRate = v => v == null ? '—' : v === 0 ? '0' : v >= 100 ? d3.format(',')(Math.round(v)) : v >= 10 ? v.toFixed(0) : v.toFixed(1);
   const POP_NOTE = '<div class="legend popnote">Per 1,000 residents (2020 Census). Visitors, workers and highway traffic also generate calls, so rates run high where few people live, like the CBD and French Quarter. Neighborhoods under 1,000 residents are left out.</div>';
   // Total / Per 1,000 residents switch
   const basisChips = (el, onSel, sel = 'n') => chips(el, [{ label: 'Total', value: 'n' }, { label: 'Per 1,000 residents', value: 'pc' }], onSel, { sel });
@@ -382,12 +397,18 @@ const NOLA = (() => {
       sg.append('path').attr('class', 'st st0').attr('d', ST.d[0]);
     }
     const streetZoom = k => { if (localSt) localSt.style('opacity', Math.max(0.35, Math.min(1, (k - 0.6) / 2.4))); };
+    // the hovered neighborhood's outline, drawn over the streets and its neighbors' fills (an outline only, so the
+    // streets and shading underneath stay visible)
+    const hoverP = root.append('path').attr('class', 'nbhover').style('pointer-events', 'none').attr('d', null);
     const focusG = root.append('g').style('pointer-events', 'none');
     if (o.districts) root.append('g').selectAll('path').data(GEO.pd).join('path').attr('d', f => f.d)
       .attr('fill', 'none').attr('stroke', 'var(--ink2)').attr('stroke-width', 1.4).attr('vector-effect', 'non-scaling-stroke').attr('opacity', .55).style('pointer-events', 'none');
     const stLabG = root.append('g').attr('aria-hidden', 'true');
     const layer = root.append('g');
-    if (o.tip) nbSel.on('mousemove', (ev, f) => tip.show(o.tip(f.idx), ev)).on('mouseleave', tip.hide);
+    // o.tip(i) can return nothing (a map whose own marks carry the tooltips): then hovering a neighborhood shows nothing
+    const unhover = () => { tip.hide(); hoverP.datum(null).attr('d', null); };
+    if (o.tip) nbSel.on('mousemove', (ev, f) => { const h = o.tip(f.idx); if (!h) return unhover(); tip.show(h, ev); if (hoverP.datum() !== f) hoverP.datum(f).attr('d', f.d); })
+      .on('mouseleave', unhover);
 
     // ---- street names, placed after each zoom so they never overlap; longer streets first ----
     const SL = ST && ST.lab, q = ST ? ST.q : 1;
@@ -477,7 +498,9 @@ const NOLA = (() => {
     addEventListener('resize', fit);
     const api = {
       svg, layer, nbSel, zoomTo, k: () => k, onZoom: f => listeners.push(f), home,
-      setFill(fn) { nbSel.attr('fill', f => fn(f.idx) || null).style('fill', f => fn(f.idx) || null); },
+      // shade neighborhoods (fn(i) -> a color, or null for the plain land color); on a shaded map the streets are
+      // drawn in the page's surface color, so they stay visible over the darkest and lightest shades alike
+      setFill(fn) { let any = false; nbSel.each(function (f) { const c = fn(f.idx) || null; if (c) any = true; this.style.fill = c || ''; if (c) this.setAttribute('fill', c); else this.removeAttribute('fill'); }); svg.classed('shaded', any); },
       // outline one neighborhood and zoom to it (-1: clear and go back to the whole mapped city)
       focus(i, dur = 450) {
         focused = i;
@@ -615,6 +638,7 @@ const NOLA = (() => {
       const li = document.createElement('li'), b = document.createElement('button'); b.type = 'button';
       const on = !!pressed(r.key); if (on) any = true; b.setAttribute('aria-pressed', on);
       const col = r.color || 'var(--muted)';
+      b.title = String(r.name).replace(/<[^>]*>/g, '').replace(/&amp;/g, '&') + (r.sub ? ' · ' + String(r.sub).replace(/<[^>]*>/g, '').replace(/&amp;/g, '&') : ''); // the full name, in case it's cut short
       b.innerHTML = `<span class="sw" style="background:${col}${r.square ? ';border-radius:3px' : ''}"></span><span class="nm"><span>${r.name}</span>${r.sub ? `<em>${r.sub}</em>` : ''}${r.count != null ? `<span class="fb"><i style="width:${(100 * r.count / mx).toFixed(1)}%;background:${col}"></i></span>` : ''}</span><span class="ct">${r.count != null ? fmt(r.count) : ''}</span>`;
       b.onclick = () => onClick(r.key); li.appendChild(b); ul.appendChild(li);
     });
@@ -630,12 +654,42 @@ const NOLA = (() => {
   // ftabs(panel, [[value, label], ...], value, onChange): a tab row at the very top of a filter panel, for one chart
   // section that switches between closely related charts of the same data (e.g. two maps). Returns the row.
   function ftabs(panel, opts, value, onChange) {
-    const d = document.createElement('div'); d.className = 'ftabs'; d.setAttribute('role', 'tablist');
+    const d = document.createElement('div'); d.className = 'ftabs' + (opts.length > 3 ? ' grid' : ''); d.setAttribute('role', 'tablist'); // four or more: two per row
     opts.forEach(([v, l]) => {
       const b = document.createElement('button'); b.type = 'button'; b.textContent = l; b.setAttribute('role', 'tab');
       b.setAttribute('aria-selected', v === value); b.onclick = () => { if (v !== value) onChange(v); }; d.appendChild(b);
     });
     panel.prepend(d); return d;
+  }
+  // mapChecks(plot, [{ key, label, checked, disabled, title, onChange(checked) }, ...]): a small box of checkboxes on
+  // the map, bottom right just above the scale bar (under the zoom buttons on phones), for map options such as
+  // "Per 1k residents". Items that are null or false are left out; an empty list hides the box. Call it on every
+  // redraw with the current state: rows are matched by key, so they keep their place (and keyboard focus).
+  function mapChecks(plot, items) {
+    items = (items || []).filter(Boolean);
+    let box = plot.querySelector(':scope>.mapchecks');
+    if (!items.length) { if (box) box.hidden = true; return box; }
+    if (!box) { box = document.createElement('div'); box.className = 'mapchecks'; box.setAttribute('role', 'group'); box.setAttribute('aria-label', 'Map options'); plot.appendChild(box); }
+    box.hidden = false;
+    const old = new Map([...box.children].map(l => [l.dataset.key, l]));
+    items.forEach(it => {
+      let l = old.get(it.key); old.delete(it.key);
+      if (!l) { l = document.createElement('label'); l.dataset.key = it.key; l.innerHTML = '<input type="checkbox"><span></span>'; }
+      box.appendChild(l); // in the order given
+      const cb = l.firstChild; l.lastChild.textContent = it.label;
+      cb.checked = !!it.checked; cb.disabled = !!it.disabled; l.classList.toggle('off', !!it.disabled);
+      if (it.title) l.title = it.title; else l.removeAttribute('title');
+      cb.onchange = () => it.onChange && it.onChange(cb.checked);
+    });
+    old.forEach(l => l.remove());
+    return box;
+  }
+  // a key that isn't a filter: rows of [label, color (a square swatch; null leaves the space), value] inside a panel
+  // section. A color starting with '|' draws a tick mark in that color instead of a square.
+  function kv(sec, rows) {
+    const d = document.createElement('div'); d.className = 'kvl';
+    d.innerHTML = rows.map(([l, c, n]) => `<span>${!c ? '<i></i>' : c[0] === '|' ? `<i class="tick" style="background:${c.slice(1)}"></i>` : `<i style="background:${c}"></i>`}${l}<b>${n}</b></span>`).join('');
+    sec.appendChild(d); return d;
   }
   // neighborhood picker inside a panel section
   function nbPick(sec, value, onSel, label = 'All neighborhoods') {
@@ -653,22 +707,59 @@ const NOLA = (() => {
   const seqVar = t => `var(${SEQ[Math.max(0, Math.min(6, Math.floor(t * 7)))]})`;
   // breaks = [low, high]; the top swatch gets a "+" only when values run past `high` (open = true)
   function seqLegend(el, breaks, fmtf, label, open = true) {
-    el.innerHTML = `<span>${label}</span>` + SEQ.map((s, i) => `<span><i style="background:var(${s})"></i>${i === 0 ? fmtf(breaks[0]) : i === 6 ? fmtf(breaks[1]) + (open ? '+' : '') : ''}</span>`).join('');
+    el.innerHTML = (label ? `<span>${label}</span>` : '') + `<span>${fmtf(breaks[0])}</span><span style="gap:0">` + SEQ.map(s => `<i style="background:var(${s});border-radius:0"></i>`).join('') + '</span>' + `<span>${fmtf(breaks[1])}${open ? '+' : ''}</span>`;
   }
-  // Seven equal-count classes, so each color holds about the same number of areas and differences across most of
-  // the city stay visible even when a few places are far above the rest. classes(values) -> { color(v), edges }
-  function classes(vals) {
+  // Up to seven equal-count classes, so each color holds about the same number of areas and differences across most
+  // of the city stay visible even when a few places are far above the rest. classes(values, { even }) -> { color(v), edges, shades }
+  // Class edges are round numbers where that's possible without changing the picture: each edge moves to the roundest
+  // nearby number (…, 10, 20, 50, 100, …, or 0.5, 0.2, 0.1 steps) only if that moves at most one area to the next color
+  // (and stays well clear of the neighboring edges), so classes stay close to equal-count; otherwise it keeps a finer value. Counts (whole numbers) only get
+  // whole-number edges. Edges are what the colors use, so the legend is exact. Classes that would hold nothing are
+  // dropped and the rest spread over the full ramp. { even: true } uses evenly spaced round edges instead (d3 ticks).
+  const STEPS = d3.range(-3, 7).flatMap(e => [1, 2, 5].map(m => +(m * 10 ** e).toPrecision(1))).sort((a, b) => b - a); // 5e6 … 0.001
+  const roundTo = (t, s) => +(Math.round(t / s) * s).toPrecision(12);
+  function classes(vals, { even = false } = {}) {
     const v = vals.filter(x => x != null && isFinite(x)).sort(d3.ascending);
-    const q = d3.scaleQuantile().domain(v).range(d3.range(7));
-    return { color: x => x == null ? 'var(--none)' : `var(${SEQ[q(x)]})`, edges: [v[0], ...q.quantiles(), v[v.length - 1]] };
+    if (!v.length) return { color: () => 'var(--none)', edges: [], shades: [] };
+    const lo = v[0], hi = v[v.length - 1], int = v.every(Number.isInteger);
+    let th;
+    if (even) th = d3.ticks(lo, hi, 7).filter(t => t > lo && t <= hi);
+    else {
+      th = d3.scaleQuantile().domain(v).range(d3.range(7)).quantiles();
+      if (int) th = th.map(Math.ceil); // for whole numbers, x >= t exactly when x >= ceil(t)
+      th = [...new Set(th)].filter(t => t > lo && t <= hi);
+      // round each edge as far as it can go while at most one area changes color and it stays well inside its neighbors
+      const crossing = (a, b) => { const x0 = Math.min(a, b), x1 = Math.max(a, b); return d3.bisectLeft(v, x1) - d3.bisectLeft(v, x0); };
+      th = th.map((t, i) => {
+        const room = 0.5 * Math.min(t - (i ? th[i - 1] : lo), (i < th.length - 1 ? th[i + 1] : hi) - t);
+        const s = STEPS.find(s => { const r = roundTo(t, s); return (!int || s >= 1) && Math.abs(r - t) <= room && crossing(t, r) <= 1; });
+        return s ? roundTo(t, s) : t;
+      });
+    }
+    th = [...new Set(th)].filter(t => t > lo && t <= hi).sort(d3.ascending);
+    // drop an edge whose class would be empty (merge it into the class below)
+    for (let i = th.length - 1; i >= 0; i--) { const top = i < th.length - 1 ? th[i + 1] : Infinity; if (!v.some(x => x >= th[i] && x < top)) th.splice(i, 1); }
+    const k = th.length + 1, shades = d3.range(k).map(i => SEQ[k === 1 ? 3 : Math.round(i * 6 / (k - 1))]);
+    // the legend's first label: the lowest value, or a round number just under it (nothing lies between the two)
+    const room0 = 0.3 * ((th[0] ?? hi) - lo), s0 = STEPS.find(s => (!int || s >= 1) && lo - Math.floor(lo / s) * s <= room0 && Math.floor(lo / s) * s >= 0);
+    const first = s0 ? +(Math.floor(lo / s0) * s0).toPrecision(12) : lo;
+    return { color: x => x == null ? 'var(--none)' : `var(${shades[d3.bisectRight(th, x)]})`, edges: [first, ...th, hi], shades };
   }
-  // legend for classes(): a stepped bar with the value where each color starts, and a swatch for areas with no value
-  function stepLegend(el, edges, fmtf, none) {
-    el.innerHTML = '<div class="steps">' + SEQ.map((s, i) => `<span><i style="background:var(${s})"></i><em>${fmtf(edges[i])}</em></span>`).join('')
-      + `<span class="end"><em>${fmtf(edges[7])}</em></span></div>` + (none ? `<span class="nonekey"><i style="background:var(--none)"></i>${none}</span>` : '');
+  // legend for classes(): a stepped bar with the value where each color starts (the top one "and up"), and a swatch
+  // for areas with no value. cl is what classes() returned (an older caller may pass its seven-class edges array)
+  function stepLegend(el, cl, fmtf, none) {
+    const edges = Array.isArray(cl) ? cl : cl.edges, shades = Array.isArray(cl) ? SEQ : cl.shades, n = shades.length;
+    el.innerHTML = (n ? '<div class="steps">' + shades.map((s, i) => `<span><i style="background:var(${s})"></i><em>${fmtf(edges[i])}${i === n - 1 && n > 1 ? '+' : ''}</em></span>`).join('') + '</div>' : '')
+      + (none ? `<span class="nonekey"><i style="background:var(--none)"></i>${none}</span>` : '');
+    // labels that would run into each other (a narrow legend): show every other one, always the first and last
+    // (checked again once the web fonts have loaded, since they set the labels' widths)
+    const ems = [...el.querySelectorAll('.steps em')];
+    const thin = () => { const r = ems.map(e => e.getBoundingClientRect());
+      if (r.some((b, i) => i && b.width && b.left < r[i - 1].right + 3)) ems.forEach((e, i) => { if (i % 2 && i < ems.length - 1) e.style.visibility = 'hidden'; }); };
+    thin(); if (document.fonts && document.fonts.status !== 'loaded') document.fonts.ready.then(thin);
   }
-  // compact numbers for legends: 950, 1.3k, 12k
-  const short = v => v >= 1000 ? d3.format('.2~s')(v).replace('G', 'B') : fmtRate(v);
+  // compact numbers for legends, exact to the value given (class edges are already round): 0, 3, 8.4, 0.05, 950, 1.25k, 12k
+  const short = v => v >= 1000 ? d3.format('.3~s')(v).replace('G', 'B') : String(+(+v).toPrecision(4));
 
   // ---------- small chart helpers ----------
   function frame(el, { h = 260, m = { t: 12, r: 16, b: 28, l: 44 } } = {}) {
@@ -734,6 +825,9 @@ const NOLA = (() => {
   // Download CSV links to the open chart's City dataset on data.nola.gov (its export is there): the view's `ds`, which
   // can be a function of the filters when one chart switches between datasets, else the page's `opts.ds`.
   // Below it, each chart is its own section (heading `label`, then the chart); only the open one shows.
+  // `label` can be a function, for a chart whose subject follows its filters; the heading is set again on each draw
+  // (give such a chart a `tab`). Redrawing keeps the filter panel's scroll and the page's, so a click low in a long
+  // panel doesn't jump it back to the top.
   // With a single chart there are no tabs: its heading takes their place in the bar.
   // Filters are shared page state: refresh() redraws the open chart, and the others redraw when next opened.
   // state() returns the filters that differ from their defaults; they're written into the link.
@@ -769,12 +863,13 @@ const NOLA = (() => {
     const one = list.length === 1;
     if (one) bar.classList.add('one');
     bar.append(one ? document.createElement('h2') : tabRow, tools); host.appendChild(bar);
+    const labelOf = v => typeof v.label === 'function' ? v.label() : v.label, heads = {};
     list.forEach(v => {
-      const t = document.createElement('button'); t.type = 'button'; t.textContent = v.tab || v.label;
+      const t = document.createElement('button'); t.type = 'button'; t.textContent = v.tab || labelOf(v);
       t.id = 'vt-' + v.id; t.setAttribute('role', 'tab'); t.setAttribute('aria-controls', 'v-' + v.id);
       t.onclick = () => open(v.id); tabRow.appendChild(t); tabs[v.id] = t;
       const sec = document.createElement('section'); sec.className = 'vsec'; sec.id = 'v-' + v.id;
-      const h = one ? bar.firstChild : document.createElement('h2'); h.textContent = v.label;
+      const h = one ? bar.firstChild : document.createElement('h2'); h.textContent = labelOf(v); heads[v.id] = h;
       const p = document.createElement('div'); p.className = 'pane ' + (v.cls || 'card');
       if (one) { h.id = 'vh-' + v.id; sec.setAttribute('aria-labelledby', h.id); sec.append(p); }
       else {
@@ -787,7 +882,21 @@ const NOLA = (() => {
     const dataLink = document.getElementById('dataLink'), ds = opts.ds || (list.find(v => v.ds) || {}).ds;
     if (dataLink && ds) { dataLink.href = 'https://data.nola.gov/d/' + ds[0]; dataLink.textContent = ds[1] + ' on data.nola.gov'; }
     // charts are drawn only while shown (hidden ones have no size); a hidden chart whose filters changed redraws when opened
-    const drawOne = v => { v.draw(panes[v.id], !drawn.has(v.id)); drawn.add(v.id); stale.delete(v.id); };
+    // keyboard focus survives a redraw: the control with the same label (or in the same place) takes it back
+    const focusKey = el => el.tagName + '|' + (el.getAttribute('aria-label') || (el.querySelector('.nm>span') || el).textContent.trim());
+    const focusables = p => [...p.querySelectorAll('button,select,input,[tabindex]')];
+    const drawOne = v => {
+      const p = panes[v.id], fp = p.querySelector(':scope>.fpanel'), keep = [fp ? fp.scrollTop : 0, scrollX, scrollY];
+      const a = document.activeElement, had = a && a !== document.body && p.contains(a) ? [focusKey(a), focusables(p).indexOf(a)] : null;
+      if (typeof v.label === 'function') heads[v.id].textContent = v.label();
+      v.draw(p, !drawn.has(v.id)); drawn.add(v.id); stale.delete(v.id);
+      if (had && !p.contains(document.activeElement)) {
+        const fs = focusables(p), t = fs.find(e => focusKey(e) === had[0]) || fs[Math.min(had[1], fs.length - 1)];
+        if (t) t.focus({ preventScroll: true });
+      }
+      if (fp && fp.scrollTop !== keep[0]) fp.scrollTop = keep[0];
+      if (scrollY !== keep[2] || scrollX !== keep[1]) scrollTo(keep[1], keep[2]);
+    };
     const draw = () => { tip.hide(); list.forEach(v => { if (v !== cur && drawn.has(v.id)) stale.add(v.id); }); drawOne(cur); writeHash(); setDs(); setSbw(); };
     function show(v) {
       cur = v;
@@ -828,7 +937,7 @@ const NOLA = (() => {
   }
   const legendHTML = items => '<div class="legend">' + items.map(([c, l, round]) => `<span><i style="background:${c}${round ? ';border-radius:50%' : ''}"></i>${l}</span>`).join('') + '</div>';
 
-  return { css, S, fmt, pct, tip, row, setGeo, views, hashState, legendHTML, stage, fsec, flist, seg, ftabs, nbPick, phoneToggle, popOf, perK, fmtRate, POP_NOTE, basisChips, shown, nbList, nbSelect, get FULL() { return FULL; }, get GEO() { return GEO; }, map, mapButtons, panelInset, seqVar, seqLegend, classes, stepLegend, short, frame, yGrid, chips, months, monthsLong,
+  return { css, S, fmt, pct, tip, row, setGeo, views, hashState, legendHTML, stage, fsec, flist, seg, ftabs, nbPick, kv, mapChecks, phoneToggle, popOf, perK, fmtRate, POP_NOTE, basisChips, shown, nbList, nbSelect, get FULL() { return FULL; }, get GEO() { return GEO; }, map, mapButtons, panelInset, seqVar, seqLegend, classes, stepLegend, short, frame, yGrid, chips, months, monthsLong,
     setYear, get YEAR() { return YEAR; }, monthTicks, doyTime, doyDate, doyISO, doyMonth, monthStarts, isoDate, share, numWord, cap, setText, setHTML, title };
 })();
 </script>
@@ -929,14 +1038,14 @@ const NOLA = (() => {
     const f = NOLA.frame(el.lastChild, { h: 340, m: { t: 6, r: 8, b: 24, l: 36 } });
     const x = d3.scaleBand().domain(d3.range(24)).range([0, f.iw]).paddingInner(.08);
     const y = d3.scaleBand().domain(order).range([0, f.ih]).paddingInner(.1);
-    const mx = d3.max(C.heat.flat()), mn = d3.min(C.heat.flat()), wks = (C.last + 1) / 7;
+    const wks = (C.last + 1) / 7, cl = NOLA.classes(C.heat.flat(), { even: true }); // evenly spaced, round steps
     order.forEach(d => C.heat[d].forEach((v, h) => {
-      f.g.append('rect').attr('x', x(h)).attr('y', y(d)).attr('width', x.bandwidth()).attr('height', y.bandwidth()).attr('rx', 3).style('fill', NOLA.seqVar((v - mn) / (mx - mn + 1)))
+      f.g.append('rect').attr('x', x(h)).attr('y', y(d)).attr('width', x.bandwidth()).attr('height', y.bandwidth()).attr('rx', 3).style('fill', cl.color(v))
         .on('mousemove', ev => tip.show(`<b>${names[d]}, ${hl(h)}–${hl(h + 1)}</b>` + row('Calls from the public', fmt(v)) + row('Per week (avg)', Math.round(v / wks)), ev)).on('mouseleave', tip.hide);
     }));
     order.forEach(d => f.g.append('text').attr('x', -6).attr('y', y(d) + y.bandwidth() / 2 + 4).attr('text-anchor', 'end').text(names[d]));
     [0, 6, 12, 18].forEach(h => f.g.append('text').attr('x', x(h)).attr('y', f.ih + 16).text(hl(h)));
-    NOLA.seqLegend(leg, [mn, mx], v => fmt(v), '', false);
+    NOLA.stepLegend(leg, cl, NOLA.short);
   }
 
   // ---------- call types table ----------
@@ -976,7 +1085,6 @@ const NOLA = (() => {
     const ts = document.createElement('select'); ts.className = 'fsel'; ts.setAttribute('aria-label', 'Call type');
     ts.innerHTML = '<option value="">Or one call type…</option>' + C.TOP.map((t, k) => unmappable(k) ? '' : `<option value="t${k}">${tcase(t)}</option>`).join('');
     ts.value = st.metric.startsWith('t') ? st.metric : ''; ts.onchange = () => { st.metric = ts.value || 'res'; V.refresh(); }; ms.appendChild(ts);
-    if (!isTime()) NOLA.seg(NOLA.fsec(panel, 'Count'), [['n', 'Total'], ['pc', 'Per 1,000 residents']], st.basis, v => { st.basis = v; V.refresh(); });
     const ls = NOLA.fsec(panel, isTime() ? 'Legend · minutes' : 'Legend'), leg = document.createElement('div'); leg.className = 'legend'; ls.appendChild(leg);
     if (perRes()) ls.insertAdjacentHTML('beforeend', NOLA.POP_NOTE);
     return leg;
@@ -993,15 +1101,16 @@ const NOLA = (() => {
             + row('Median arrival, emergency', r[4] >= 30 ? r[2] + ' min' : 'too few calls') + row('Median arrival, non-emergency', r[3] == null ? '—' : r[3] + ' min'); } });
       m.lastNb = -1;
     }
+    NOLA.mapChecks(plot, [!isTime() && { key: 'per', label: 'Per 1k residents', checked: st.basis === 'pc', onChange: on => { st.basis = on ? 'pc' : 'n'; V.refresh(); } }]);
     // seven equal-count classes: each shade holds about ten neighborhoods
     const cl = NOLA.classes(nb.map((r, i) => metricVal(i)));
     m.setFill(i => cl.color(metricVal(i)));
     const none = nb.some((r, i) => metricVal(i) == null) ? (perRes() ? 'Under 1,000 residents' : isTime() ? 'Too few calls' : 'No data') : null;
-    const lf = v => isTime() ? v.toFixed(1) : NOLA.short(v);
-    NOLA.stepLegend(leg, cl.edges, lf, none);
+    const lf = NOLA.short;
+    NOLA.stepLegend(leg, cl, lf, none);
     // on phones the panel folds away, so the map carries its own copy of the legend
     if (first) plot.insertAdjacentHTML('beforeend', '<div class="maplegend"></div>');
-    NOLA.stepLegend(plot.querySelector('.maplegend'), cl.edges, lf, none);
+    NOLA.stepLegend(plot.querySelector('.maplegend'), cl, lf, none);
     plot.querySelector('.maplegend').insertAdjacentHTML('afterbegin', `<div class="mlh">${metricLabel()}${isTime() ? ' (min)' : ''}</div>`);
     if (m.lastNb !== st.nb) { m.focus(st.nb, first ? 0 : 450); m.lastNb = st.nb; }
   }
