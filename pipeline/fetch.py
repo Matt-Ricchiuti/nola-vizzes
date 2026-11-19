@@ -1288,11 +1288,108 @@ def build_permits(api, nbp):
     }
 
 
+# ---------------------------------------------------------------- new businesses (occupational licenses)
+BIZ_APPS, BIZ_NOW = 'abc4-h3u3', 'hjcd-grvu'
+BIZ_START = 2018   # the license application dataset starts in 2018
+BIZ_OUT = ['Approved or issued', 'Listed as filed or in review', 'Withdrawn or incomplete', 'Denied', 'Duplicate or wrong type', 'Not stated']
+BIZ_SECTORS = 10   # sectors shown by name (by count in the past 12 months); the rest are "Other sectors"
+BIZ_VENDOR = 'Event and street vendors'
+
+
+def biz_outcome(s):
+    s = (s or '').strip().lower()
+    if not s:
+        return 5
+    if s in ('issued', 'approved', 'expired') or 'issuance' in s:
+        return 0
+    if 'review' in s or s in ('application filed', 'gtb hearing required'):
+        return 1
+    if s.startswith('denied') or 'denial' in s or 'does not meet' in s or 'misrepresentation' in s or 'revoked' in s:
+        return 3
+    if 'duplicate' in s or 'incorrect application type' in s or s.startswith('void') or 'changed' in s:
+        return 4
+    return 2   # withdrew, failed to respond or pay, deficient, application expired, reminders
+
+
+def biz_type_key(s):
+    """Business types are spelled slightly differently in the two datasets ('Restaurants (table…' vs 'Restaurants(table…')."""
+    return re.sub(r'\s+', ' ', re.sub(r'\s*\(\s*', '(', (s or '').lower())).strip()
+
+
+def build_biz(api, nbp):
+    a_cols = ['application_filed', 'currentstatus', 'category', 'businesstype', 'ishome', 'longitude', 'latitude']
+    n_cols = ['businesstype', 'businessstartdate', 'longitude', 'latitude']
+    api.require_columns(BIZ_APPS, a_cols, 'Business license applications')
+    api.require_columns(BIZ_NOW, n_cols, 'Occupational business licenses')
+    apps = fetch_all(api, BIZ_APPS, ','.join(a_cols))
+    need(len(apps) > 10000, f'Business license applications: only {len(apps)} rows')
+    clean = lambda s: re.sub(r'\s+', ' ', (s or '').strip())
+    filed = [parse_ts(r.get('application_filed')) for r in apps]
+    today = max(f for f in filed if f).date()
+    win0 = today - dt.timedelta(days=364)
+    years = list(range(BIZ_START, today.year + 1))
+    # sectors (NAICS) in order of the past 12 months; applications without one are "Not stated"
+    cat = [clean(r.get('category')) or 'Not stated' for r in apps]
+    S = [c for c in ranked(Counter(c for c, f in zip(cat, filed) if f and f.date() >= win0)) if c != 'Not stated'][:BIZ_SECTORS]
+    S += ['Other sectors', 'Not stated']
+    si = {c: k for k, c in enumerate(S)}
+    sector = lambda c: si.get(c, len(S) - 2)
+    nbs, _ = points_to_nb(nbp, apps)
+    yr = [[0] * len(S) for _ in years]
+    yo = [[[0] * len(BIZ_OUT) for _ in S] for _ in years]
+    nby = [Counter() for _ in range(72)]
+    new12 = [Counter() for _ in range(72)]
+    home = [[0, 0] for _ in years]   # [home-based, not] per year filed
+    for r, f, c, nb in zip(apps, filed, cat, nbs):
+        if f is None or f.year < BIZ_START or f.date() > today:
+            continue
+        k, s = f.year - BIZ_START, sector(c)
+        yr[k][s] += 1
+        yo[k][s][biz_outcome(r.get('currentstatus'))] += 1
+        h = (r.get('ishome') or '').strip()
+        if h in ('True', 'False'):
+            home[k][0 if h == 'True' else 1] += 1
+        if nb >= 0:
+            nby[nb][(k, s)] += 1
+            if f.date() >= win0:
+                new12[nb][s] += 1
+    # businesses licensed now, given a sector through the applications' type -> sector pairs
+    t2s = defaultdict(Counter)
+    for r, c in zip(apps, cat):
+        if r.get('businesstype') and c != 'Not stated':
+            t2s[biz_type_key(r['businesstype'])][c] += 1
+    now = fetch_all(api, BIZ_NOW, ','.join(n_cols))
+    need(len(now) > 10000, f'Occupational business licenses: only {len(now)} rows')
+    S2 = S[:-2] + ['Other sectors', BIZ_VENDOR, 'Other or not stated']
+    s2i = {c: k for k, c in enumerate(S2)}
+    nnb, _ = points_to_nb(nbp, now)
+    nowNb = [Counter() for _ in range(72)]
+    for r, nb in zip(now, nnb):
+        t = (r.get('businesstype') or '').strip()
+        if re.match(r'(special events|mardi gras|flea market|artist-painting)', t, re.I):
+            s = s2i[BIZ_VENDOR]
+        else:
+            c = t2s.get(biz_type_key(t))
+            s = s2i.get(ranked(c)[0], s2i['Other sectors']) if c else len(S2) - 1
+        if nb >= 0:
+            nowNb[nb][s] += 1
+    sparse = lambda c: [v for key in sorted(c) for v in ((*key, c[key]) if isinstance(key, tuple) else (key, c[key]))]
+    return {
+        'ds': [BIZ_APPS, BIZ_NOW], 'last': today.isoformat(), 'winStart': win0.isoformat(),
+        'S': S, 'out': BIZ_OUT, 'years': years, 'yr': yr, 'yo': yo, 'home': home,
+        'nby': [sparse(c) for c in nby],      # [yearIdx, sector, n, ...] per nb
+        'new12': [sparse(c) for c in new12],  # [sector, n, ...] per nb, past 12 months
+        'S2': S2, 'now': [sparse(c) for c in nowNb], 'nowTotal': len(now), 'nowNoLoc': sum(nb < 0 for nb in nnb),
+        'total': len(apps), 'noLoc': sum(nb < 0 for nb in nbs),
+    }
+
+
 # Data files of the pages added with the 311 / housing / business set, and when each counts as stale
 # (file, label, field holding its newest record date, days without a new record before warning).
-NEW_FILES = ['311.json', 'str.json', 'blight.json', 'permits.json']
+NEW_FILES = ['311.json', 'str.json', 'blight.json', 'permits.json', 'biz.json']
 STALE = [('311.json', '311 calls', 'last', 7), ('str.json', 'Short-term rental permit applications', 'last', 14),
-         ('blight.json', 'Code enforcement cases', 'last', 14), ('permits.json', 'Permits', 'last', 14)]
+         ('blight.json', 'Code enforcement cases', 'last', 14), ('permits.json', 'Permits', 'last', 14),
+         ('biz.json', 'Business license applications', 'last', 14)]
 
 
 # ---------------------------------------------------------------- sanity checks against the last good build
@@ -1358,6 +1455,12 @@ def validate(name, obj, prev, same_year=True):
         need(obj['total'] > 5000, 'permits: suspiciously few permits in the past 12 months')
         need(obj['noLoc'] < 0.1 * obj['total'], 'permits: most permits failed to map to a neighborhood')
         check_not_collapsed('permits issued in the past 12 months', obj['total'], prev and prev.get('total'), floor=0.75)
+    elif name == 'biz.json':
+        need(len(obj['nby']) == 72 and len(obj['new12']) == 72 and len(obj['now']) == 72 and len(obj['yr']) == len(obj['years']), 'biz: shape')
+        need(obj['total'] > 10000 and obj['nowTotal'] > 10000, 'biz: suspiciously few licenses')
+        need(obj['noLoc'] < 0.1 * obj['total'], 'biz: most applications failed to map to a neighborhood')
+        check_not_collapsed('business license applications', obj['total'], prev and prev.get('total'))
+        check_not_collapsed('current business licenses', obj['nowTotal'], prev and prev.get('nowTotal'), floor=0.8)
 
 
 def central_date(iso_utc):
@@ -1522,6 +1625,12 @@ def main():
             out['permits.json'] = build_permits(api, nbp)
     print('building permits ...', flush=True)
     attempt(['permits.json'], permits)
+
+    def biz():
+        if not unchanged('biz.json', f'{api.version(BIZ_APPS)}|{api.version(BIZ_NOW)}|{geo_key}'):
+            out['biz.json'] = build_biz(api, nbp)
+    print('new businesses ...', flush=True)
+    attempt(['biz.json'], biz)
 
     for name in [n for n in out if n != 'geo.json']:
         same_year = (prev[name] or {}).get('year') == out[name].get('year') if name in ('drone.json', 'cfs.json') else True

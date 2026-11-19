@@ -23,6 +23,7 @@ The workflow runs at 10:30 UTC. The City loads CPC Projects at about 06:00 UTC, 
 | `311.json` | `2jgv-pqrq`'s `rowsUpdatedAt` or `geo.json` changed | Incremental download (see below). "Today" is the newest request in the data. |
 | `str.json` | any of `ufdg-ajws`, `en36-xvxg`, `2ei9-wqw2` or `geo.json` changed | Three small whole downloads (about 8 requests, 9 MB). |
 | `permits.json` | `rcm3-fn58`'s `rowsUpdatedAt` or `geo.json` changed | Also reloaded in full nightly. API counts by year, plus the past 12 months' rows (about 6 requests, 4 MB). |
+| `biz.json` | `abc4-h3u3`'s or `hjcd-grvu`'s `rowsUpdatedAt`, or `geo.json`, changed | Two whole downloads (about 6 requests, 11 MB). |
 | `blight.json` | any of the six code enforcement datasets or `geo.json` changed | The City reloads these every night (every row gets a new `:updated_at`), so incremental downloads don't help; most numbers are counted by the API instead (about 16 requests, 11 MB). |
 
 On the 1st of every month (and with `--full`, or the workflow's "full" checkbox) everything is downloaded and rebuilt regardless. Queries are ordered (`:id` as the tie-breaker), so the same City data always produces byte-identical files. Rebuilt files are written only when their content changed, and pages embed only the date their own data last changed, so a day without new City data changes nothing and the workflow commits and deploys nothing.
@@ -307,6 +308,31 @@ The City reloads this dataset in full nightly (about 350,000 rows). The builder 
 - The map can show permits per 1,000 housing units (2020 Census); neighborhoods under 500 housing units get no rate.
 
 Checked against the API on 2026-11-19: permits issued in 2025, solar and EV permits in 2026 and new construction in the past 12 months match `count(*)` queries; Mid-City and Gentilly Terrace match `within_polygon` counts on `location_1`.
+
+## `data/biz.json`: new businesses
+
+Two datasets, each downloaded whole:
+
+- **Occupational Business License Data for the Office of Business and External Services** (`abc4-h3u3`, about 21,000 rows from 2018): one row per license application. `application_filed, currentstatus, category, businesstype, ishome, longitude, latitude`. This is the "new businesses" source: applications by year filed, NAICS sector (`category`) and neighborhood.
+- **Occupational Business Licenses** (`hjcd-grvu`, about 38,000 rows): businesses holding a license now. `businesstype, businessstartdate, longitude, latitude`. It has no sector column, so each business type gets the sector the applications most often pair with it (types are matched ignoring case and spacing before parentheses). Special event, Mardi Gras, flea market and street-artist licenses are "Event and street vendors"; unmatched types are "Other or not stated". It lists only businesses licensed now, so it isn't used to count openings over time (businesses that closed are missing).
+
+"Today" is the newest `application_filed`.
+
+```
+{ "ds": [2 ids], "last", "winStart",
+  "S": [10 sectors by count in the past 12 months, "Other sectors", "Not stated"],
+  "out": ["Approved or issued", "Listed as filed or in review", "Withdrawn or incomplete", "Denied", "Duplicate or wrong type", "Not stated"],
+  "years": [2018, ...], "yr": [[n per S] per year filed], "yo": [[[n per outcome] per S] per year filed],
+  "home": [[home-based, not] per year filed],
+  "nby": [[yearIdx, S, n, ...] per nb], "new12": [[S, n, ...] per nb],          # applications
+  "S2": [S without "Not stated", then "Event and street vendors", "Other or not stated"],
+  "now": [[S2, n, ...] per nb], "nowTotal", "nowNoLoc", "total", "noLoc" }
+```
+
+- **Outcomes** (`biz_outcome`, on `currentstatus`): Issued, Approved, Expired (approved and since expired) and temporary issuances are Approved or issued; Application Filed and any "...Review" status are Listed as filed or in review (many older applications still carry these); denials, "does not meet requirements", misrepresentation and revoked are Denied; duplicates, incorrect application type, voided and changed type or company are Duplicate or wrong type; withdrawn, failure to respond or pay, deficient, application expired and reminders are Withdrawn or incomplete.
+- Locations of 0 or the geocoder's out-of-state placeholder are left off the map (`noLoc`, `nowNoLoc`; many current licenses are vendors and taxis based outside the city).
+
+Checked against the API on 2026-11-19: applications filed in 2025 and retail applications in the past 12 months match `count(*)` queries; Central City and the French Quarter match `within_polygon` counts for both datasets.
 
 ## Page copy that mentions specific numbers
 

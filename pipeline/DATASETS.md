@@ -6,9 +6,9 @@ The site's rule is to chart only datasets with records added in the past year. T
 
 | Mark | Meaning | Count |
 |---|---|---|
-| ✅ | Already on the site | 29 |
-| ⭐ | Strong candidate for a new page | 4 |
-| 🔸 | Possible: smaller, harder, or best as part of another page | 21 |
+| ✅ | Already on the site | 31 |
+| ⭐ | Strong candidate for a new page | 3 |
+| 🔸 | Possible: smaller, harder, or best as part of another page | 20 |
 | 🗺️ | Map layer or supporting data (boundaries, population), not a page on its own | 40 |
 | · | Not a candidate (stale, archived, or superseded) | 116 |
 
@@ -84,8 +84,8 @@ Worth adding to every map: 2020 population by neighborhood (`2w4d-xaw2`), so cou
 
 | | Dataset | Newest record | Rows | Notes |
 |---|---|---|--:|---|
-| ⭐ | [Occupational Business Licenses](https://data.nola.gov/d/hjcd-grvu) `hjcd-grvu` | 2026-11-16 | 38,189 | New businesses by type and neighborhood, month by month. |
-| 🔸 | [Occupational Business License Data for the Office of Business and External Services](https://data.nola.gov/d/abc4-h3u3) `abc4-h3u3` | 2026-11-17 | 21,290 | Business license detail / currently active licenses; supports the business page. |
+| ✅ | [Occupational Business Licenses](https://data.nola.gov/d/hjcd-grvu) `hjcd-grvu` | 2026-11-16 | 38,189 | New businesses page: businesses licensed now (map tab). |
+| ✅ | [Occupational Business License Data for the Office of Business and External Services](https://data.nola.gov/d/abc4-h3u3) `abc4-h3u3` | 2026-11-17 | 21,290 | New businesses page: license applications by year, sector, outcome and neighborhood. |
 | · | [Certified Disadvantaged Business Enterprise (DBE) Directory](https://data.nola.gov/d/q42h-ptn2) `q42h-ptn2` | updated 2019-11-11 | 626 | Not updated since 2019-11. |
 | · | [Historical Occupational Business Licenses 2012](https://data.nola.gov/d/c77v-v89q) `c77v-v89q` | updated 2018-03-22 | 12,869 | Not updated since 2018-03. |
 | · | [Historical Occupational Business Licenses 2013](https://data.nola.gov/d/tc3j-b7gd) `tc3j-b7gd` | updated 2018-03-22 | 12,892 | Not updated since 2018-03. |

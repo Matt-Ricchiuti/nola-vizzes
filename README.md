@@ -57,6 +57,7 @@ How to build a view (`src/lib.js`): `NOLA.views([...])` lists the views; each vi
 | `311.html` | 311 OPCD Calls (`2jgv-pqrq`), February 2019 on | daily (incremental download) |
 | `blight.html` | Code Enforcement All Cases (`u6yx-v2tw`), Violations (`3ehi-je3s`), Inspections (`uh5a-f7uw`), Hearings (`44ct-56tr`), Grass Cutting (`xhih-vxs6`), Abatements (`xv8z-gn8b`) | daily |
 | `permits.html` | Permits (`rcm3-fn58`) | daily |
+| `biz.html` | Occupational Business License Data (`abc4-h3u3`, applications) and Occupational Business Licenses (`hjcd-grvu`, current) | daily |
 | `str.html` | Active Short-Term Rental Licenses (`ufdg-ajws`), Non-Commercial STR Licenses (`2ei9-wqw2`), STR Permit Applications (`en36-xvxg`) | daily |
 | `trees.html` | Tree Location (`3tyj-9x33`) + green space, Oct 2026 export in `data/trees.json` | static (street map daily) |
 | `about.html` | About the site, sources, disclaimer | with each build |
