@@ -143,8 +143,9 @@ const NOLA = (() => {
     }
     // the opening view is about k = 0.45; allow zooming out far enough to see the whole parish, east marsh included
     const zoom = d3.zoom().scaleExtent([0.25, 40])
-      // touch: only two-finger gestures move the map, so one finger still scrolls the page (touch-action in lib.css)
-      .filter(ev => ev.type.startsWith('touch') ? ev.touches.length >= 2 : (!ev.ctrlKey || ev.type === 'wheel') && !ev.button)
+      // touch: only two-finger gestures move the map, so one finger still scrolls the page (touch-action in lib.css);
+      // in full screen there's no page to scroll, so one finger moves the map too
+      .filter(ev => ev.type.startsWith('touch') ? ev.touches.length >= 2 || !!el.closest('.mapfs') : (!ev.ctrlKey || ev.type === 'wheel') && !ev.button)
       .on('zoom', ev => {
         if (ev.sourceEvent) moved = true; // the reader moved the map, so a resize keeps their view instead of refitting
         root.attr('transform', ev.transform); k = ev.transform.k; streetZoom(k); drawScale();
@@ -162,8 +163,7 @@ const NOLA = (() => {
     el.addEventListener('gesturechange', e => { e.preventDefault(); if (touching) return; moved = true;
       const r = svg.node().getBoundingClientRect(); svg.call(zoom.scaleTo, gk * e.scale, [(e.clientX - r.left) * W / r.width, (e.clientY - r.top) * H / r.height]); });
     // fit an extent into the part of the map the filter panel doesn't cover
-    const inset = () => { if (!o.panel || getComputedStyle(o.panel).position !== 'absolute' || !o.panel.childElementCount) return 0;
-      return (o.panel.offsetWidth + 24) * W / Math.max(1, el.clientWidth); };
+    const inset = () => panelInset(o.panel, el.clientWidth) * W / Math.max(1, el.clientWidth);
     function zoomTo(ext, dur = 0) {
       const [x0, y0, x1, y1] = ext; target = ext; moved = false;
       const L = inset(), s = Math.min((W - L) / (x1 - x0), H / (y1 - y0)) * 0.96;
@@ -172,11 +172,9 @@ const NOLA = (() => {
     }
     const home = o.extent || FULL;
     let focused = -1;
-    const ctl = document.createElement('div'); ctl.className = 'mapctl';
     const by = f => () => { moved = true; svg.transition().duration(250).call(zoom.scaleBy, f); };
-    [['+', 'Zoom in', by(1.7)], ['−', 'Zoom out', by(1 / 1.7)],
-     ['⤢', 'Reset view', () => api.focus(focused)]].forEach(([t, l, fn]) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = t; b.title = l; b.setAttribute('aria-label', l); b.onclick = fn; ctl.appendChild(b); });
-    el.appendChild(ctl);
+    // entering or leaving full screen resizes the map: fit() refits it (or keeps the reader's view) and places labels again
+    mapButtons(el, { zoomIn: by(1.7), zoomOut: by(1 / 1.7), reset: () => api.focus(focused), onFull: () => { fit(); drawScale(); layoutLabels(); } });
     zoomTo(home); drawScale(); layoutLabels();
     // follow the map's box (window resizes, the page's scrollbar appearing, rotating a phone): an untouched map is
     // refitted to what it was showing; one the reader has moved keeps its center and scale
@@ -203,8 +201,73 @@ const NOLA = (() => {
     };
     return api;
   }
-  // kept for older callers; maps carry their own controls now
-  function mapButtons() {}
+  // how far (CSS px) the floating filter panel reaches into a map `mapW` px wide, so fits keep clear of it.
+  // 0 when the panel isn't floating, is folded away, or covers most of a narrow map (phones in full screen).
+  function panelInset(panel, mapW) {
+    if (!panel || !panel.childElementCount || getComputedStyle(panel).position !== 'absolute') return 0;
+    const w = panel.offsetWidth; return w && w < mapW / 2 ? w + 24 : 0;
+  }
+
+  // ---------- map controls: full screen, zoom in, zoom out, reset ----------
+  const ico = d => `<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><path d="${d}"/></svg>`;
+  const ICON = {
+    full: ico('M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5'),
+    exit: ico('M9 4v5H4M15 4v5h5M20 15h-5v5M4 15h5v5'),
+    plus: ico('M12 5v14M5 12h14'),
+    minus: ico('M5 12h14'),
+    reset: ico('M4.6 13.5A7.6 7.6 0 1 0 6.6 6.6M6.6 2.4v4.2h4.2') // circular arrow, back to the opening view
+  };
+  const D = document, fsElement = () => D.fullscreenElement || D.webkitFullscreenElement || null;
+  // mapButtons(host, { zoomIn, zoomOut, reset, onFull(on) }) adds the control stack to a map's box (host) and returns it.
+  // Full screen takes the map's whole stage (filter panel, legend, scale bar, controls) with the Fullscreen API, or,
+  // where that isn't offered (iPhone Safari) or is refused, a fixed layer over the page with the page's scroll locked.
+  // Esc and the browser's own exit keep the button in step. onFull runs once the new size has settled.
+  function mapButtons(host, { zoomIn, zoomOut, reset, onFull } = {}) {
+    if (!host) return null;
+    const box = host.closest('.stage') || host;
+    const ctl = D.createElement('div'); ctl.className = 'mapctl';
+    const add = (icon, label, fn) => { const b = D.createElement('button'); b.type = 'button'; b.innerHTML = icon; b.title = label; b.setAttribute('aria-label', label); b.onclick = fn; ctl.appendChild(b); return b; };
+    let mode = null, sy = 0; // mode: 'api' | 'css' | null
+    const fsb = add(ICON.full, 'Full screen', () => (mode ? exit() : enter()));
+    fsb.setAttribute('aria-pressed', 'false'); fsb.classList.add('fsbtn');
+    if (zoomIn) add(ICON.plus, 'Zoom in', zoomIn);
+    if (zoomOut) add(ICON.minus, 'Zoom out', zoomOut);
+    if (reset) add(ICON.reset, 'Reset view', reset);
+    host.appendChild(ctl);
+    const settle = on => { let n = 0; const go = () => { if (onFull) onFull(on); if (++n < 3) requestAnimationFrame(go); }; requestAnimationFrame(go); };
+    const onKey = e => { if (e.key === 'Escape' && mode === 'css' && !/^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) { e.preventDefault(); exit(); } };
+    function show(on) {
+      box.classList.toggle('mapfs', on); box.classList.toggle('mapfs-css', on && mode === 'css');
+      D.documentElement.classList.toggle('mapfs-lock', on && mode === 'css');
+      fsb.innerHTML = on ? ICON.exit : ICON.full; fsb.setAttribute('aria-pressed', on); fsb.title = on ? 'Exit full screen (Esc)' : 'Full screen';
+      // the tooltip has to live inside the full-screen layer to be seen there
+      tip.hide(); (on ? box : D.body).appendChild(tipEl);
+      if (on) D.addEventListener('keydown', onKey); else { D.removeEventListener('keydown', onKey); mode = null; if (Math.abs(scrollY - sy) > 1) scrollTo(scrollX, sy); }
+      settle(on);
+    }
+    function css() { mode = 'css'; show(true); }
+    function enter() {
+      sy = scrollY;
+      const req = box.requestFullscreen || box.webkitRequestFullscreen;
+      if (!(D.fullscreenEnabled || D.webkitFullscreenEnabled) || !req) return css();
+      mode = 'api';
+      let p; try { p = req.call(box, { navigationUI: 'hide' }); } catch (e) { return css(); }
+      if (p && p.catch) p.catch(failed);
+      // a browser that neither enters nor refuses (some embedded views leave the request hanging) gets the fallback
+      setTimeout(failed, 1200);
+    }
+    function exit() {
+      if (mode === 'api' && fsElement() === box) (D.exitFullscreen || D.webkitExitFullscreen).call(D);
+      else if (mode) show(false);
+    }
+    const changed = () => { const on = fsElement() === box;
+      if (on && (mode !== 'api' || !box.classList.contains('mapfs'))) { mode = 'api'; show(true); } // (also a late success after the fallback took over)
+      else if (!on && mode === 'api' && box.classList.contains('mapfs')) show(false); };
+    const failed = () => { if (mode === 'api' && fsElement() !== box) css(); }; // older Safari reports a refusal by event, not a promise
+    ['fullscreenchange', 'webkitfullscreenchange'].forEach(t => D.addEventListener(t, changed));
+    ['fullscreenerror', 'webkitfullscreenerror'].forEach(t => D.addEventListener(t, failed));
+    return ctl;
+  }
 
   // ---------- filters on the chart ----------
   // stage(el, { map }) turns a view's pane into a filter panel + plot area. On maps the panel floats over the map,
@@ -240,7 +303,7 @@ const NOLA = (() => {
     let y0 = null, two = false, ht = 0;
     plot.addEventListener('touchstart', e => { two = e.touches.length > 1; y0 = two ? null : [e.touches[0].clientX, e.touches[0].clientY]; }, { passive: true });
     plot.addEventListener('touchmove', e => {
-      if (two || !y0 || e.touches.length !== 1) return;
+      if (two || !y0 || e.touches.length !== 1 || plot.closest('.mapfs')) return; // in full screen one finger moves the map
       const t = e.touches[0]; if (Math.hypot(t.clientX - y0[0], t.clientY - y0[1]) < 12) return; y0 = null;
       let h = plot.querySelector(':scope>.maphint');
       if (!h) { h = document.createElement('div'); h.className = 'maphint'; h.setAttribute('aria-hidden', 'true'); h.textContent = 'Use two fingers to move the map'; plot.appendChild(h); }
@@ -485,6 +548,6 @@ const NOLA = (() => {
   }
   const legendHTML = items => '<div class="legend">' + items.map(([c, l, round]) => `<span><i style="background:${c}${round ? ';border-radius:50%' : ''}"></i>${l}</span>`).join('') + '</div>';
 
-  return { css, S, fmt, pct, tip, row, setGeo, views, hashState, legendHTML, stage, fsec, flist, seg, ftabs, nbPick, phoneToggle, popOf, perK, fmtRate, POP_NOTE, basisChips, shown, nbList, nbSelect, lonlat, get FULL() { return FULL; }, get GEO() { return GEO; }, map, mapButtons, seqVar, seqLegend, classes, stepLegend, short, frame, yGrid, chips, months, monthsLong,
+  return { css, S, fmt, pct, tip, row, setGeo, views, hashState, legendHTML, stage, fsec, flist, seg, ftabs, nbPick, phoneToggle, popOf, perK, fmtRate, POP_NOTE, basisChips, shown, nbList, nbSelect, lonlat, get FULL() { return FULL; }, get GEO() { return GEO; }, map, mapButtons, panelInset, seqVar, seqLegend, classes, stepLegend, short, frame, yGrid, chips, months, monthsLong,
     setYear, get YEAR() { return YEAR; }, monthTicks, doyTime, doyDate, doyISO, doyMonth, monthStarts, isoDate, share, numWord, cap, setText, setHTML, title };
 })();
