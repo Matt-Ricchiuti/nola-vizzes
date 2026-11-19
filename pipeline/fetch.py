@@ -904,6 +904,62 @@ def month_index(d, y0, m0):
     return (d.year - y0) * 12 + d.month - m0
 
 
+# ---------------------------------------------------------------- dots: one point per record, for the maps' dot layers
+# Each map page's data file carries a `dots` object built from rows its builder already downloads (no extra requests).
+# Columnar and small: x/y in map units x DOT_Q (about 5 m), the record's day as days since DOT_EPOCH, delta-encoded in
+# date order (so a new day's records only add to the end, and the committed file changes little from day to day),
+# and small lookup lists for categories. Records outside every neighborhood or without a location are left out.
+DOT_Q = 4
+DOT_EPOCH = dt.date(2000, 1, 1)
+
+
+def dot_xy(lon, lat):
+    """[lon, lat] -> (x, y) in map units x DOT_Q, or None when the location is missing or outside the parish's box."""
+    if lon is None or lat is None or not (-90.2 < lon < -89.5 and 29.8 < lat < 30.25):
+        return None
+    return round((lon + 90.14) * 4830 * DOT_Q), round((30.20 - lat) * 5550 * DOT_Q)
+
+
+def dot_lonlat(nbp, lons, lats):
+    """Neighborhood index and dot x/y per record (nb -1 and xy None when it isn't mapped)."""
+    xy = [dot_xy(a, b) for a, b in zip(lons, lats)]
+    nbs = nbp.lookup([a if p else 0 for a, p in zip(lons, xy)], [b if p else 0 for b, p in zip(lats, xy)])
+    return [int(n) if p else -1 for n, p in zip(nbs, xy)], xy
+
+
+def dot_pack(recs, cols):
+    """recs: dicts with 'day' (a date or None), 'x', 'y', 'nb' and the keys in `cols`. Sorted by day (records without
+    one first, then by x, y), packed column by column. 'd' holds day deltas from `d0` (days since DOT_EPOCH)."""
+    recs = sorted(recs, key=lambda r: (r['day'] is not None, r['day'] or DOT_EPOCH, r['x'], r['y'], [str(r[c]) for c in cols]))
+    out = {'q': DOT_Q, 'epoch': DOT_EPOCH.isoformat(), 'n': len(recs),
+           'x': [r['x'] for r in recs], 'y': [r['y'] for r in recs], 'nb': [r['nb'] for r in recs]}
+    days = [(r['day'] - DOT_EPOCH).days if r['day'] else None for r in recs]
+    if any(d is not None for d in days):
+        d0 = next(d for d in days if d is not None)
+        out['d0'], prev, dd = d0, d0, []
+        for d in days:
+            if d is None:
+                dd.append(-1)   # no date (sorted first, so it never sits between two dated records)
+            else:
+                dd.append(d - prev)
+                prev = d
+        out['d'] = dd
+    for c in cols:
+        out[c] = [r[c] for r in recs]
+    return out
+
+
+def dot_dict(values):
+    """Category strings -> (list by count, ties by name; index per value)."""
+    lst = ranked(Counter(values))
+    ix = {v: k for k, v in enumerate(lst)}
+    return lst, [ix[v] for v in values]
+
+
+def clean_addr(s):
+    return re.sub(r'\s+', ' ', (s or '').strip())[:48]
+
+
 # ---------------------------------------------------------------- 311 service requests
 SR_DS = '2jgv-pqrq'
 # The City loaded about 313,000 older (2012-2018) requests with a created date of January 1-2, 2019, so the page
@@ -978,7 +1034,9 @@ def build_311(api, nbp):
                     closeNb[nb][t].append(d)
     stat = lambda v: [len(v), median(v), p90(v)]
     trees = tree_requests(rows, created, closed, nbs, typ, reason, pending, last)
+    dots = sr_dots(rows, created, closed, pending, recent, nbs, tix, reason, R)
     return trees, {
+        'dots': dots,
         'ds': SR_DS, 'start': SR_START[:7], 'last': last.strftime('%Y-%m-%d'), 'winStart': win0.isoformat(),
         'T': T, 'R': R, 'mon': mon, 'years': years, 'nby': nby,
         'nb12': [[v for r in sorted(c) for v in (r, c[r])] for c in nb12],   # [reason, n, reason, n, ...]
@@ -987,6 +1045,31 @@ def build_311(api, nbp):
         'closeNb': [[[len(v), median(v)] for v in row] for row in closeNb],
         'total': n, 'recent': sum(recent), 'open': sum(pending), 'noLoc': sum(nb < 0 for nb in nbs),
     }
+
+
+def sr_dots(rows, created, closed, pending, recent, nbs, tix, reason, R):
+    """One dot per located request filed in the past 12 months or still open (any age). r: index into `R`
+    (the page's [type, reason] list, plus [type, 'Other'] for reasons it doesn't list); c: days to close
+    (-1 still open, -2 closed with no close date)."""
+    RP = [list(r) for r in R]
+    ri = {(t, s): k for k, (t, s) in enumerate(RP)}
+    recs = []
+    for i in range(len(rows)):
+        if not (recent[i] or pending[i]) or nbs[i] < 0:
+            continue
+        p = dot_xy(fnum(rows[i]['longitude']), fnum(rows[i]['latitude']))
+        if p is None:
+            continue
+        k = ri.get((tix[i], reason[i]), ri.get((tix[i], 'Other')))
+        if k is None:
+            RP.append([tix[i], 'Other'])
+            k = ri[(tix[i], 'Other')] = len(RP) - 1
+        days = None if pending[i] else days_between(created[i], closed[i])
+        recs.append({'day': created[i].date(), 'x': p[0], 'y': p[1], 'nb': nbs[i], 'r': k,
+                     'c': -1 if pending[i] else -2 if days is None else int(days + 0.5)})
+    out = dot_pack(recs, ['r', 'c'])
+    out['R'] = RP
+    return out
 
 
 TR_TYPE = 'Tree Service'  # the 311 request type for trees (trims, dead or dying trees, blocked streets and signs)
