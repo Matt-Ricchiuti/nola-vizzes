@@ -55,6 +55,7 @@ How to build a view (`src/lib.js`): `NOLA.views([...])` lists the views; each vi
 | `drone.html` | NOPD Drone Flights (`ay9z-ynxz`), current year | daily (not in the menus) |
 | `cpc.html` | CPC Projects (`xxb5-5azv`) | daily |
 | `311.html` | 311 OPCD Calls (`2jgv-pqrq`), February 2019 on | daily (incremental download) |
+| `str.html` | Active Short-Term Rental Licenses (`ufdg-ajws`), Non-Commercial STR Licenses (`2ei9-wqw2`), STR Permit Applications (`en36-xvxg`) | daily |
 | `trees.html` | Tree Location (`3tyj-9x33`) + green space, Oct 2026 export in `data/trees.json` | static (street map daily) |
 | `about.html` | About the site, sources, disclaimer | with each build |
 

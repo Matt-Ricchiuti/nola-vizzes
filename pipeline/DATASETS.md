@@ -6,8 +6,8 @@ The site's rule is to chart only datasets with records added in the past year. T
 
 | Mark | Meaning | Count |
 |---|---|---|
-| ✅ | Already on the site | 19 |
-| ⭐ | Strong candidate for a new page | 14 |
+| ✅ | Already on the site | 22 |
+| ⭐ | Strong candidate for a new page | 11 |
 | 🔸 | Possible: smaller, harder, or best as part of another page | 21 |
 | 🗺️ | Map layer or supporting data (boundaries, population), not a page on its own | 40 |
 | · | Not a candidate (stale, archived, or superseded) | 116 |
@@ -129,15 +129,15 @@ Worth adding to every map: 2020 population by neighborhood (`2w4d-xaw2`), so cou
 | | Dataset | Newest record | Rows | Notes |
 |---|---|---|--:|---|
 | ✅ | [CPC Projects](https://data.nola.gov/d/xxb5-5azv) `xxb5-5azv` | 2026-11-17 | 15,671 | Planning cases page |
-| ⭐ | [Active Short-Term Rental Licenses](https://data.nola.gov/d/ufdg-ajws) `ufdg-ajws` | 2026-11-17 | 4,308 | STR page: active licenses by neighborhood and type. Pairs with the STR topic on the planning page. |
+| ✅ | [Active Short-Term Rental Licenses](https://data.nola.gov/d/ufdg-ajws) `ufdg-ajws` | 2026-11-17 | 4,308 | Short-term rentals page: active licenses map. |
 | ⭐ | [Code Enforcement All Cases](https://data.nola.gov/d/u6yx-v2tw) `u6yx-v2tw` | 2026-11-17 | 183,641 | Blight page: the core case table (join the others on case number). |
 | ⭐ | [Code Enforcement All Hearings](https://data.nola.gov/d/44ct-56tr) `44ct-56tr` | updated 2026-11-18 | 103,421 | Blight page: hearing outcomes. Includes scheduled future hearings. |
 | ⭐ | [Code Enforcement All Inspections](https://data.nola.gov/d/uh5a-f7uw) `uh5a-f7uw` | 2026-11-18 | 247,464 | Blight page: inspection activity. |
 | ⭐ | [Code Enforcement All Violations](https://data.nola.gov/d/3ehi-je3s) `3ehi-je3s` | 2026-11-17 | 274,076 | Blight page: what violations are cited, and where. |
 | ⭐ | [Grass Cutting (Lot Abatement/Chapter 66)](https://data.nola.gov/d/xhih-vxs6) `xhih-vxs6` | 2026-11-17 | 23,531 | Blight page: overgrown-lot cases and City cuts. |
-| ⭐ | [Non-Commercial Short-Term Rental Licenses](https://data.nola.gov/d/2ei9-wqw2) `2ei9-wqw2` | 2026-10-27 | 1,231 | STR page: residential (non-commercial) licenses. |
+| ✅ | [Non-Commercial Short-Term Rental Licenses](https://data.nola.gov/d/2ei9-wqw2) `2ei9-wqw2` | 2026-10-27 | 1,231 | Short-term rentals page: non-commercial licenses by building type. |
 | ⭐ | [Permits](https://data.nola.gov/d/rcm3-fn58) `rcm3-fn58` | 2026-11-17 | 350,562 | Permits page: construction and renovation by neighborhood and type, processing times. |
-| ⭐ | [Short-Term Rental Permit Applications](https://data.nola.gov/d/en36-xvxg) `en36-xvxg` | 2026-11-17 | 39,140 | STR page: applications over time, approvals vs. denials. |
+| ✅ | [Short-Term Rental Permit Applications](https://data.nola.gov/d/en36-xvxg) `en36-xvxg` | 2026-11-17 | 39,140 | Short-term rentals page: applications per year by outcome. |
 | 🔸 | [Adjudication Enforcement Cases for the Office of Business and External Services](https://data.nola.gov/d/wy29-i338) `wy29-i338` | 2026-11-18 | 114,916 | Adjudication cases, hearings, fines and fees. Fines collected vs. owed could be a story. |
 | 🔸 | [Adjudication Enforcement Detailed Hearings Data for the Office of Business and External Services](https://data.nola.gov/d/uzyk-jrck) `uzyk-jrck` | updated 2026-11-18 | 53,011 | Adjudication cases, hearings, fines and fees. Fines collected vs. owed could be a story. |
 | 🔸 | [Adjudication Enforcement Fines and Fees Data for the Office of Business and External Services](https://data.nola.gov/d/f5zm-xkyr) `f5zm-xkyr` | updated 2026-11-18 | 225,315 | Adjudication cases, hearings, fines and fees. Fines collected vs. owed could be a story. |

@@ -988,10 +988,109 @@ def build_311(api, nbp):
     }
 
 
+# ---------------------------------------------------------------- short-term rentals
+STR_ACTIVE, STR_APPS, STR_NC = 'ufdg-ajws', 'en36-xvxg', '2ei9-wqw2'
+# active licenses that are rentals (operator permits are people, not places, and are counted separately)
+STR_CAT = ['Short Term Rental Commercial Owner', 'Non-Commercial Short Term Rental', 'Lodging Exempt from STR Regulation']
+# applications: license types the City has used since 2017, grouped
+STR_GROUPS = ['Commercial', 'Residential / non-commercial', 'Temporary', 'Other or not stated']
+STR_STATUS = ['Issued', 'Expired', 'Revoked', 'Pending', 'Withdrawn', 'Denied', 'Duplicate']
+
+
+def str_group(lt, sub):
+    lt, sub = (lt or '').strip(), (sub or '').strip()
+    if lt == 'Short Term Rental Commercial Owner' or (lt == 'Short Term Rental' and sub == 'Commercial STR'):
+        return 0
+    if lt.startswith('Non-Commercial') or lt.startswith('Short Term Rental Residential') or lt == 'Interim STR' or (lt == 'Short Term Rental' and sub == 'Accessory STR'):
+        return 1
+    if lt == 'Short Term Rental' and sub == 'Temporary STR':
+        return 2
+    return 3
+
+
+def fetch_all(api, ds, select, order=':id', where=None, page=50000):
+    rows = []
+    while True:
+        params = {'$select': select, '$order': order, '$limit': page, '$offset': len(rows)}
+        if where:
+            params['$where'] = where
+        got = api.get(f'/resource/{ds}.json', params)
+        rows += got
+        if len(got) < page:
+            return rows
+
+
+def build_str(api, nbp):
+    # active licenses
+    cols = ['license_type', 'residential_subtype', 'bedroom_limit', 'issue_date', 'longitude', 'latitude']
+    api.require_columns(STR_ACTIVE, cols, 'Active STR licenses')
+    act = fetch_all(api, STR_ACTIVE, ','.join(cols))
+    need(len(act) > 500, f'Active STR licenses: only {len(act)} rows')
+    nbs, xy = points_to_nb(nbp, act)
+    pts, operators, other = [], Counter(), 0
+    for r, nb, (x, y) in zip(act, nbs, xy):
+        lt = (r.get('license_type') or '').strip()
+        if lt == 'Short Term Rental Operator':
+            operators[(r.get('residential_subtype') or '').strip() or 'N/A'] += 1
+        elif lt in STR_CAT:
+            pts.append([x, y, STR_CAT.index(lt), nb, int(fnum(r.get('bedroom_limit')) or 0)])
+        else:
+            other += 1
+    need(not other, f'Active STR licenses: {other} rows of an unknown license type. Add it to STR_CAT.')
+    pts.sort()
+    # non-commercial license details
+    nc_cols = ['type_of_building', 'partial_whole', 'operator_type', 'bedrooms_rented', 'current_status', 'location']
+    api.require_columns(STR_NC, nc_cols, 'Non-commercial STR licenses')
+    nc = fetch_all(api, STR_NC, ','.join(nc_cols))
+    need(len(nc) > 100, f'Non-commercial STR licenses: only {len(nc)} rows')
+    loc = [(r.get('location') or {}).get('coordinates') or [None, None] for r in nc]
+    ncnb, _ = points_to_nb(nbp, [{'longitude': a, 'latitude': b} for a, b in loc])
+    clean = lambda v: re.sub(r'\s+', ' ', (v or '').strip()) or 'Not stated'
+    B = ranked(Counter(clean(r.get('type_of_building')) for r in nc))
+    OP = ranked(Counter(clean(r.get('operator_type')) for r in nc))
+    ST = ranked(Counter(clean(r.get('current_status')) for r in nc))
+    ncr = sorted([nb, B.index(clean(r.get('type_of_building'))), 1 if clean(r.get('partial_whole')) == 'Whole Unit' else 0 if clean(r.get('partial_whole')) == 'Partial Unit' else 2,
+                  int(fnum(r.get('bedrooms_rented')) or 0), OP.index(clean(r.get('operator_type'))), ST.index(clean(r.get('current_status')))] for r, nb in zip(nc, ncnb))
+    # applications since 2017
+    a_cols = ['application_date', 'license_type', 'residential_subtype', 'current_status', 'x', 'y']
+    api.require_columns(STR_APPS, a_cols, 'STR permit applications')
+    apps = fetch_all(api, STR_APPS, ','.join(a_cols))
+    need(len(apps) > 10000, f'STR permit applications: only {len(apps)} rows')
+    anb, _ = sp_points_to_nb(nbp, apps, 'x', 'y')
+    dates = [parse_ts(r.get('application_date')) for r in apps]
+    last = max(d for d in dates if d)
+    y0 = min(d.year for d in dates if d)
+    years = list(range(y0, last.year + 1))
+    yr = [[[0] * len(STR_STATUS) for _ in STR_GROUPS] for _ in years]
+    nby = [Counter() for _ in range(72)]
+    undated = unknown = 0
+    for r, d, nb in zip(apps, dates, anb):
+        s = (r.get('current_status') or '').strip()
+        if s not in STR_STATUS:
+            unknown += 1
+            continue
+        if d is None:
+            undated += 1
+            continue
+        g, k, si = str_group(r.get('license_type'), r.get('residential_subtype')), d.year - y0, STR_STATUS.index(s)
+        yr[k][g][si] += 1
+        if nb >= 0:
+            nby[nb][(k, g, si)] += 1
+    need(unknown < 50, f'STR permit applications: {unknown} rows with an unknown status. Add it to STR_STATUS.')
+    return {
+        'ds': [STR_ACTIVE, STR_APPS, STR_NC], 'last': last.strftime('%Y-%m-%d'),
+        'cat': STR_CAT, 'pts': pts, 'operators': [[k, v] for k, v in sorted(operators.items(), key=lambda kv: (-kv[1], kv[0]))],
+        'nc': {'B': B, 'OP': OP, 'ST': ST, 'rows': ncr},   # rows: [nb, building, whole(1)/partial(0)/not stated(2), bedrooms, operatorType, status]
+        'groups': STR_GROUPS, 'status': STR_STATUS, 'years': years, 'yr': yr,
+        'nby': [[v for key in sorted(c) for v in (*key, c[key])] for c in nby],   # [yearIdx, group, status, n, ...]
+        'total': len(pts), 'apps': len(apps), 'undated': undated,
+    }
+
+
 # Data files of the pages added with the 311 / housing / business set, and when each counts as stale
 # (file, label, field holding its newest record date, days without a new record before warning).
-NEW_FILES = ['311.json']
-STALE = [('311.json', '311 calls', 'last', 7)]
+NEW_FILES = ['311.json', 'str.json']
+STALE = [('311.json', '311 calls', 'last', 7), ('str.json', 'Short-term rental permit applications', 'last', 14)]
 
 
 # ---------------------------------------------------------------- sanity checks against the last good build
@@ -1041,6 +1140,11 @@ def validate(name, obj, prev, same_year=True):
         need(obj['total'] > 100000 and obj['recent'] > 20000, '311: suspiciously few requests')
         need(obj['noLoc'] < 0.1 * obj['total'], '311: most requests failed to map to a neighborhood')
         check_not_collapsed('311 requests', obj['total'], prev and prev.get('total'))
+    elif name == 'str.json':
+        need(len(obj['nby']) == 72 and len(obj['yr']) == len(obj['years']) and all(len(p) == 5 for p in obj['pts']), 'str: shape')
+        need(obj['total'] > 500 and len(obj['nc']['rows']) > 100, 'str: suspiciously few licenses')
+        need(sum(p[3] < 0 for p in obj['pts']) < 0.1 * obj['total'], 'str: most licenses failed to map to a neighborhood')
+        check_not_collapsed('STR permit applications', obj['apps'], prev and prev.get('apps'))
 
 
 def central_date(iso_utc):
@@ -1187,6 +1291,12 @@ def main():
             out['311.json'] = build_311(api, nbp)
     print('311 requests ...', flush=True)
     attempt(['311.json'], sr)
+
+    def strs():
+        if not unchanged('str.json', '|'.join([api.version(d) for d in (STR_ACTIVE, STR_APPS, STR_NC)] + [geo_key])):
+            out['str.json'] = build_str(api, nbp)
+    print('short-term rentals ...', flush=True)
+    attempt(['str.json'], strs)
 
     for name in [n for n in out if n != 'geo.json']:
         same_year = (prev[name] or {}).get('year') == out[name].get('year') if name in ('drone.json', 'cfs.json') else True

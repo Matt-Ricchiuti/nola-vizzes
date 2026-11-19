@@ -21,6 +21,7 @@ The workflow runs at 10:30 UTC. The City loads CPC Projects at about 06:00 UTC, 
 | `hist.json` | with `cfs.json` (current year); a past year when its dataset's `rowsUpdatedAt` moved | Past years are checked daily for last year in January–February, and all years on the 1st of the month. The City loads each year's final rows on January 1. |
 | `cpc.json` | `xxb5-5azv`'s `rowsUpdatedAt` or `geo.json` changed | "Today" for upcoming hearings and the 365-day window is the day the City loaded the data. |
 | `311.json` | `2jgv-pqrq`'s `rowsUpdatedAt` or `geo.json` changed | Incremental download (see below). "Today" is the newest request in the data. |
+| `str.json` | any of `ufdg-ajws`, `en36-xvxg`, `2ei9-wqw2` or `geo.json` changed | Three small whole downloads (about 8 requests, 9 MB). |
 
 On the 1st of every month (and with `--full`, or the workflow's "full" checkbox) everything is downloaded and rebuilt regardless. Queries are ordered (`:id` as the tie-breaker), so the same City data always produces byte-identical files. Rebuilt files are written only when their content changed, and pages embed only the date their own data last changed, so a day without new City data changes nothing and the workflow commits and deploys nothing.
 
@@ -218,6 +219,33 @@ Rows with `date_created >= 2019-02-01` (about 730,000), columns `request_type, r
 - The page offers requests per 1,000 residents (2020 population), since requests come from people; neighborhoods under 1,000 residents get no rate.
 
 Checked against the API on 2026-11-19: past-12-month total, open total, October 2026 total and Streetlights in October 2026 match `count(*)` queries exactly, and Lakeview and St. Roch match `within_polygon` counts.
+
+## `data/str.json`: short-term rentals
+
+Three datasets, each downloaded whole (ordered by `:id`):
+
+- **Active Short-Term Rental Licenses** (`ufdg-ajws`, about 4,300 rows): `license_type, residential_subtype, bedroom_limit, issue_date, longitude, latitude`. Licenses of type "Short Term Rental Operator" are permits for the person running a rental, not a place, so they're counted separately (`operators`, by subtype) and left off the map. The other three types (`cat`) are mapped: 0 "Short Term Rental Commercial Owner", 1 "Non-Commercial Short Term Rental", 2 "Lodging Exempt from STR Regulation". A new type fails the build (add it to `STR_CAT`).
+- **Non-Commercial Short-Term Rental Licenses** (`2ei9-wqw2`, about 1,200 rows): `type_of_building, partial_whole, operator_type, bedrooms_rented, current_status, location`.
+- **Short-Term Rental Permit Applications** (`en36-xvxg`, about 39,000 rows since 2017): `application_date, license_type, residential_subtype, current_status, x, y`. This dataset has no lon/lat columns, only Louisiana South state plane x/y in US feet (EPSG:3452), converted with `sp_lonlat` (an inverse Lambert conformal conic; it matches the City's own lon/lat in the other STR datasets to 1e-7°). x/y of -1 means no location.
+
+```
+{ "ds": [ids], "last": newest application_date,
+  "cat": [3 license types], "pts": [[x, y, cat, nb, bedroomLimit], ...]   # sorted, so the file only changes with the data
+  "operators": [[subtype, n], ...],
+  "nc": { "B": [building types], "OP": [operator types], "ST": [statuses],
+          "rows": [[nb, building, whole(1)/partial(0)/not stated(2), bedrooms, operatorType, status], ...] },
+  "groups": ["Commercial", "Residential / non-commercial", "Temporary", "Other or not stated"],
+  "status": ["Issued", "Expired", "Revoked", "Pending", "Withdrawn", "Denied", "Duplicate"],
+  "years": [2017, ...], "yr": [[[n per status] per group] per year],
+  "nby": [[yearIdx, group, status, n, ...] per nb],
+  "total": mapped licenses, "apps": application rows, "undated": applications without a date }
+```
+
+- **Application groups** (`str_group`): Commercial = "Short Term Rental Commercial Owner", or "Short Term Rental" with subtype "Commercial STR" (2017 rules). Residential = any "Non-Commercial…" type, "Short Term Rental Residential Owner…", "Interim STR", or "Short Term Rental" + "Accessory STR". Temporary = "Short Term Rental" + "Temporary STR". Everything else (a few unlabeled or "Choose a License Type" rows) is "Other or not stated".
+- **Status** is `current_status` as of the download; "Expired" means the license was issued and has since expired. An unknown status fails the build (add it to `STR_STATUS`).
+- The page shades neighborhoods by license count or by licenses per 100 housing units (2020 Census `hu` in geo.json). Neighborhoods under 500 housing units get no rate.
+
+Checked against the API on 2026-11-19: license counts by type, status totals and non-commercial building types match `count(*)` queries; Marigny and Bywater match `within_polygon` counts for both license datasets.
 
 ## Page copy that mentions specific numbers
 
