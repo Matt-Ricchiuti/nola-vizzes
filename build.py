@@ -10,7 +10,7 @@ Templates can use these placeholders, filled in at build time:
     {{CFS_YEAR}} {{CFS_DS}} {{CFS_PREV}}   year, dataset id and previous year of the Calls for Service page
     {{DRONE_YEAR}}  year covered by the drone page
     {{DRONE_THRU}} {{CFS_THRU}} {{CPC_THRU}}   last day each page's data reaches, e.g. "Nov 5, 2026"
-    {{MENU}}        home-page menu of the four pages
+    {{MENU}}        home-page menu of the listed pages (PAGES minus UNLISTED)
 """
 import json, sys, os, re, html, datetime as dt
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -29,6 +29,10 @@ PAGES = {'drone': ('NOPD drone flights', {'drone': 'drone.json'}),
          'cpc': ('Planning cases', {'cpc': 'cpc.json'}),
          'trees': ('Street trees', {'trees': 'trees.json'})}
 EXTRA = {'about': 'About'}
+# Pages still built (so old links keep working and they can come back) but left out of the header and home-page
+# menus. Remove a key to list the page again.
+UNLISTED = {'drone', 'cfs'}
+listed = lambda: [(k, l) for k, (l, _) in PAGES.items() if k not in UNLISTED]
 
 css = open(P('src', 'lib.css'), encoding='utf-8').read()
 lib = open(P('src', 'lib.js'), encoding='utf-8').read()
@@ -61,7 +65,7 @@ TOKENS = {'{{PULLED}}': fdate(pulled),
           '{{DRONE_YEAR}}': str(drone_year),
           '{{FOOT}}': '<div class="foot">Data: <a id="dataLink" href="https://data.nola.gov">data.nola.gov</a> · Not affiliated with the City of New Orleans · <a href="about.html">About</a></div>'}
 
-# Header: the site name, then one "Visualizations" menu that opens downward to the four pages.
+# Header: the site name, then one "Visualizations" menu that opens downward to the listed pages.
 # Hover, keyboard (Tab / Escape) and tap all work.
 NAV_JS = ('<script>(()=>{const dd=document.currentScript.closest(".site").querySelector(".dd"),b=dd.querySelector(".ddbtn");'
           'const set=o=>{dd.classList.toggle("open",o);b.setAttribute("aria-expanded",o)};'
@@ -71,17 +75,17 @@ NAV_JS = ('<script>(()=>{const dd=document.currentScript.closest(".site").queryS
 def nav(key):
     e = html.escape
     cur = ' class="on" aria-current="page"'
-    pages = ''.join(f'<li><a href="{k}.html"{cur if k == key else ""}>{e(l)}</a></li>' for k, (l, _) in PAGES.items())
+    pages = ''.join(f'<li><a href="{k}.html"{cur if k == key else ""}>{e(l)}</a></li>' for k, l in listed())
     extra = ''.join(f'<a class="xlink{" on" if k == key else ""}" href="{k}.html">{e(l)}</a>' for k, l in EXTRA.items())
     return ('<div class="site"><b><a href="index.html" style="color:inherit;text-decoration:none">Nola Vizzes</a></b>'
             '<nav class="topnav" aria-label="Site"><div class="dd">'
             f'<button type="button" class="ddbtn{" on" if key in PAGES else ""}" aria-haspopup="true" aria-expanded="false">Visualizations<span aria-hidden="true">▾</span></button>'
             f'<ul class="dd1">{pages}</ul></div>{extra}</nav>' + NAV_JS + '</div>')
 
-# The home-page menu lists the four pages; each page stacks all of its charts.
+# The home-page menu lists the listed pages; each page stacks all of its charts.
 def menu():
     e = html.escape
-    pages = ''.join(f'<li><a href="{k}.html">{e(l)}</a></li>' for k, (l, _) in PAGES.items())
+    pages = ''.join(f'<li><a href="{k}.html">{e(l)}</a></li>' for k, l in listed())
     extra = ''.join(f'<a href="{k}.html">{e(l)}</a>' for k, l in EXTRA.items())
     return f'<ul class="vlist">{pages}</ul><div class="vextra">{extra}</div>'
 TOKENS['{{MENU}}'] = menu()
