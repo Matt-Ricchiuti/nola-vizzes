@@ -25,60 +25,90 @@
   // reasons apply to requests made in the past 12 months; open requests are counted by type only
   const rsn = () => st.measure === 'made' ? st.reason : -1;
 
-  // ---------- per-neighborhood numbers ----------
-  // past 12 months, by reason: nb12[nb] = [reason, n, reason, n, ...]
-  const nbR = D.nb12.map(a => { const m = new Map(); for (let i = 0; i < a.length; i += 2) m.set(a[i], a[i + 1]); return m; });
-  const madeOf = (nb, type = st.type, reason = rsn()) => {
-    let s = 0; nbR[nb].forEach((n, r) => { if (reason >= 0 ? r === reason : type < 0 || D.R[r][0] === type) s += n; }); return s; };
-  const openOf = (nb, type = st.type) => { const a = D.openAge[nb]; return type >= 0 ? d3.sum(a[type]) : d3.sum(a, r => d3.sum(r)); };
-  const raw = i => st.measure === 'open' ? openOf(i) : madeOf(i);
-  const val = i => st.basis === 'pc' ? NOLA.perK(raw(i), NOLA.popOf(i)) : raw(i);
+  // ---------- the map: a dot per request ----------
+  // Dots: every request filed in the past 12 months, and every request still open, of any age (D.dots, from the
+  // pipeline). The "Past 12 months" tab filters by when it was filed and its status; "Open now" by how long it has
+  // been open. The heatmap (a checkbox on the map) counts the dots shown per neighborhood.
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const P = NOLA.dotData(D.dots), PN = P.n;
+  const pType = Int16Array.from(P.r, r => P.R[r][0]);
+  const LASTD = P.dayOf(D.last), WIN0 = P.dayOf(D.winStart);
+  const ageOf = i => LASTD - P.day[i];
+  const ageBucket = i => { const a = ageOf(i); return a < 30 ? 0 : a < 90 ? 1 : a < 365 ? 2 : a < 730 ? 3 : 4; };
+  st.per = ['1', '6', '12'].includes(H.p) ? H.p : '1';
+  st.stat = ['open', 'closed'].includes(H.stat) ? H.stat : 'all';
+  st.age = H.age != null && +H.age >= 0 && +H.age < 5 ? +H.age : -1;
+  st.heat = H.heat === '1';
+  const isOpen = i => P.c[i] === -1;
+  // the filters, apart from type, reason and neighborhood
+  const base = i => st.measure === 'open' ? isOpen(i) && (st.age < 0 || ageBucket(i) === st.age)
+    : P.day[i] >= WIN0 && NOLA.inPeriod(P.day[i], LASTD, st.per) && (st.stat === 'all' || (st.stat === 'open') === isOpen(i));
+  const okType = i => st.type < 0 || pType[i] === st.type, okReason = i => rsn() < 0 || P.r[i] === st.reason;
+  const okNb = i => st.nb < 0 || P.nb[i] === st.nb;
+  const visible = i => base(i) && okType(i) && okReason(i) && okNb(i);
+  // colors: one per named type, gray for the rest; closed requests drawn fainter, under the open ones
+  const COLORS = [['var(--muted)', .45], ...d3.range(7).map(t => [tColor(t), .45]), 'var(--muted)', ...d3.range(7).map(t => tColor(t))];
+  const colorOf = i => (isOpen(i) ? 8 : 0) + (pType[i] < 7 ? 1 + pType[i] : 0);
+  let nbCnt = new Array(72).fill(0);
   const filterName = () => rsn() >= 0 ? reasonName(st.reason) : st.type >= 0 ? D.T[st.type] : '';
-  const keyLabel = () => (st.measure === 'open' ? 'Open requests' : 'Requests, past 12 months') + (st.basis === 'pc' ? ' per 1,000 residents' : '');
-  const mapLabel = () => st.measure === 'open' ? 'Open requests, by neighborhood' : 'Requests in the past 12 months, by neighborhood';
+  const perLabel = { 1: 'month', 6: '6 months', 12: 'year' };
+  const mapLabel = () => st.measure === 'open' ? 'Open requests' : `Requests filed in the past ${perLabel[st.per]}`;
+  const keyLabel = () => (st.measure === 'open' ? 'Open requests' : 'Requests shown') + (st.basis === 'pc' ? ' per 1,000 residents' : '') + ', by neighborhood';
+  const heatVal = i => st.basis === 'pc' ? NOLA.perK(nbCnt[i], NOLA.popOf(i)) : nbCnt[i];
 
-  // ---------- neighborhood map ----------
   let m;
   function drawMap(pane, first) {
     const { panel, plot } = staged(pane, first, true);
     panel.innerHTML = '';
+    // counts under the current filters: per type, per reason, per age, and per neighborhood (for the heatmap)
+    const tCnt = new Array(NT).fill(0), rCnt = new Array(P.R.length).fill(0), aCnt = [0, 0, 0, 0, 0];
+    nbCnt = new Array(72).fill(0); let shown = 0;
+    for (let i = 0; i < PN; i++) {
+      const b = base(i), ty = okType(i), rs = okReason(i), nb = okNb(i);
+      if (b && nb) { tCnt[pType[i]]++; if (ty) rCnt[P.r[i]]++; }
+      if (b && ty && rs) { nbCnt[P.nb[i]]++; if (nb) shown++; }
+      if (st.measure === 'open' && isOpen(i) && ty && rs && nb) aCnt[ageBucket(i)]++;
+    }
     NOLA.ftabs(panel, [['made', 'Past 12 months'], ['open', 'Open now']], st.measure, v => set('measure', v));
     NOLA.nbPick(NOLA.fsec(panel, 'Neighborhood'), st.nb, v => set('nb', v));
     if (st.nb >= 0) yearsMini(NOLA.fsec(panel, 'Requests per year' + (st.type >= 0 ? ' · ' + D.T[st.type] : '')), st.nb);
-    const nbs = st.nb >= 0 ? [st.nb] : d3.range(72);
-    const tCount = t => d3.sum(nbs, nb => st.measure === 'open' ? openOf(nb, t) : madeOf(nb, t, -1));
-    NOLA.flist(NOLA.fsec(panel, 'Request type', st.type >= 0 ? ['Show all', () => set('type', -1)] : null),
-      D.T.map((t, k) => ({ key: k, name: t, color: tColor(k), count: tCount(k) })), { pressed: k => st.type === k, onClick: toggle('type') });
+    if (st.measure === 'made') {
+      NOLA.periodSeg(NOLA.fsec(panel, 'Filed in the last'), st.per, v => set('per', v), NOLA.PERIODS.slice(0, 3));
+      NOLA.seg(NOLA.fsec(panel, 'Status'), [['all', 'All'], ['open', 'Open'], ['closed', 'Closed']], st.stat, v => set('stat', v));
+    } else {
+      NOLA.flist(NOLA.fsec(panel, 'Open for', st.age >= 0 ? ['Any time', () => set('age', -1)] : null),
+        AGE_L.map((l, a) => ({ key: a, name: l, color: AGE_C[a], count: aCnt[a], square: true })), { pressed: a => st.age === a, onClick: toggle('age') });
+    }
+    NOLA.flist(NOLA.fsec(panel, `Request type · ${fmt(shown)} shown`, st.type >= 0 ? ['Show all', () => set('type', -1)] : null),
+      D.T.map((t, k) => ({ key: k, name: t, color: tColor(k), count: tCnt[k] })), { pressed: k => st.type === k, onClick: toggle('type') });
     if (st.type >= 0 && st.measure === 'made') {
       const rs = D.R.map((r, k) => k).filter(k => D.R[k][0] === st.type);
       if (rs.length > 1) NOLA.flist(NOLA.fsec(panel, 'Reason', st.reason >= 0 ? ['Any reason', () => set('reason', -1)] : null),
-        rs.map(k => ({ key: k, name: reasonName(k), color: tColor(st.type), count: d3.sum(nbs, nb => nbR[nb].get(k) || 0) })),
+        rs.map(k => ({ key: k, name: reasonName(k), color: tColor(st.type), count: rCnt[k] })),
         { pressed: k => st.reason === k, onClick: toggle('reason') });
     }
-    const leg = document.createElement('div'); leg.className = 'legend'; NOLA.fsec(panel, keyLabel()).appendChild(leg);
     if (first) {
-      m = NOLA.map(plot, { panel, label: 'Map of 311 requests by neighborhood', tip: mapTip });
+      m = NOLA.map(plot, { panel, label: 'Map of 311 requests', tip: mapTip });
       m.lastNb = -1;
-      plot.insertAdjacentHTML('beforeend', '<div class="maplegend"></div>');
     }
-    NOLA.mapChecks(plot, [{ key: 'per', label: 'Per 1k residents', checked: st.basis === 'pc', onChange: on => set('basis', on ? 'pc' : 'n') }]);
-    const cl = NOLA.classes(d3.range(72).map(val));
-    m.setFill(i => cl.color(val(i)));
-    const none = d3.range(72).some(i => val(i) == null) ? 'Under 1,000 residents' : null;
-    NOLA.stepLegend(leg, cl, NOLA.short, none);
-    const ml = plot.querySelector('.maplegend');
-    NOLA.stepLegend(ml, cl, NOLA.short, none);
-    ml.insertAdjacentHTML('afterbegin', `<div class="mlh">${keyLabel()}${filterName() ? ' · ' + filterName() : ''}</div>`);
+    m.dots({ x: P.x, y: P.y, n: PN, colors: COLORS, color: colorOf, visible, r: NOLA.dotR, tip: dotTip });
+    NOLA.heatToggle(plot, st.heat, on => set('heat', on), { label: 'Per 1k residents', checked: st.basis === 'pc', onChange: on => set('basis', on ? 'pc' : 'n') });
+    const cl = st.heat ? NOLA.classes(d3.range(72).map(heatVal)) : null;
+    m.setFill(cl ? i => cl.color(heatVal(i)) : () => null);
+    NOLA.heatKey(panel, plot, cl, keyLabel(), NOLA.short, cl && d3.range(72).some(i => heatVal(i) == null) ? 'Under 1,000 residents' : null);
     if (m.lastNb !== st.nb) { m.focus(st.nb, first ? 0 : 450); m.lastNb = st.nb; }
   }
+  function dotTip(i) {
+    const c = P.c[i], rn = P.R[P.r[i]][1];
+    const status = c === -1 ? `Open, ${fmt(ageOf(i))} day${ageOf(i) === 1 ? '' : 's'}` : c === 0 ? 'Closed the same day' : c > 0 ? `Closed after ${fmt(c)} day${c === 1 ? '' : 's'}` : 'Closed';
+    return `<b>${esc(D.T[pType[i]])}</b><div style="color:var(--ink2)">${esc(rn === 'Other' ? 'Other reason' : rn)}</div>`
+      + row('Filed', NOLA.isoDate(P.iso(P.day[i]))) + row('Status', status) + row('Neighborhood', nbName(P.nb[i]));
+  }
   function mapTip(i) {
-    const pop = NOLA.popOf(i), rate = NOLA.perK(raw(i), pop);
-    const top = [...nbR[i]].filter(([r]) => st.type < 0 || D.R[r][0] === st.type).map(([r, n]) => [reasonName(r), n])
-      .sort((a, b) => b[1] - a[1] || byName(a[0], b[0])).slice(0, 3);
-    return `<b>${GEO.nb[i].name}</b><div style="color:var(--ink2)">${filterName() || 'All requests'}</div>`
-      + row('Requests, past 12 months', fmt(madeOf(i))) + (rsn() < 0 ? row('Open now', fmt(openOf(i))) : '')
-      + row('Residents (2020)', pop == null ? '—' : fmt(pop)) + (rate != null ? row((st.measure === 'open' ? 'Open' : 'Requests') + ' per 1,000 residents', NOLA.fmtRate(rate)) : '')
-      + (top.length && rsn() < 0 ? '<div style="margin-top:6px;color:var(--ink2)">Most common, past 12 months</div>' + top.map(([r, n]) => row(r, fmt(n))).join('') : '');
+    const pop = NOLA.popOf(i), rate = NOLA.perK(nbCnt[i], pop);
+    return `<b>${GEO.nb[i].name}</b><div style="color:var(--ink2)">${filterName() || (st.measure === 'open' ? 'Open requests' : 'All requests')}</div>`
+      + row(st.measure === 'open' ? 'Open requests shown' : 'Requests shown', fmt(nbCnt[i]))
+      + row('Residents (2020)', pop == null ? '—' : fmt(pop)) + (rate != null ? row('Per 1,000 residents', NOLA.fmtRate(rate)) : '');
   }
   // small yearly bar chart for the chosen neighborhood, inside the map panel
   function yearsMini(sec, nb) {
@@ -203,5 +233,6 @@
     { id: 'open', label: 'Open requests, by how long they have been open', tab: 'Open requests', draw: drawOpen },
   ], { ds: [D.ds, '311 OPCD Calls'],
        state: () => ({ measure: st.measure !== 'made' ? st.measure : null, type: st.type >= 0 ? st.type : null, reason: st.reason >= 0 ? st.reason : null,
-                       basis: st.basis !== 'n' ? st.basis : null, nb: st.nb >= 0 ? st.nb : null }) });
+                       basis: st.basis !== 'n' ? st.basis : null, nb: st.nb >= 0 ? st.nb : null,
+                       p: st.per !== '1' ? st.per : null, stat: st.stat !== 'all' ? st.stat : null, age: st.age >= 0 ? st.age : null, heat: st.heat ? 1 : null }) });
 })();
