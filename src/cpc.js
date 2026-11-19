@@ -119,6 +119,12 @@
     if (document.activeElement !== b) b.value = isoOf(st.to);
     rangeSec.querySelector('.linkbtn').hidden = defRange();
   }
+  // what each case-type color means, right under the map and the per-year-by-type chart (the two views colored by type)
+  function typeKey(pane) {
+    const key = document.createElement('div'); key.className = 'cpc-key';
+    key.innerHTML = FOLD.map(f => `<div class="cpc-kt"><i style="background:${f.color}"></i><div><b>${f.n}</b><p>${f.about}</p></div></div>`).join('');
+    pane.after(key);
+  }
   function drawMap(pane, first) {
     const { panel, plot } = staged(pane, first, true, true); // the tabs and agenda live in the panel, so phones show it open
     pane.classList.add('cpc-stage'); // a wider panel on this page (lib.css)
@@ -142,10 +148,7 @@
         ud.selectAll('circle').attr('r', 7 / Math.sqrt(k)).attr('stroke-width', 2 / Math.sqrt(k));
         rg.selectAll('circle').attr('r', 4 / Math.sqrt(k)).attr('stroke-width', 1 / Math.sqrt(k));
       });
-      // what each color means, right under the map
-      const key = document.createElement('div'); key.className = 'cpc-key';
-      key.innerHTML = FOLD.map(f => `<div class="cpc-kt"><i style="background:${f.color}"></i><div><b>${f.n}</b><p>${f.about}</p></div></div>`).join('');
-      pane.after(key);
+      typeKey(pane);
     }
     if (mp.lastNb !== st.nb) { mp.focus(st.nb, first ? 0 : 450); mp.lastNb = st.nb; }
     ud.style('display', filed ? 'none' : null); rg.style('display', filed ? null : 'none');
@@ -231,6 +234,7 @@
   // ---------- filings per year ----------
   function drawYears(pane, first) {
     const { panel, plot } = staged(pane, first);
+    if (first) typeKey(pane);
     const yrs = Object.keys(P.typeY).sort();
     const data = yrs.map(y => { const a = FOLD.map(() => 0); P.typeY[y].forEach((v, t) => a[foldOf(t)] += v); return { y, a }; });
     panel.innerHTML = '';
