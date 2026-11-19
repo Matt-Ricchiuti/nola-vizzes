@@ -297,7 +297,9 @@ table.static tbody tr{cursor:auto}
 /* small yearly bars inside a map's panel (311) */
 .srmini svg text{fill:var(--ink2)}
 
-.hero{padding:clamp(40px,14vh,140px) 0 clamp(48px,18vh,200px);text-align:center}
+/* splash: no header bar; the title and menu sit in the middle of the window, footer at the bottom */
+.splash{min-height:100vh;min-height:100svh;display:flex;flex-direction:column;box-sizing:border-box;padding-bottom:24px}
+.hero{flex:1;display:flex;flex-direction:column;justify-content:center;padding:24px 0 8vh;text-align:center}
 .hero h1{font-size:clamp(32px,5.6vw,58px);line-height:1.08;margin:0 auto 32px;max-width:15em;text-wrap:balance}
 .hero h1 span{display:block;margin-top:.35em;font-size:.48em;line-height:1.2;color:var(--ink2)}
 .vmenu{position:relative;width:max-content;max-width:100%;margin:0 auto;text-align:left}
@@ -323,15 +325,14 @@ table.static tbody tr{cursor:auto}
 .vextra{margin-top:12px;padding-top:8px;border-top:1px solid var(--grid)}
 .vextra a{display:inline-block;color:var(--ink2);font-size:13px}
 @media(max-width:600px){
-  .hero{padding:28px 0 40px}
+  .hero{padding:24px 0 6vh}
   .vmenu,.vmenu summary{width:100%}
   .vmenu summary{justify-content:space-between}
   .vmenu summary svg{margin-left:auto}
   .vpanel{position:static;width:auto;margin:8px 0 0;box-shadow:0 10px 30px rgb(0 0 0 / .10);padding:14px 8px 8px}
   .vpanel a{padding:9px 10px;font-size:15px}
 }
-</style></head><body><div class="wrap">
-<div class="site"><b><a href="index.html" style="color:inherit;text-decoration:none">Nola Vizzes</a></b><nav class="topnav" aria-label="Site"><div class="dd"><button type="button" class="ddbtn" aria-haspopup="true" aria-expanded="false">Visualizations<span aria-hidden="true">▾</span></button><ul class="dd1"><li><a href="cpc.html">City Planning Cases</a></li><li><a href="311.html">311 Requests</a></li><li><a href="str.html">Short-Term Rentals (STRs)</a></li><li><a href="blight.html">Blight/Code-enforcement</a></li><li><a href="permits.html">Permits</a></li><li><a href="trees.html">Trees</a></li><li><a href="biz.html">New Businesses</a></li></ul></div><a class="xlink" href="about.html">About</a></nav><script>(()=>{const dd=document.currentScript.closest(".site").querySelector(".dd"),b=dd.querySelector(".ddbtn");const set=o=>{dd.classList.toggle("open",o);b.setAttribute("aria-expanded",o)};b.onclick=e=>{e.stopPropagation();set(!dd.classList.contains("open"))};document.addEventListener("click",e=>{if(!dd.contains(e.target))set(false)});dd.addEventListener("keydown",e=>{if(e.key==="Escape"){set(false);b.focus()}})})()</script></div>
+</style></head><body><div class="wrap splash">
 <div class="hero">
 <h1>NOLA Vizzes<span>Visualized Data from data.nola.gov</span></h1>
 <details class="vmenu" id="vmenu">
