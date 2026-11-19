@@ -119,7 +119,7 @@
   const csvMap = () => NOLA.nbList().map(f => Object.assign({ neighborhood: f.name, new_applications_past_12_months: newOf(f.idx, -1) },
     ...D.S.map((s, k) => ({ ['new, ' + nm(s)]: newOf(f.idx, k) })), { licensed_now: nowOf(f.idx, -1) }, ...D.S2.map((s, k) => ({ ['now, ' + nm(s)]: nowOf(f.idx, k) }))));
   const csvYears = () => yearCounts().map((d, k) => Object.assign({ year_filed: D.years[k], area: st.nb >= 0 ? nbName(st.nb) : 'New Orleans', applications: d3.sum(d) }, ...D.S.map((s, j) => ({ [nm(s)]: d[j] }))));
-  const csvOut = () => outCounts().map((d, k) => Object.assign({ year_filed: D.years[k], sector: st.sec >= 0 ? nm(D.S[st.sec]) : 'All', applications: d3.sum(d) }, ...D.out.map((o, j) => ({ [o]: d[j] }))));
+  const csvOut = () => outCounts().map((d, k) => Object.assign({ year_filed: D.years[k], sector: st.sec >= 0 ? nm(D.S[st.sec]) : 'All' }, ...D.out.map((o, j) => ({ [o]: d[j] }))));
 
   const V = NOLA.views([
     { id: 'map', label: () => st.measure === 'now' ? 'Businesses licensed now, by neighborhood' : 'New business license applications in the past 12 months, by neighborhood', tab: 'Map of businesses', keep: true, draw: drawMap, csv: csvMap },

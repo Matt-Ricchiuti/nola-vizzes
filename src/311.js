@@ -197,10 +197,9 @@
   }
 
   // ---------- CSV downloads ----------
-  const csvMap = () => NOLA.nbList().map(f => { const i = f.idx, pop = NOLA.popOf(i), rk = NOLA.perK(raw(i), pop);
+  const csvMap = () => NOLA.nbList().map(f => { const i = f.idx, pop = NOLA.popOf(i);
     return Object.assign({ neighborhood: f.name, residents_2020: pop, requests_past_12_months: madeOf(i, -1, -1), open_now: openOf(i, -1) },
-      st.type >= 0 ? { filter: filterName(), filtered_requests_past_12_months: madeOf(i), filtered_open_now: rsn() < 0 ? openOf(i) : '' } : {},
-      { [(st.type >= 0 ? 'filtered_' : '') + (st.measure === 'open' ? 'open' : 'requests') + '_per_1000_residents']: rk == null ? '' : +rk.toFixed(2) },
+      st.type >= 0 || st.reason >= 0 ? { filter: st.reason >= 0 ? reasonName(st.reason) : D.T[st.type], filtered_requests_past_12_months: madeOf(i), filtered_open_now: openOf(i) } : {},
       ...D.T.map((t, k) => ({ [t + ' (past 12 months)']: madeOf(i, k, -1) }))); });
   const csvMonthly = () => mon.map(d => Object.assign({ month: `${d.y}-${String(d.mo + 1).padStart(2, '0')}`, total: d3.sum(d.a) }, ...D.T.map((t, k) => ({ [t]: d.a[k] }))));
   const csvClose = () => st.nb >= 0

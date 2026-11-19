@@ -147,18 +147,17 @@
 
   // ---------- CSV downloads ----------
   const csvMap = () => st.view === 'dots'
-    ? pts.filter(p => catOn(p.cat) && p.nb >= 0 && inNb(p)).map(p => { const [lon, lat] = NOLA.lonlat(p.x, p.y);
-      return { license: CAT[p.cat].n, bedroom_limit: p.beds || '', neighborhood: nbName(p.nb), lon, lat }; })
-    : NOLA.nbList().map(f => Object.assign({ neighborhood: f.name, housing_units_2020: HU[f.idx] }, ...CAT.map((c, k) => ({ [c.n.toLowerCase().replace(/ /g, '_').replace(/-/g, '_') + '_licenses']: byNb[f.idx][k] })),
-      { shown_licenses: cnt(f.idx), shown_per_100_homes: perHU(cnt(f.idx), f.idx) == null ? '' : +perHU(cnt(f.idx), f.idx).toFixed(2) }));
+    ? pts.filter(p => catOn(p.cat) && (st.nb < 0 || p.nb === st.nb)).map(p => { const [lon, lat] = p.x || p.y ? NOLA.lonlat(p.x, p.y) : ['', ''];
+      return { license: CAT[p.cat].n, bedrooms: p.beds || '', neighborhood: nbName(p.nb), lon, lat }; })
+    : NOLA.nbList().map(f => Object.assign({ neighborhood: f.name, housing_units_2020: HU[f.idx] }, ...CAT.map((c, k) => ({ [c.n.toLowerCase().replace(/ /g, '_') + '_licenses']: byNb[f.idx][k] })),
+      { selected_per_100_homes: perHU(cnt(f.idx), f.idx) == null ? '' : +perHU(cnt(f.idx), f.idx).toFixed(2) }));
   const csvNC = () => NC.B.map((b, k) => { const rs = ncRows.filter(r => r.b === k && (st.nb < 0 || r.nb === st.nb));
-    return { area: st.nb >= 0 ? nbName(st.nb) : 'New Orleans', building: b, licenses: rs.length, part_of_home: rs.filter(r => r.whole === 0).length, whole_unit: rs.filter(r => r.whole === 1).length, not_stated: rs.filter(r => r.whole === 2).length }; });
-  const csvApps = () => appCounts().map((d, k) => Object.assign({ year: D.years[k], area: st.nb >= 0 ? nbName(st.nb) : 'New Orleans', license_type: st.group >= 0 ? GNAME[st.group][0] : 'All', applications: d3.sum(d) },
+    return { area: st.nb >= 0 ? nbName(st.nb) : 'New Orleans', building: b, licenses: rs.length, part_of_home: rs.filter(r => r.whole === 0).length, whole_unit: rs.filter(r => r.whole === 1).length }; });
+  const csvApps = () => appCounts().map((d, k) => Object.assign({ year: D.years[k], area: st.nb >= 0 ? nbName(st.nb) : 'New Orleans', license_type: st.group >= 0 ? GNAME[st.group][0] : 'All' },
     ...D.status.map((s, j) => ({ [STATUS[s] || s]: d[j] }))));
 
   const V = NOLA.views([
-    { id: 'map', label: () => st.view === 'shade' ? 'Active short-term rental licenses, by neighborhood' : 'Active short-term rental licenses', tab: 'Map of licenses', keep: true, draw: drawMap, csv: csvMap,
-      file: () => st.view === 'dots' ? 'licenses' : 'neighborhoods' },
+    { id: 'map', label: () => st.view === 'shade' ? 'Active short-term rental licenses, by neighborhood' : 'Active short-term rental licenses', tab: 'Map of licenses', keep: true, draw: drawMap, csv: csvMap },
     { id: 'noncommercial', label: 'Non-commercial licenses, by type of building', tab: 'Non-commercial licenses', draw: drawNC, csv: csvNC },
     { id: 'applications', label: 'Permit applications per year, by current status', tab: 'Permit applications', draw: drawApps, csv: csvApps },
   ], { ds: [D.ds[0], 'Active Short-Term Rental Licenses'],

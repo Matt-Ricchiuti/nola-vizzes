@@ -206,17 +206,17 @@
     return Object.assign({ neighborhood: f.name, housing_units_2020: HU[i], open_cases: openOf(i, -1) }, ...STAGE.map((s, k) => ({ ['open, ' + s.toLowerCase()]: openOf(i, k) })),
       { cases_filed_past_12_months: newOf(i, -1) }, ...NEW_L.map(([l], k) => ({ ['filed past 12 months, ' + l.toLowerCase()]: D.new12[i][k] })),
       { overgrown_lot_cases_past_12_months: D.g12[i], properties_in_abatement: D.abOpen[i] }); });
-  const csvYears = () => { const { years, data } = yearsData();
-    return data.map((d, k) => ({ year: years[k], area: st.nb >= 0 ? nbName(st.nb) : 'New Orleans', cases: st.kind === 'grass' ? 'overgrown lots' : 'code enforcement', filed: d[0] + d[1], still_open: d[0], closed: d[1] })); };
+  const csvYears = () => { const years = st.kind === 'grass' ? D.gyears : D.years, data = (st.kind === 'grass' ? D.gyr : D.yr)[st.nb >= 0 ? st.nb : 72];
+    return data.map((d, k) => ({ year: years[k], area: st.nb >= 0 ? nbName(st.nb) : 'New Orleans', cases: st.kind === 'grass' ? 'overgrown lots' : 'code enforcement', still_open: d[0], closed: d[1] })); };
   const csvOpen = () => { const A = D.openAge[st.nb >= 0 ? st.nb : 72];
     return STAGE.map((s, k) => Object.assign({ area: st.nb >= 0 ? nbName(st.nb) : 'New Orleans', stage: s, open: d3.sum(A[k]) }, ...AGE_L.map((l, a) => ({ [l]: A[k][a] })))); };
-  const csvHear = () => D.hear.map((d, k) => Object.assign({ year: D.years[k], hearings: d3.sum(d) }, ...D.hearGroups.map((g, j) => ({ [HEAR_L[g] || g]: d[j] }))));
+  const csvHear = () => D.hear.map((d, k) => Object.assign({ year: D.years[k] }, ...D.hearGroups.map((g, j) => ({ [HEAR_L[g] || g]: d[j] }))));
   const csvViol = () => D.viol.map(v => ({ violation: vName(v[0]), code_section: vCode(v[0]) ? '26-' + vCode(v[0]) : '', past_12_months: v[1], previous_12_months: v[2] }));
-  const csvInsp = () => imon.map(d => Object.assign({ month: `${d.y}-${String(d.mo + 1).padStart(2, '0')}`, inspections: d3.sum(d.a) }, ...D.inspGroups.map((g, k) => ({ [g]: d.a[k] }))));
+  const csvInsp = () => imon.map(d => Object.assign({ month: `${d.y}-${String(d.mo + 1).padStart(2, '0')}` }, ...D.inspGroups.map((g, k) => ({ [g]: d.a[k] }))));
 
   const V = NOLA.views([
     { id: 'map', label: () => MAP_L[st.measure], tab: 'Map of cases', keep: true, draw: drawMap, csv: csvMap },
-    { id: 'years', label: () => KIND_L[st.kind], tab: 'Cases filed per year', draw: drawYears, csv: csvYears, file: () => st.kind === 'grass' ? 'overgrown-lots-per-year' : 'years' },
+    { id: 'years', label: () => KIND_L[st.kind], tab: 'Cases filed per year', draw: drawYears, csv: csvYears },
     { id: 'open', label: 'Open cases, by stage and how long they have been open', tab: 'Open cases', draw: drawOpen, csv: csvOpen },
     { id: 'violations', label: 'Most cited violations, past 12 months', tab: 'Violations', draw: drawViol, csv: csvViol },
     { id: 'hearings', label: 'Hearing results per year', tab: 'Hearings', draw: drawHear, csv: csvHear },
