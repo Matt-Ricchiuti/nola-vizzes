@@ -20,6 +20,7 @@ The workflow runs at 10:30 UTC. The City loads CPC Projects at about 06:00 UTC, 
 | `cfs.json` | the current year's dataset id or `rowsUpdatedAt`, or `geo.json`, changed | |
 | `hist.json` | with `cfs.json` (current year); a past year when its dataset's `rowsUpdatedAt` moved | Past years are checked daily for last year in January–February, and all years on the 1st of the month. The City loads each year's final rows on January 1. |
 | `cpc.json` | `xxb5-5azv`'s `rowsUpdatedAt` or `geo.json` changed | "Today" for upcoming hearings and the 365-day window is the day the City loaded the data. |
+| `311.json` | `2jgv-pqrq`'s `rowsUpdatedAt` or `geo.json` changed | Incremental download (see below). "Today" is the newest request in the data. |
 
 On the 1st of every month (and with `--full`, or the workflow's "full" checkbox) everything is downloaded and rebuilt regardless. Queries are ordered (`:id` as the tie-breaker), so the same City data always produces byte-identical files. Rebuilt files are written only when their content changed, and pages embed only the date their own data last changed, so a day without new City data changes nothing and the workflow commits and deploys nothing.
 
@@ -55,10 +56,11 @@ Y(lat) = round((30.20 - lat) * 111000 / 20)      # y grows southward, like SVG
 ```
 geo.json = { "nb": [ {"n": NAME, "r": [ring, ...]}, ...72 ],   # order = feature order from the API
              "pd": [ {"n": DISTRICT, "r": [...]}, ...8 ],
-             "pop": [2020 population per nb, ...72] }
+             "pop": [2020 population per nb, ...72],
+             "hu":  [2020 housing units per nb, ...72] }
 ```
 
-**Population.** `pop` is `sum_pop100` from "Neighborhood Statistical Areas Demographics 2020" (`2w4d-xaw2`), matched on `gnocdc_lab` (two spellings differ; see `POP_ALIAS` in `fetch.py`). It's used only for the calls-for-service map's "Per 1,000 residents" option. Planning cases and street trees aren't shown per resident: cases follow parcels and trees follow streets, so population is the wrong denominator for them. Neighborhoods under 1,000 residents get no rate.
+**Population and housing units.** `pop` is `sum_pop100` and `hu` is `sum_hu100` from "Neighborhood Statistical Areas Demographics 2020" (`2w4d-xaw2`), matched on `gnocdc_lab` (two spellings differ; see `POP_ALIAS` in `fetch.py`). It's used only for the calls-for-service map's "Per 1,000 residents" option. Planning cases and street trees aren't shown per resident: cases follow parcels and trees follow streets, so population is the wrong denominator for them. Neighborhoods under 1,000 residents get no rate.
 
 **Opening view.** Every neighborhood is drawn, counted and listed in the pickers. `NOLA.setGeo` marks neighborhoods under 100 residents per square mile (`f.skip`: Lake Catherine, Viavant–Venetian Isles) only so maps *open* on the rest of the city; they're one zoom-out or menu pick away. Shaded maps use seven equal-count classes (`NOLA.classes`, legend `NOLA.stepLegend`).
 
@@ -185,6 +187,37 @@ Fetch every row (15,671 as of the pull; 15,579 after dropping rows the dataset r
 - `typeY` and `themeY` start at 2004 (the few December 2003 filings are left off). `pts` is in API (`:id`) order.
 - The `pts` window starts 365 days before the pull date and is stored as `windowStart`.
 - `up` can still list a case twice (rows that differ only in other fields). The front end dedupes them on date + case number, and flags dates that fall on a weekend or holiday as "date as listed".
+
+## Large datasets: incremental downloads (`synced_rows` in `fetch.py`)
+
+The 311 page (and any other page built from a dataset of hundreds of thousands of rows) keeps a copy of the rows it needs in `.cache/raw/<id>.csv.gz`, with each row's Socrata `:id` and `:updated_at`. Each run asks only for rows with `:updated_at` at or after the newest one in the copy (one request of a few hundred to a few thousand rows) and merges them in by `:id`. If the merged copy's row count differs from the City's `count(*)` for the same filter (rows deleted, or moved out of the filter), the copy is missing or unreadable, its columns changed, or it's a full run (the 1st of the month or `--full`), every row is downloaded again in pages of 50,000. Rows are always sorted by `:id` before aggregating, so an incremental build and a full download give identical files.
+
+## `data/311.json`: 311 OPCD Calls (`2jgv-pqrq`)
+
+Rows with `date_created >= 2019-02-01` (about 730,000), columns `request_type, request_reason, date_created, case_close_date, request_status, longitude, latitude`, downloaded incrementally (above). A full download is about 19 requests and 136 MB; a normal day is one small request. The City's file dates about 313,000 older (2012–2018) requests to January 1–2, 2019, when they were moved into the current system, so the page starts with February 2019.
+
+```
+{ "ds", "start": "2019-02", "last": newest date_created (YYYY-MM-DD), "winStart": first day of the past 12 months,
+  "T": [12 request types by count in the past 12 months, then "Other"],
+  "R": [[typeIdx, reason], ...],          # reasons with >= 30 requests in the past 12 months, then [typeIdx, "Other"] per type
+  "mon": [[count per T] per month from start],                    # whole city
+  "years": [2019, ...], "nby": [[[count per T] per year] per nb], # by year created
+  "nb12": [[reasonIdx, n, reasonIdx, n, ...] per nb],             # past 12 months
+  "ages": [30, 90, 365, 730],
+  "openAge": [[[n per age bucket] per T] per nb, + whole city as row 72],  # request_status = Pending, by days since created
+  "closeR": [[n, medianDays, p90Days] per R], "closeT": [[n, medianDays, p90Days] per T],
+  "closeNb": [[[n, medianDays] per T] per nb],
+  "total", "recent", "open", "noLoc" }
+```
+
+- **Past 12 months** = the 365 days ending on `last` (`winStart` to `last`).
+- **Types**: `request_type` as the City records it. Types not in `T` (including ones the City no longer uses, like `Roads/Drainage`) are counted as "Other".
+- **Open** = `request_status` "Pending". Age buckets: under 30 days, 30–89, 90–364, 1–2 years, over 2 years.
+- **Time to close** = `case_close_date − date_created` in days, for requests with `case_close_date` in the past 12 months and not before `date_created`. Many closed requests have no close date (most closed abandoned-vehicle requests), so they're not counted. Medians and 90th percentiles use the same rule as the calls page (`sorted[floor(n * q)]`, null under 15 values).
+- **Location**: lon/lat, point-in-polygon against the neighborhoods. Rows with lon/lat of 0 have no neighborhood (`noLoc`, about 2%).
+- The page offers requests per 1,000 residents (2020 population), since requests come from people; neighborhoods under 1,000 residents get no rate.
+
+Checked against the API on 2026-11-19: past-12-month total, open total, October 2026 total and Streetlights in October 2026 match `count(*)` queries exactly, and Lakeview and St. Roch match `within_polygon` counts.
 
 ## Page copy that mentions specific numbers
 

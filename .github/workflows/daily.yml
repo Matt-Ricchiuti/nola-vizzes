@@ -42,8 +42,8 @@ jobs:
           cache: pip
           cache-dependency-path: pipeline/requirements.txt
       - run: pip install -r pipeline/requirements.txt
-      # Downloads that rarely change (boundaries, population), kept between runs so they aren't fetched daily.
-      # A miss only means downloading them again.
+      # Downloads that rarely change (boundaries, population), plus saved copies of the big datasets (Calls for
+      # Service, 311) that are updated incrementally, kept between runs. A miss only means downloading them again.
       - uses: actions/cache@v5
         with:
           path: .cache/raw

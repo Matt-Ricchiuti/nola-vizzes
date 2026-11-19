@@ -303,14 +303,24 @@ POP_ALIAS = {'FILMORE': 'FILLMORE', 'MARLYVILLE - FONTAINEBLEAU': 'MARLYVILLE - 
 
 
 def add_population(api, geo):
-    """2020 Census population per neighborhood (2w4d-xaw2, sum_pop100), stored as geo['pop'] in neighborhood order."""
-    api.require_columns('2w4d-xaw2', ['gnocdc_lab', 'sum_pop100'], 'Neighborhood demographics 2020')
-    rows = api.raw('2w4d-xaw2', '/resource/2w4d-xaw2.json', {'$select': 'gnocdc_lab,sum_pop100', '$limit': 500})
-    pop = {POP_ALIAS.get(r['gnocdc_lab'], r['gnocdc_lab']): int(float(r['sum_pop100'])) for r in rows if r.get('gnocdc_lab') and r.get('sum_pop100')}
-    missing = [f['n'] for f in geo['nb'] if f['n'] not in pop]
+    """2020 Census population and housing units per neighborhood (2w4d-xaw2, sum_pop100 and sum_hu100), stored as
+    geo['pop'] and geo['hu'] in neighborhood order."""
+    api.require_columns('2w4d-xaw2', ['gnocdc_lab', 'sum_pop100', 'sum_hu100'], 'Neighborhood demographics 2020')
+    params = {'$select': 'gnocdc_lab,sum_pop100,sum_hu100', '$limit': 500}
+    rows = api.raw('2w4d-xaw2', '/resource/2w4d-xaw2.json', params)
+    if rows and 'sum_hu100' not in rows[0]:  # a copy saved before housing units were added
+        api.use_raw, keep = False, api.use_raw
+        rows = api.raw('2w4d-xaw2', '/resource/2w4d-xaw2.json', params)
+        api.use_raw = keep
+    def col(c):
+        return {POP_ALIAS.get(r['gnocdc_lab'], r['gnocdc_lab']): int(float(r[c])) for r in rows if r.get('gnocdc_lab') and r.get(c)}
+    pop, hu = col('sum_pop100'), col('sum_hu100')
+    missing = [f['n'] for f in geo['nb'] if f['n'] not in pop or f['n'] not in hu]
     need(not missing, f'Neighborhood population: no 2020 count for {missing}. Add the spelling to POP_ALIAS.')
     geo['pop'] = [pop[f['n']] for f in geo['nb']]
+    geo['hu'] = [hu[f['n']] for f in geo['nb']]
     need(300000 < sum(geo['pop']) < 450000, f"Neighborhood population: total {sum(geo['pop'])} looks wrong")
+    need(150000 < sum(geo['hu']) < 250000, f"Neighborhood housing units: total {sum(geo['hu'])} looks wrong")
 
 
 STREET_TIER = {'Freeway': 0, 'Ramp': 1, 'Major Arterial': 2, 'Minor Arterial': 2, 'Local': 3}
@@ -786,6 +796,204 @@ def build_cpc(api, nbp, today):
             'lastFiled': max((parse_ts(r.get('filing_date')) for r in rows if parse_ts(r.get('filing_date'))), default=None).strftime('%Y-%m-%d')}
 
 
+# ---------------------------------------------------------------- large datasets, downloaded incrementally
+def synced_rows(api, ds, cols, where, label, total=None):
+    """Every row of `ds` matching `where`, kept in RAW_CACHE as <ds>.csv.gz and brought up to date incrementally.
+
+    The same idea as cfs_rows: the copy holds each row's Socrata :id and :updated_at, so a run asks only for rows
+    updated since the newest one in the copy (usually one small request) and merges them in by :id. If the merged
+    copy's row count differs from the City's count for `where` (rows were deleted or moved out of the window), the
+    copy is missing or unreadable, its columns differ, or this is a full run (the 1st of the month, or --full),
+    every row is downloaded again in pages of 50,000. Returns (rows, how) with rows as dicts of strings."""
+    fn = os.path.join(RAW_CACHE, f'{ds}.csv.gz')
+    fields = [':id', ':updated_at'] + cols
+    if total is None:
+        total = int(api.get(f'/resource/{ds}.json', {'$select': 'count(*) as n', '$where': where})[0]['n'])
+    need(total > 0, f'{label} ({ds}): 0 rows')
+
+    def fetch(w):
+        got = []
+        while True:
+            page = list(csv.DictReader(io.StringIO(api.get(f'/resource/{ds}.csv', {
+                '$select': ','.join(fields), '$where': w, '$order': ':id', '$limit': 50000, '$offset': len(got)}, kind='csv'))))
+            got += page
+            if len(page) < 50000:
+                return got
+
+    rows, how = None, ''
+    if api.use_raw and os.path.exists(fn):
+        try:
+            with gzip.open(fn, 'rt', encoding='utf-8', newline='') as f:
+                rd = csv.DictReader(f)
+                copy = {r[':id']: r for r in rd} if rd.fieldnames == fields else {}
+        except (OSError, EOFError, csv.Error):
+            copy = {}
+        mark = max((r[':updated_at'] for r in copy.values()), default='')
+        if copy and mark:
+            delta = fetch(f"({where}) AND :updated_at >= '{mark.rstrip('Z')}'")
+            for r in delta:
+                copy[r[':id']] = r
+            if len(copy) == total:
+                rows, how = list(copy.values()), f'{len(delta):,} new or changed rows merged into the saved copy'
+            else:
+                print(f'  saved copy has {len(copy):,} rows but the City has {total:,}: downloading all', flush=True)
+    if rows is None:
+        rows, how = fetch(where), f'full download, {total:,} rows'
+    need(len(rows) >= total * 0.99, f'{label}: fetched {len(rows)} rows but the API reports {total}')
+    os.makedirs(RAW_CACHE, exist_ok=True)
+    with gzip.open(fn + '.tmp', 'wt', encoding='utf-8', newline='') as f:
+        w = csv.DictWriter(f, fieldnames=fields, extrasaction='ignore')
+        w.writeheader()
+        w.writerows(sorted(rows, key=lambda r: r[':id']))
+    os.replace(fn + '.tmp', fn)
+    print(f'  {label}: {how}', flush=True)
+    return sorted(rows, key=lambda r: r[':id']), how
+
+
+def points_to_nb(nbp, rows, lon='longitude', lat='latitude'):
+    """Neighborhood index per row (-1 when the row has no usable location), plus x/y in the shared projection."""
+    lo = [fnum(r.get(lon)) for r in rows]
+    la = [fnum(r.get(lat)) for r in rows]
+    has = [a is not None and b is not None and -90.2 < a < -89.5 and 29.8 < b < 30.25 for a, b in zip(lo, la)]
+    nbs = nbp.lookup([a if h else 0 for a, h in zip(lo, has)], [b if h else 0 for b, h in zip(la, has)])
+    return [int(n) if h else -1 for n, h in zip(nbs, has)], [(X(a), Y(b)) if h else (0, 0) for a, b, h in zip(lo, la, has)]
+
+
+def sp_lonlat(x, y):
+    """Louisiana South state plane coordinates in US feet (NAD83, EPSG:3452), which several City datasets use
+    instead of lon/lat, -> (lon, lat). Inverse Lambert conformal conic on GRS80; matches the City's own lon/lat
+    columns to 1e-7 degrees. None for missing or placeholder (-1) values."""
+    if x is None or y is None or x < 3e6 or y < 3e5:
+        return None
+    a, f = 6378137.0, 1 / 298.257222101
+    e = math.sqrt(2 * f - f * f)
+    p1, p2, p0, l0 = (math.radians(v) for v in (30 + 42 / 60, 29 + 18 / 60, 28 + 30 / 60, -(91 + 20 / 60)))
+    m = lambda p: math.cos(p) / math.sqrt(1 - (e * math.sin(p)) ** 2)
+    t = lambda p: math.tan(math.pi / 4 - p / 2) / ((1 - e * math.sin(p)) / (1 + e * math.sin(p))) ** (e / 2)
+    n = (math.log(m(p1)) - math.log(m(p2))) / (math.log(t(p1)) - math.log(t(p2)))
+    F = m(p1) / (n * t(p1) ** n)
+    r0 = a * F * t(p0) ** n
+    xm, ym = x * 1200 / 3937 - 1000000.0, r0 - y * 1200 / 3937
+    tt = (math.copysign(math.hypot(xm, ym), n) / (a * F)) ** (1 / n)
+    phi = math.pi / 2 - 2 * math.atan(tt)
+    for _ in range(8):
+        phi = math.pi / 2 - 2 * math.atan(tt * ((1 - e * math.sin(phi)) / (1 + e * math.sin(phi))) ** (e / 2))
+    return math.degrees(math.atan2(xm, ym) / n + l0), math.degrees(phi)
+
+
+def sp_points_to_nb(nbp, rows, xcol, ycol):
+    """points_to_nb for rows located by state plane x/y columns."""
+    ll = [sp_lonlat(fnum(r.get(xcol)), fnum(r.get(ycol))) for r in rows]
+    return points_to_nb(nbp, [{'longitude': p and p[0], 'latitude': p and p[1]} for p in ll])
+
+
+def days_between(a, b):
+    """Days from datetime a to b, to 0.1, or None when either is missing or b is before a."""
+    if a is None or b is None or b < a:
+        return None
+    return (b - a).total_seconds() / 86400
+
+
+def ranked(counter, keep=None):
+    """Keys by count, ties broken by name, so the same data always gives the same order."""
+    out = [k for k, _ in sorted(counter.items(), key=lambda kv: (-kv[1], kv[0]))]
+    return out[:keep] if keep else out
+
+
+def month_index(d, y0, m0):
+    return (d.year - y0) * 12 + d.month - m0
+
+
+# ---------------------------------------------------------------- 311 service requests
+SR_DS = '2jgv-pqrq'
+# The City loaded about 313,000 older (2012-2018) requests with a created date of January 1-2, 2019, so the page
+# starts with February 2019, the first full month of requests made through the current system.
+SR_START = '2019-02-01'
+SR_TYPES = 12      # request types shown by name (by count since SR_START); the rest are "Other"
+SR_REASON_MIN = 30  # a reason needs this many requests in the past 12 months to be listed by name
+
+
+def build_311(api, nbp):
+    cols = ['request_type', 'request_reason', 'date_created', 'case_close_date', 'request_status', 'longitude', 'latitude']
+    api.require_columns(SR_DS, cols, '311 calls')
+    rows, _ = synced_rows(api, SR_DS, cols, f"date_created >= '{SR_START}'", '311 requests')
+    created = [parse_ts(r['date_created']) for r in rows]
+    bad = sum(c is None for c in created)
+    need(bad < len(rows) * 0.001, f'311 requests: {bad} rows with unreadable date_created')
+    keep = [i for i, c in enumerate(created) if c is not None]
+    rows, created = [rows[i] for i in keep], [created[i] for i in keep]
+    closed = [parse_ts(r['case_close_date']) for r in rows]
+    nbs, _ = points_to_nb(nbp, rows)
+    n = len(rows)
+    last = max(created)
+    today = last.date()                     # "now" is the newest request in the data, so the file only changes with it
+    win0 = today - dt.timedelta(days=364)   # past 12 months: the 365 days ending on that day
+    recent = [created[i].date() >= win0 for i in range(n)]
+    pending = [r['request_status'] == 'Pending' for r in rows]
+    typ = [(r['request_type'] or '').strip() or 'Not recorded' for r in rows]
+    reason = [(r['request_reason'] or '').strip() or 'Not recorded' for r in rows]
+
+    # types in the order of the past 12 months, so the list matches what people ask for now; types the City has
+    # stopped using (e.g. 'Roads/Drainage' before it was split) fall under "Other"
+    T = ranked(Counter(t for t, r in zip(typ, recent) if r), SR_TYPES)
+    T += ['Other'] * (len(set(typ)) > len(T))
+    ti = {t: k for k, t in enumerate(T)}
+    tix = [ti.get(t, len(T) - 1) for t in typ]
+    # reasons, with the type each belongs to; rare ones are pooled as "Other" within their type
+    rc = Counter((tix[i], reason[i]) for i in range(n) if recent[i])
+    R = sorted((list(k) for k in rc if rc[k] >= SR_REASON_MIN), key=lambda k: (k[0], -rc[tuple(k)], k[1]))
+    R += [[t, 'Other'] for t in range(len(T)) if any(k[0] == t and rc[k] < SR_REASON_MIN for k in rc)]
+    ri = {(t, s): k for k, (t, s) in enumerate(R)}
+    rix = [ri.get((tix[i], reason[i]), ri.get((tix[i], 'Other'), -1)) for i in range(n)]
+
+    y0, m0 = int(SR_START[:4]), int(SR_START[5:7])
+    nm = month_index(last, y0, m0) + 1
+    month = [month_index(c, y0, m0) for c in created]
+    years = list(range(y0, last.year + 1))
+    NT, AGES = len(T), [30, 90, 365, 730]                     # open for: <30 days, 30-89, 90-364, 1-2 years, 2+ years
+    mon = [[0] * NT for _ in range(nm)]                       # requests per month per type, whole city
+    nby = [[[0] * NT for _ in years] for _ in range(72)]      # requests per year per type, per neighborhood
+    nb12 = [Counter() for _ in range(72)]                     # past 12 months, per neighborhood per reason
+    openAge = [[[0] * (len(AGES) + 1) for _ in range(NT)] for _ in range(73)]  # still open, by age; row 72 = whole city
+    closeR, closeT = [[] for _ in R], [[] for _ in T]         # days to close, requests closed in the past 12 months
+    closeNb = [[[] for _ in T] for _ in range(72)]
+    for i in range(n):
+        t, nb = tix[i], nbs[i]
+        mon[month[i]][t] += 1
+        if nb >= 0:
+            nby[nb][created[i].year - y0][t] += 1
+            if recent[i]:
+                nb12[nb][rix[i]] += 1
+        if pending[i]:
+            age = sum((today - created[i].date()).days >= a for a in AGES)
+            openAge[72][t][age] += 1
+            if nb >= 0:
+                openAge[nb][t][age] += 1
+        elif closed[i] is not None and closed[i].date() >= win0:
+            d = days_between(created[i], closed[i])
+            if d is not None:
+                closeR[rix[i]].append(d)
+                closeT[t].append(d)
+                if nb >= 0:
+                    closeNb[nb][t].append(d)
+    stat = lambda v: [len(v), median(v), p90(v)]
+    return {
+        'ds': SR_DS, 'start': SR_START[:7], 'last': last.strftime('%Y-%m-%d'), 'winStart': win0.isoformat(),
+        'T': T, 'R': R, 'mon': mon, 'years': years, 'nby': nby,
+        'nb12': [[v for r in sorted(c) for v in (r, c[r])] for c in nb12],   # [reason, n, reason, n, ...]
+        'ages': AGES, 'openAge': openAge,
+        'closeR': [stat(v) for v in closeR], 'closeT': [stat(v) for v in closeT],
+        'closeNb': [[[len(v), median(v)] for v in row] for row in closeNb],
+        'total': n, 'recent': sum(recent), 'open': sum(pending), 'noLoc': sum(nb < 0 for nb in nbs),
+    }
+
+
+# Data files of the pages added with the 311 / housing / business set, and when each counts as stale
+# (file, label, field holding its newest record date, days without a new record before warning).
+NEW_FILES = ['311.json']
+STALE = [('311.json', '311 calls', 'last', 7)]
+
+
 # ---------------------------------------------------------------- sanity checks against the last good build
 def load_prev(name):
     p = os.path.join(DATA, name)
@@ -826,6 +1034,13 @@ def validate(name, obj, prev, same_year=True):
         need(len(obj['nbRecent']) == 72 and len(obj['TYP']) == 11 and len(obj['TH']) == 7, 'cpc: shape')
         need(obj['total'] > 1000, 'cpc: suspiciously few cases')
         check_not_collapsed('planning cases', obj['total'], prev and (prev.get('total') or sum(sum(v) for v in prev['typeY'].values())))
+    # ---- pages added with the 311 / housing / business set ----
+    elif name == '311.json':
+        need(len(obj['T']) >= 5 and len(obj['nby']) == 72 and len(obj['openAge']) == 73 and len(obj['nb12']) == 72, '311: shape')
+        need(all(len(m) == len(obj['T']) for m in obj['mon']), '311: monthly rows')
+        need(obj['total'] > 100000 and obj['recent'] > 20000, '311: suspiciously few requests')
+        need(obj['noLoc'] < 0.1 * obj['total'], '311: most requests failed to map to a neighborhood')
+        check_not_collapsed('311 requests', obj['total'], prev and prev.get('total'))
 
 
 def central_date(iso_utc):
@@ -858,7 +1073,7 @@ def main():
     files = state.get('files', {})                 # data file -> {'key': what it was built from, 'changed': date its content last changed}
     hist_versions = state.get('histVersions', {})  # year -> version of that year's dataset when hist.json last counted it
     FOUND_IDS.update({int(y): i for y, i in state.get('cfsIds', {}).items()})
-    prev = {n: load_prev(n) for n in ['geo.json', 'streets.json', 'drone.json', 'cfs.json', 'hist.json', 'cpc.json']}
+    prev = {n: load_prev(n) for n in ['geo.json', 'streets.json', 'drone.json', 'cfs.json', 'hist.json', 'cpc.json', *NEW_FILES]}
     out, keys, failed = {}, {}, []
 
     def unchanged(name, key):
@@ -966,6 +1181,13 @@ def main():
     print('planning cases ...', flush=True)
     attempt(['cpc.json'], cpc)
 
+    # ---- pages added with the 311 / housing / business set: each file is rebuilt when its dataset(s) or geo changed
+    def sr():
+        if not unchanged('311.json', f'{api.version(SR_DS)}|{geo_key}'):
+            out['311.json'] = build_311(api, nbp)
+    print('311 requests ...', flush=True)
+    attempt(['311.json'], sr)
+
     for name in [n for n in out if n != 'geo.json']:
         same_year = (prev[name] or {}).get('year') == out[name].get('year') if name in ('drone.json', 'cfs.json') else True
         attempt([name], lambda: validate(name, out[name], prev[name], same_year))
@@ -983,6 +1205,10 @@ def main():
         warn(f'Drone flights has no flights after {drone_last} ({(today - drone_last).days} days ago).')
     if cpc_d['lastFiled'] < (today - dt.timedelta(days=30)).isoformat():
         warn(f"CPC Projects has no filings after {cpc_d['lastFiled']}.")
+    for name, label, field, days in STALE:
+        d = cur.get(name)
+        if d and d.get(field) and d[field][:10] < (today - dt.timedelta(days=days)).isoformat():
+            warn(f'{label} has no records after {d[field][:10]}.')
 
     # Write only the files whose content changed, so a day without new data leaves data/ and the site untouched.
     os.makedirs(a.out, exist_ok=True)
@@ -1014,6 +1240,9 @@ def main():
     print(f"changed: {', '.join(changed) or 'nothing'}")
     print(f"  drone {len(drone_d['recs'])} flights ({drone_d['year']}), cfs {sum(map(sum, cfs_d['daily']))} calls ({cfs_d['year']}, through day {cfs_d['last']}), "
           f"cpc {cpc_d['total']} cases, {len(cpc_d['up'])} upcoming")
+    for name in NEW_FILES:
+        if cur.get(name):
+            print(f"  {name}: {cur[name].get('total', '?')} records through {cur[name].get('last', '?')}")
     print(f'  {api.n_req} API requests, {api.n_bytes / 1e6:.1f} MB')
     if not a.no_build and a.out == DATA:
         subprocess.run([sys.executable, os.path.join(ROOT, 'build.py')], check=True)

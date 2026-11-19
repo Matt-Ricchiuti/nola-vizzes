@@ -20,7 +20,7 @@ build.py    src/ + data/ -> site/
 ## How the daily refresh works
 
 1. At 10:30 UTC (4:30 a.m. Central in winter, 5:30 a.m. in summer), `daily.yml` runs `python pipeline/fetch.py`.
-2. `fetch.py` checks each dataset's "last updated" time on data.nola.gov and downloads only the ones the City changed. For Calls for Service it downloads only the rows changed since the last run and merges them into a saved copy. On the 1st of each month everything is downloaded fresh as a backstop.
+2. `fetch.py` checks each dataset's "last updated" time on data.nola.gov and downloads only the ones the City changed. For the big datasets (Calls for Service, 311) it downloads only the rows changed since the last run and merges them into a saved copy. On the 1st of each month everything is downloaded fresh as a backstop.
 3. Each rebuilt data file is checked. If a dataset comes back empty, a column is missing, or a count drops by more than 10%, that page keeps its last good version and the others still publish.
 4. Files are rewritten only when their content changed, so a day with no new City data commits and publishes nothing. Otherwise the workflow commits `data/` and `site/` and publishes the site.
 5. If any dataset failed, the run ends with a red X on the repo's **Actions** tab and GitHub emails you. Warnings (for example, the City hasn't added new calls in over a week) show in yellow on the run but don't stop it.
@@ -54,6 +54,7 @@ How to build a view (`src/lib.js`): `NOLA.views([...])` lists the views; each vi
 | `cfs.html` | Calls for Service, current year + 2014 onward yearly files | daily (not in the menus) |
 | `drone.html` | NOPD Drone Flights (`ay9z-ynxz`), current year | daily (not in the menus) |
 | `cpc.html` | CPC Projects (`xxb5-5azv`) | daily |
+| `311.html` | 311 OPCD Calls (`2jgv-pqrq`), February 2019 on | daily (incremental download) |
 | `trees.html` | Tree Location (`3tyj-9x33`) + green space, Oct 2026 export in `data/trees.json` | static (street map daily) |
 | `about.html` | About the site, sources, disclaimer | with each build |
 

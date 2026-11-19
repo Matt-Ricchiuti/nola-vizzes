@@ -6,8 +6,8 @@ The site's rule is to chart only datasets with records added in the past year. T
 
 | Mark | Meaning | Count |
 |---|---|---|
-| ✅ | Already on the site | 18 |
-| ⭐ | Strong candidate for a new page | 15 |
+| ✅ | Already on the site | 19 |
+| ⭐ | Strong candidate for a new page | 14 |
 | 🔸 | Possible: smaller, harder, or best as part of another page | 21 |
 | 🗺️ | Map layer or supporting data (boundaries, population), not a page on its own | 40 |
 | · | Not a candidate (stale, archived, or superseded) | 116 |
@@ -44,7 +44,7 @@ Worth adding to every map: 2020 population by neighborhood (`2w4d-xaw2`), so cou
 
 | | Dataset | Newest record | Rows | Notes |
 |---|---|---|--:|---|
-| ⭐ | [311 OPCD Calls (2012-Present)](https://data.nola.gov/d/2jgv-pqrq) `2jgv-pqrq` | 2026-11-17 | 1,048,056 | Most-viewed dataset on the portal. Requests by type and neighborhood, time to close, backlog. Daily, back to 2012. |
+| ✅ | [311 OPCD Calls (2012-Present)](https://data.nola.gov/d/2jgv-pqrq) `2jgv-pqrq` | 2026-11-17 | 1,048,056 | 311 page. Requests made through the current system start in 2019 (older ones are dated Jan 1–2, 2019). |
 | ⭐ | [Public Records Requests](https://data.nola.gov/d/jsrk-e98x) `jsrk-e98x` | 2026-11-17 | 10,417 | Public records requests by department, response times, overdue requests. |
 | 🗺️ | [City Council Districts](https://data.nola.gov/d/d49t-wy6p) `d49t-wy6p` | updated 2026-01-29 | 5 | Council districts: a useful second map view on every page |
 | · | [311 Calls (Historic Data: 2012-2018)](https://data.nola.gov/d/3iz8-nghx) `3iz8-nghx` | updated 2019-01-08 | 303,735 | Not updated since 2019-01. |

@@ -189,3 +189,10 @@ tbody tr:hover td{background:var(--chip)}
   .mlh{margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .fpanel.collapsed{display:none}
 }
+
+/* ===================== 311 service requests page (src/311.js) ===================== */
+.srmini svg text{fill:var(--ink2)}
+.srages{display:flex;flex-direction:column;gap:5px;font-size:12.5px;color:var(--ink2)}
+.srages span{display:grid;grid-template-columns:12px 1fr auto;gap:8px;align-items:center}
+.srages i{width:11px;height:11px;border-radius:3px}
+.srages b{font:400 12px "IBM Plex Mono",ui-monospace,monospace;color:var(--muted)}
