@@ -8,6 +8,14 @@
   --t-park:#1d3128;--t-park-line:#2d4a3a;--t-wild:#1b2b24;--t-cem:#232d29;--t-lot:#272a24;--t-park-ink:#93c29d}}
 .tmap{position:absolute;inset:0;display:block;width:100%;height:100%;touch-action:none;cursor:grab;border-radius:12px}
 .tmap.drag{cursor:grabbing}
+/* the Trees / Tree requests switch floats at the top center of the map */
+.ftabs.tmode{position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:3;width:max-content;max-width:calc(100% - 120px);background:var(--surface);border:1px solid var(--ring);box-shadow:0 4px 14px rgb(0 0 0 / .14)}
+.ftabs.tmode button{flex:0 0 auto;padding:6px 14px;white-space:nowrap}
+.ftabs.tmode button[aria-selected="true"]{background:var(--ink);color:var(--surface);box-shadow:none}
+.tstats{display:flex;flex-direction:column;gap:3px;font-size:12.5px}
+.tstats .r{display:flex;justify-content:space-between;gap:12px}
+.tstats .r span:last-child{font-family:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;color:var(--ink)}
+.tstats .r span:first-child{color:var(--ink2)}
 /* the map is the page: it runs from under the header to the bottom of the window (--tt set by trees.js) */
 .tfill.stage.mapstage{height:max(460px,calc(100vh - var(--tt,0px) - var(--gut)))}
 @media(max-width:760px){
@@ -19,7 +27,7 @@
 </head><body><div class="wrap">
 {{NAV}}
 <h1>Street trees</h1>
-<div class="src"><a href="https://data.nola.gov/d/3tyj-9x33">Tree Location</a> · data.nola.gov · City data as of Apr 17, 2025 · Not refreshed daily</div>
+<div class="src"><a href="https://data.nola.gov/d/3tyj-9x33">Tree Location</a> · data.nola.gov · City data as of Apr 17, 2025 · Requests: <a href="https://data.nola.gov/d/2jgv-pqrq">311 OPCD Calls</a> through {{SR_THRU}}</div>
 <div id="chart"></div>
 {{FOOT}}
 </div>

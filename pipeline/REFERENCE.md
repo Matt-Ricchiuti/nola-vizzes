@@ -21,6 +21,7 @@ The workflow runs at 10:30 UTC. The City loads CPC Projects at about 06:00 UTC, 
 | `hist.json` | with `cfs.json` (current year); a past year when its dataset's `rowsUpdatedAt` moved | Past years are checked daily for last year in January–February, and all years on the 1st of the month. The City loads each year's final rows on January 1. |
 | `cpc.json` | `xxb5-5azv`'s `rowsUpdatedAt` or `geo.json` changed | "Today" for upcoming hearings and the 365-day window is the day the City loaded the data. |
 | `311.json` | `2jgv-pqrq`'s `rowsUpdatedAt` or `geo.json` changed | Incremental download (see below). "Today" is the newest request in the data. |
+| `treereq.json` | with `311.json` (same rows, same key) | No requests of its own: built from the 311 rows already downloaded. |
 | `str.json` | any of `ufdg-ajws`, `en36-xvxg`, `2ei9-wqw2` or `geo.json` changed | Three small whole downloads (about 8 requests, 9 MB). |
 | `permits.json` | `rcm3-fn58`'s `rowsUpdatedAt` or `geo.json` changed | Also reloaded in full nightly. API counts by year, plus the past 12 months' rows (about 6 requests, 4 MB). |
 | `biz.json` | `abc4-h3u3`'s or `hjcd-grvu`'s `rowsUpdatedAt`, or `geo.json`, changed | Two whole downloads (about 6 requests, 11 MB). |
@@ -222,6 +223,17 @@ Rows with `date_created >= 2019-02-01` (about 730,000), columns `request_type, r
 - The page offers requests per 1,000 residents (2020 population), since requests come from people; neighborhoods under 1,000 residents get no rate.
 
 Checked against the API on 2026-11-19: past-12-month total, open total, October 2026 total and Streetlights in October 2026 match `count(*)` queries exactly, and Lakeview and St. Roch match `within_polygon` counts.
+
+## `data/treereq.json`: 311 tree requests (trees page)
+
+The "Tree requests (311)" map on the trees page. `build_311` keeps every 311 request of type `Tree Service` (about 10,800 since November 2020; nearly all since 2022) and writes one point per located request:
+
+- `R`: reasons with at least 30 requests, by count (ties by name), then "Other". Today: Tree Trim, Street or Sidewalk Blocked, Dead or Dying Tree (added April 2026), Blocking Stop Sign or Traffic Signal.
+- `x`, `y`: longitude / latitude x 1e5. `nb`: neighborhood index in `geo.json` (the page maps it to the inventory's own neighborhood list by name).
+- `r`: reason index. `d`: day filed, as days since `t0`. `c`: days from filing to the City's close date (-1 still pending, -2 closed with no close date).
+- `last`: the newest 311 request, the page's "today" for the Month / 6 months / Year filter.
+
+Checked against the API on 2026-11-19: 1,706 tree requests filed in the 182 days to Nov 18, 846 still pending; the page shows 1,705 (one has no location) and 846 open.
 
 ## `data/str.json`: short-term rentals
 

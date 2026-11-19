@@ -31,7 +31,7 @@ PAGES = {'drone': ('NOPD drone flights', {'drone': 'drone.json'}),
          'str': ('Short-Term Rentals (STRs)', {'str': 'str.json'}),
          'blight': ('Blight/Code-enforcement', {'ce': 'blight.json'}),
          'permits': ('Permits', {'permits': 'permits.json'}),
-         'trees': ('Trees', {'trees': 'trees.json'}),
+         'trees': ('Trees', {'trees': 'trees.json', 'treq': 'treereq.json'}),
          'biz': ('New Businesses', {'biz': 'biz.json'})}
 EXTRA = {'about': 'About'}
 # Pages still built (so old links keep working and they can come back) but left out of the header and home-page
