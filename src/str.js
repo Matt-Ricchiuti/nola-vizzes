@@ -17,7 +17,8 @@
 
   const H = NOLA.hashState();
   const st = { nb: H.nb != null ? +H.nb : -1, cats: H.cats != null ? [...new Set(H.cats.split('').map(Number).filter(c => c >= 0 && c < 3))].sort() : [0, 1, 2],
-               view: H.mapview === 'shade' ? 'shade' : 'dots', basis: H.basis === 'hu' ? 'hu' : 'n', group: H.group != null ? +H.group : -1 };
+               heat: H.heat === '1' || H.mapview === 'shade', basis: H.basis === 'hu' ? 'hu' : 'n', group: H.group != null ? +H.group : -1,
+               bd: ['1', '2', '3'].includes(H.bd) ? +H.bd : -1 };   // links from before the heatmap checkbox used mapview=shade
   if (!(st.nb >= -1 && st.nb < 72)) st.nb = -1;
   if (!(st.group >= -1 && st.group < D.groups.length)) st.group = -1;
   if (!st.cats.length) st.cats = [0, 1, 2];
@@ -43,49 +44,48 @@
       + `<div style="color:var(--ink2);margin-bottom:6px">${here.length === 1 ? 'Active short-term rental license' : here.length + ' active short-term rental licenses'} · ${nbName(p.nb)}</div>`
       + here.slice(0, 6).map(one).join('') + (here.length > 6 ? `<div style="color:var(--ink2)">and ${here.length - 6} more</div>` : '');
   }
-  const byNb = d3.range(72).map(() => [0, 0, 0]), bedsNb = d3.range(72).map(() => [0, 0, 0]);
-  pts.forEach(p => { if (p.nb >= 0) { byNb[p.nb][p.cat]++; bedsNb[p.nb][p.cat] += p.beds; } });
+  // bedroom limit: 1, 2, 3 or more (0: not stated)
+  const bedsOk = p => st.bd < 0 || (st.bd === 3 ? p.beds >= 3 : p.beds === st.bd);
+  let byNb = [], bedsNb = [];
   const cnt = i => d3.sum(st.cats, c => byNb[i][c]);
   const val = i => st.basis === 'hu' ? perHU(cnt(i), i) : cnt(i);
   const inNb = p => st.nb < 0 || p.nb === st.nb;
-  const keyLabel = () => 'Licenses' + (st.basis === 'hu' ? ' per 100 homes' : '');
+  const keyLabel = () => 'Licenses shown' + (st.basis === 'hu' ? ' per 100 homes' : '') + ', by neighborhood';
   let m, dotG;
   function drawMap(pane, first) {
     const { panel, plot } = staged(pane, first, true);
     panel.innerHTML = '';
-    NOLA.ftabs(panel, [['dots', 'Each license'], ['shade', 'By neighborhood']], st.view, v => set('view', v));
+    // per neighborhood, under the bedroom filter (every neighborhood, for the heatmap)
+    byNb = d3.range(72).map(() => [0, 0, 0]); bedsNb = d3.range(72).map(() => [0, 0, 0]);
+    pts.forEach(p => { if (p.nb >= 0 && bedsOk(p)) { byNb[p.nb][p.cat]++; bedsNb[p.nb][p.cat] += p.beds; } });
+    const mine = pts.filter(p => p.nb >= 0 && inNb(p) && bedsOk(p));
     NOLA.nbPick(NOLA.fsec(panel, 'Neighborhood'), st.nb, v => set('nb', v));
-    NOLA.flist(NOLA.fsec(panel, `License type · ${fmt(pts.filter(p => p.nb >= 0 && inNb(p) && catOn(p.cat)).length)} shown`),
-      CAT.map((c, k) => ({ key: k, name: c.n, sub: c.sub, color: c.c, count: pts.filter(p => p.cat === k && p.nb >= 0 && inNb(p)).length })), { pressed: catOn, onClick: toggleCat, mode: 'toggle' });
-    let leg = null;
-    if (st.view === 'shade') {
-      leg = document.createElement('div'); leg.className = 'legend'; NOLA.fsec(panel, keyLabel()).appendChild(leg);
-    }
+    NOLA.flist(NOLA.fsec(panel, `License type · ${fmt(mine.filter(p => catOn(p.cat)).length)} shown`),
+      CAT.map((c, k) => ({ key: k, name: c.n, sub: c.sub, color: c.c, count: mine.filter(p => p.cat === k).length })), { pressed: catOn, onClick: toggleCat, mode: 'toggle' });
+    NOLA.seg(NOLA.fsec(panel, 'Bedroom limit'), [[-1, 'Any'], [1, '1'], [2, '2'], [3, '3 or more']], st.bd, v => set('bd', v));
     if (first) {
       m = NOLA.map(plot, { panel, label: 'Map of short-term rental licenses', tip: mapTip });
       dotG = m.layer.append('g'); m.lastNb = -1;
       m.onZoom(k => dotG.selectAll('circle').attr('r', DOT_R() / Math.sqrt(k)).attr('stroke-width', .8 / Math.sqrt(k)));
       plot.insertAdjacentHTML('beforeend', '<div class="maplegend"></div>');
     }
-    const ml = plot.querySelector('.maplegend');
-    NOLA.mapChecks(plot, [st.view === 'shade' && { key: 'per', label: 'Per 100 homes', checked: st.basis === 'hu', onChange: on => set('basis', on ? 'hu' : 'n') }]);
-    if (st.view === 'shade') {
-      const cl = NOLA.classes(d3.range(72).map(val));
-      m.setFill(i => cl.color(val(i)));
-      const none = d3.range(72).some(i => val(i) == null) ? `Under ${MIN_HU} homes` : null, lf = NOLA.short;
-      NOLA.stepLegend(leg, cl, lf, none); NOLA.stepLegend(ml, cl, lf, none);
-      ml.insertAdjacentHTML('afterbegin', `<div class="mlh">${keyLabel()}</div>`);
-      ml.hidden = false;
-    } else { m.setFill(() => null); ml.innerHTML = '<div class="legend" style="margin:0">' + CAT.filter((c, k) => catOn(k)).map(c => `<span><i style="background:${c.c};border-radius:50%"></i>${c.n}</span>`).join('') + '</div>'; ml.hidden = false; }
+    NOLA.heatToggle(plot, st.heat, on => set('heat', on), { label: 'Per 100 homes', checked: st.basis === 'hu', onChange: on => set('basis', on ? 'hu' : 'n') });
+    const cl = st.heat ? NOLA.classes(d3.range(72).map(val)) : null;
+    m.setFill(cl ? i => cl.color(val(i)) : () => null);
+    NOLA.heatKey(panel, plot, cl, keyLabel(), NOLA.short, cl && d3.range(72).some(i => val(i) == null) ? `Under ${MIN_HU} homes` : null);
+    if (!cl) { // phones: without the heatmap, the map's legend is the dots' key
+      const ml = plot.querySelector('.maplegend'); ml.hidden = false;
+      ml.innerHTML = '<div class="legend" style="margin:0">' + CAT.filter((c, k) => catOn(k)).map(c => `<span><i style="background:${c.c};border-radius:50%"></i>${c.n}</span>`).join('') + '</div>';
+    }
     const k = m.k();
-    dotG.selectAll('circle').data(st.view === 'dots' ? pts.filter(p => catOn(p.cat) && p.nb >= 0 && inNb(p)) : []).join('circle')
+    dotG.selectAll('circle').data(mine.filter(p => catOn(p.cat))).join('circle')
       .attr('cx', p => p.x).attr('cy', p => p.y).attr('r', DOT_R() / Math.sqrt(k)).attr('fill', p => CAT[p.cat].c).attr('fill-opacity', .85)
       .attr('stroke', 'var(--surface)').attr('stroke-width', .8 / Math.sqrt(k))
       .on('mousemove click', (ev, p) => tip.show(licTip(p), ev)).on('mouseleave', tip.hide); // click: a tap on a phone
     if (m.lastNb !== st.nb) { m.focus(st.nb, first ? 0 : 450); m.lastNb = st.nb; }
   }
   function mapTip(i) {
-    if (st.view === 'dots') return null; // on the license map only the dots have tooltips
+    if (!st.heat) return null; // without the heatmap only the dots have tooltips
     const n = byNb[i], r = perHU(cnt(i), i);
     return `<b>${GEO.nb[i].name}</b>` + CAT.map((c, k) => row(sw(c.c) + c.n, fmt(n[k]))).join('') + row('Bedrooms licensed', fmt(d3.sum(st.cats, c => bedsNb[i][c])))
       + row('Housing units (2020)', fmt(HU[i] || 0)) + (r != null ? row((st.cats.length < 3 ? 'Shown licenses' : 'Licenses') + ' per 100 homes', NOLA.fmtRate(r)) : '');
@@ -162,10 +162,10 @@
   }
 
   const V = NOLA.views([
-    { id: 'map', label: () => st.view === 'shade' ? 'Active short-term rental licenses, by neighborhood' : 'Active short-term rental licenses', tab: 'Map of licenses', keep: true, draw: drawMap, ds: [D.ds[0], 'Active Short-Term Rental Licenses'] },
+    { id: 'map', label: 'Active short-term rental licenses', tab: 'Map of licenses', keep: true, draw: drawMap, ds: [D.ds[0], 'Active Short-Term Rental Licenses'] },
     { id: 'noncommercial', label: 'Non-commercial licenses, by type of building', tab: 'Non-commercial licenses', draw: drawNC, ds: [D.ds[2], 'Non-Commercial Short-Term Rental Licenses'] },
     { id: 'applications', label: 'Permit applications per year, by current status', tab: 'Permit applications', draw: drawApps, ds: [D.ds[1], 'Short-Term Rental Permit Applications'] },
   ], { ds: [D.ds[0], 'Active Short-Term Rental Licenses'],
-       state: () => ({ mapview: st.view !== 'dots' ? st.view : null, cats: st.cats.length < 3 ? st.cats.join('') : null, basis: st.basis !== 'n' ? st.basis : null,
+       state: () => ({ heat: st.heat ? 1 : null, bd: st.bd >= 0 ? st.bd : null, cats: st.cats.length < 3 ? st.cats.join('') : null, basis: st.basis !== 'n' ? st.basis : null,
                        group: st.group >= 0 ? st.group : null, nb: st.nb >= 0 ? st.nb : null }) });
 })();

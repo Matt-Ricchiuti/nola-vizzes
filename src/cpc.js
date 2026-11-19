@@ -80,7 +80,13 @@
   const upF = () => upNb().filter(okFold);
 
   // ---------- cases filed ----------
+  // each point's address, case number and open/closed (ptsInfo, same order as pts)
+  if (P.ptsInfo) P.pts.forEach((p, i) => { p.info = P.ptsInfo[i]; });
   const mapped = P.pts.filter(p => NOLA.shown(p[4]));
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const filedTip = p => { const [addr, cnum, open] = p.info || ['', '', null];
+    return `<b>${esc(addr || P.TYP[p[1]])}</b><div style="color:var(--ink2)">${addr ? P.TYP[p[1]] : ''}${addr && cnum ? ' · ' : ''}${esc(cnum)}</div>` + row('Filed', pDate(p[0]))
+      + (open != null ? row('Status', open ? 'Open' : 'Closed') : '') + row('Neighborhood', nbName(p[4])) + (p[5] ? row('Topics', P.TH.filter((t, i) => (p[5] >> i) & 1).join(', ')) : ''); };
   const okType = p => st.fold < 0 || foldOf(p[1]) === st.fold, okTheme = p => st.theme < 0 || (p[5] >> st.theme) & 1, okNb = p => st.nb < 0 || p[4] === st.nb;
   const okDate = p => p[0] >= st.from && p[0] <= st.to;
   const inRange = () => mapped.filter(okDate);
@@ -216,7 +222,7 @@
     const k = mp.k();
     rg.selectAll('circle').data(pts, p => p.join()).join('circle').attr('cx', p => p[2]).attr('cy', p => p[3]).attr('r', 4 / Math.sqrt(k))
       .attr('fill', p => FOLD[foldOf(p[1])].color).attr('fill-opacity', .85).attr('stroke', 'var(--surface)').attr('stroke-width', 1 / Math.sqrt(k))
-      .on('mousemove', (ev, p) => tip.show(`<b>${P.TYP[p[1]]}</b>` + row('Filed', pDate(p[0])) + row('Neighborhood', nbName(p[4])) + (p[5] ? row('Topics', P.TH.filter((t, i) => (p[5] >> i) & 1).join(', ')) : ''), ev)).on('mouseleave', tip.hide);
+      .on('mousemove click', (ev, p) => tip.show(filedTip(p), ev)).on('mouseleave', tip.hide); // click: a tap on a phone
   }
 
   // ---------- filings per year ----------
