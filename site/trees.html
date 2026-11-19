@@ -283,6 +283,9 @@ table.static tbody tr{cursor:auto}
   --t-park:#1d3128;--t-park-line:#2d4a3a;--t-wild:#1b2b24;--t-cem:#232d29;--t-lot:#272a24;--t-park-ink:#93c29d}}
 .tmap{position:absolute;inset:0;display:block;width:100%;height:100%;touch-action:none;cursor:grab;border-radius:12px}
 .tmap.drag{cursor:grabbing}
+/* no visible chart title: the switch on the map says which map it is (the heading stays for screen readers) */
+.vbar.one h2{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+.vbar.one .tools{margin-left:auto}
 /* the Trees / Tree requests switch floats at the top center of the map */
 .ftabs.tmode{position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:3;width:max-content;max-width:calc(100% - 120px);background:var(--surface);border:1px solid var(--ring);box-shadow:0 4px 14px rgb(0 0 0 / .14)}
 .ftabs.tmode button{flex:0 0 auto;padding:6px 14px;white-space:nowrap}
