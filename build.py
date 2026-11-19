@@ -113,8 +113,18 @@ if os.path.exists(P('data', 'streets.json')):
     if mode == 'preview': STREETS_TAG = '<script>' + streets_js + '</script>'
     print('built streets.js', len(streets_js), '' if write('streets.js', streets_js) else '(unchanged)')
 
-def fill(h, key):
-    h = h.replace('{{CSS}}', css).replace('{{NAV}}', nav(key)).replace('{{D3}}', d3_tag() + STREETS_TAG)
+# Data that rarely changes goes in its own file too, so a page whose other data changes daily (trees: the 311 tree
+# requests) doesn't make every visitor download it again: data file -> (script, global it sets).
+STATIC_DATA = {'trees.json': ('trees-data.js', 'TREES_DATA')}
+static_tags = {}
+for f, (js_name, var) in STATIC_DATA.items():
+    if not os.path.exists(P('data', f)): continue
+    body = f'window.{var}=' + json.dumps(load(f), separators=(',', ':'), ensure_ascii=False) + ';'
+    static_tags[f] = '<script>' + body + '</script>' if mode == 'preview' else f'<script src="{js_name}"></script>'
+    print('built', js_name, len(body), '' if write(js_name, body) else '(unchanged)')
+
+def fill(h, key, extra=''):
+    h = h.replace('{{CSS}}', css).replace('{{NAV}}', nav(key)).replace('{{D3}}', d3_tag() + STREETS_TAG + extra)
     h = h.replace('{{PULLED}}', fdate(page_date.get(key) or pulled))  # a data page shows when its own data last changed
     for k, v in TOKENS.items(): h = h.replace(k, v)
     return h
@@ -125,11 +135,15 @@ for key, (label, files) in PAGES.items():
     if files:
         data = {'geo': geo}
         if key in page_date: data['meta'] = {'pulled': page_date[key].isoformat()}  # cpc.js reads this as "today"
-        for k, f in files.items(): data[k] = load(f)
+        ext = {k: f for k, f in files.items() if f in static_tags}  # loaded from their own script (STATIC_DATA)
+        for k, f in files.items():
+            if k not in ext: data[k] = load(f)
         js = open(P('src', f'{key}.js'), encoding='utf-8').read()
         # data/lib/js last, so placeholder-looking text inside the data is never touched
-        h = fill(h, key)
-        h = h.replace('{{LIB}}', lib).replace('{{JS}}', js).replace('{{DATA}}', json.dumps(data, separators=(',', ':'), ensure_ascii=False))
+        h = fill(h, key, ''.join(static_tags[f] for f in ext.values()))
+        dj = json.dumps(data, separators=(',', ':'), ensure_ascii=False)
+        if ext: dj = 'Object.assign(' + dj + ',{' + ','.join(f'{json.dumps(k)}:window.{STATIC_DATA[f][1]}' for k, f in ext.items()) + '})'
+        h = h.replace('{{LIB}}', lib).replace('{{JS}}', js).replace('{{DATA}}', dj)
     else:
         h = fill(h, key)
     print('built', key, len(h), '' if write(f'{key}.html', h) else '(unchanged)')

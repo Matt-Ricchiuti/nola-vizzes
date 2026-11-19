@@ -9,7 +9,8 @@ Hand-built visualizations of City of New Orleans open data (data.nola.gov), host
 ```
 src/        page templates (*.html), page scripts (*.js), shared lib.css + lib.js
 data/       JSON the pages are built from (rewritten by the daily job)
-site/       built pages, published as-is by GitHub Pages (streets.js = street base map shared by all maps)
+site/       built pages, published as-is by GitHub Pages (streets.js = street base map shared by all maps;
+            trees-data.js = the static tree inventory, kept out of trees.html so browsers cache it)
 pipeline/   fetch.py (downloads + aggregates everything), REFERENCE.md (rules behind every data file)
 build.py    src/ + data/ -> site/
 .github/workflows/
