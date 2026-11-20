@@ -709,8 +709,8 @@ const NOLA = (() => {
     return o;
   }
   // views(list, { state, ds }) -- list: [{ id, label, tab, cls, keep, draw(el, first), ds: [id, name] or () => [id, name] }]
-  // A bar at the top of #chart holds a tab per chart (`tab`, or `label`) and Copy link / Download CSV for the open one.
-  // Download CSV links to the open chart's City dataset on data.nola.gov (its export is there): the view's `ds`, which
+  // A bar at the top of #chart holds a tab per chart (`tab`, or `label`) and Copy link / Source Data for the open one.
+  // Source Data links to the open chart's City dataset on data.nola.gov (its export is there): the view's `ds`, which
   // can be a function of the filters when one chart switches between datasets, else the page's `opts.ds`.
   // Below it, each chart is its own section (heading `label`, then the chart); only the open one shows.
   // `label` can be a function, for a chart whose subject follows its filters; the heading is set again on each draw
@@ -732,12 +732,12 @@ const NOLA = (() => {
     const linkFor = () => location.href.split('#')[0] + '#' + cur.id + stateKV();
     const writeHash = () => history.replaceState(null, '', '#' + cur.id + stateKV());
     const btn = t => { const b = document.createElement('button'); b.className = 'btn'; b.type = 'button'; b.textContent = t; return b; };
-    // the bar: tabs, then the open chart's Copy link / Download CSV
+    // the bar: tabs, then the open chart's Copy link / Source Data
     const bar = document.createElement('div'); bar.className = 'vbar';
     const tabRow = document.createElement('div'); tabRow.className = 'vtabs'; tabRow.setAttribute('role', 'tablist'); tabRow.setAttribute('aria-label', 'Charts');
     const tools = document.createElement('div'); tools.className = 'tools';
     const linkB = btn('Copy link'), csvB = document.createElement('a');
-    csvB.className = 'btn'; csvB.textContent = 'Download CSV'; csvB.target = '_blank'; csvB.rel = 'noopener';
+    csvB.className = 'btn'; csvB.textContent = 'Source Data'; csvB.target = '_blank'; csvB.rel = 'noopener';
     const dsOf = v => (typeof v.ds === 'function' ? v.ds() : v.ds) || opts.ds;
     const setDs = () => { const d = dsOf(cur); csvB.href = 'https://data.nola.gov/d/' + d[0]; csvB.title = `Open the ${d[1]} dataset on data.nola.gov`; };
     linkB.onclick = async () => {
