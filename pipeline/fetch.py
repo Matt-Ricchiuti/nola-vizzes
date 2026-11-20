@@ -1161,8 +1161,9 @@ def build_311(api, nbp):
     stat = lambda v: [len(v), median(v), p90(v)]
     trees = tree_requests(rows, created, closed, nbs, typ, reason, pending, last)
     drain = drainage_requests(rows, created, closed, nbs, typ, reason, pending, last)
+    streq = street_requests(rows, created, closed, nbs, typ, reason, pending, last)
     dots = sr_dots(rows, created, closed, pending, recent, nbs, tix, reason, R)
-    return trees, drain, {
+    return trees, drain, streq, {
         'dots': dots,
         'ds': SR_DS, 'start': SR_START[:7], 'last': last.strftime('%Y-%m-%d'), 'winStart': win0.isoformat(),
         'T': T, 'R': R, 'mon': mon, 'years': years, 'nby': nby,
@@ -1267,6 +1268,156 @@ def drainage_requests(rows, created, closed, nbs, typ, reason, pending, last):
                      'c': -1 if pending[i] else -2 if days is None else int(days + 0.5)})
     return {'ds': SR_DS, 'start': SR_START, 'last': last.strftime('%Y-%m-%d'), 'G': [g for g, _ in DR_GROUPS],
             'dots': dot_pack(recs, ['g', 'c']), 'total': len(idx), 'open': sum(pending[i] for i in idx), 'noLoc': no_loc}
+
+
+# ---------------------------------------------------------------- streets
+# 311 street requests: road surface, sidewalks and curbs, utility cuts, debris, and streetlights. The current types
+# ("Roads and Streets", "Streetlights") replaced "Roads/Drainage" (used until 2024) and "Traffic Signals/Signs/Striping/
+# Streetlights" (until 2023), so their reasons are read under all four. Drainage reasons are on the drainage page;
+# signs and striping are left out.
+SQ_TYPES = {'Roads and Streets', 'Roads/Drainage', 'Streetlights', 'Traffic Signals/Signs/Striping/Streetlights'}
+SQ_GROUPS = [
+    ('Pothole', ['Pothole']),
+    ('Street sinking', ['Street Subsidence (Sinking)']),
+    ('Sidewalk, curb or ramp', ['Sidewalk Damaged or Missing', 'Damaged Sidewalk', 'Accessibility Ramps, Curbs and Sidewalk Repair',
+                                'Curb Damage', 'ADA Ramps Damaged or Missing']),
+    ('Shoulder or pavement damage', ['Road Shoulder Damage', 'Road Shoulder Repair', 'Push-up/Pavement Expansion']),
+    ('Utility cut left unpaved', ['Abandoned Service Cut', 'Service Cut']),
+    ('Debris in the road', ['Debris in Driving Lanes', 'Debris in Roadway']),
+    ('Streetlight out', ['Streetlight Outage/Malfunction', 'Street Light Outage/Malfunction']),
+    ('Streetlight down or leaning', ['Streetlight Knocked Down/Leaning', 'Street Light Knocked Down/Leaning']),
+    ('New streetlight wanted', ['New Streetlight Request']),
+]
+SQ_LIGHTS = 6   # groups from this one on are streetlights
+SQ_REASON_GROUP = {r: g for g, (_, rs) in enumerate(SQ_GROUPS) for r in rs}
+
+
+def street_requests(rows, created, closed, nbs, typ, reason, pending, last):
+    """The 311 street and streetlight requests since SR_START, one dot each, for the streets page. Built from the 311
+    rows already downloaded, so it costs no extra API requests. Dots (dot_pack): g reason group (SQ_GROUPS), c days to
+    close (-1 still open, -2 closed with no close date)."""
+    idx = [i for i in range(len(rows)) if typ[i] in SQ_TYPES and reason[i] in SQ_REASON_GROUP]
+    need(len(idx) > 10000, f'311 street requests: only {len(idx)} found')
+    recs, no_loc = [], 0
+    for i in idx:
+        p = dot_xy(fnum(rows[i]['longitude']), fnum(rows[i]['latitude']))
+        if p is None or nbs[i] < 0:
+            no_loc += 1
+            continue
+        days = None if pending[i] else days_between(created[i], closed[i])
+        recs.append({'day': created[i].date(), 'x': p[0], 'y': p[1], 'nb': nbs[i], 'g': SQ_REASON_GROUP[reason[i]],
+                     'c': -1 if pending[i] else -2 if days is None else int(days + 0.5)})
+    return {'ds': SR_DS, 'start': SR_START, 'last': last.strftime('%Y-%m-%d'), 'G': [g for g, _ in SQ_GROUPS], 'lights': SQ_LIGHTS,
+            'dots': dot_pack(recs, ['g', 'c']), 'total': len(idx), 'open': sum(pending[i] for i in idx), 'noLoc': no_loc}
+
+
+# Road work: the City's RoadWork project lists, one row per street segment of a project (a point on the segment).
+# DPW (u5mk-y9z4) is the paving work; SWB (bsnu-de3a) the sewer, water and drainage lines under the same streets, mostly
+# under the same project ids. Both are merged by segment id, so a block is one dot. A project's total cost is repeated
+# on every one of its segments: it's kept once per project and never added up across segments. The outreach contact
+# column (often a person's name) is never downloaded.
+RW_DPW, RW_SWB = 'u5mk-y9z4', 'bsnu-de3a'
+RW_DPW_COLS = ['segmentid', 'projid', 'project_name', 'current_phase', 'projtype', 'consttype', 'startqtr', 'endqtr',
+               'total_cost', 'project_contractor', 'location']
+RW_SWB_COLS = ['segmentid', 'projid', 'ssstat', 'sstype', 'location']
+RW_PHASES = ['Under construction', 'Planned', 'Complete', 'Not stated']   # a block with two phases shows the first
+RW_PHASE_OF = {'construction': 0, 'planned': 1, 'planned/complete': 1, 'complete': 2}
+RW_PROGRAMS = {'RR': 'FEMA Recovery Roads', 'DPW': 'Public Works', 'SELA': 'SELA drainage', 'HMGP': 'FEMA Hazard Mitigation',
+               'NDR': 'National Disaster Resilience', 'DOTD': 'State DOTD', 'RTA': 'RTA', 'SWB': 'Sewerage & Water Board'}
+
+
+def rw_phase(s):
+    return RW_PHASE_OF.get(re.sub(r'\s+', '', (s or '')).lower(), 3)
+
+
+def rw_program(s):
+    """'DPW/RR' -> 'Public Works + FEMA Recovery Roads'; codes it doesn't know are kept as they are."""
+    codes = re.findall(r'RR|DPW|SELA|HMGP|NDR|DOTD|RTA|SWB|[A-Z]{2,}', (s or '').upper())
+    out = list(dict.fromkeys(RW_PROGRAMS.get(c, c) for c in codes))
+    return ' + '.join(out) or 'Not stated'
+
+
+def rw_lines(s):
+    """The SWB work type by the lines it names: 'Sewer Line Repair (SSERP)' -> 'Sewer line'; 'Drainage Line, Sewer Line,
+    and Water Line Replacement (FEMA)' -> 'Drainage, sewer and water lines'. Its 75 spellings come down to a few kinds."""
+    s = (s or '').lower()
+    parts = [w for w, k in (('Drainage', 'drain'), ('Sewer', 'sewer'), ('Water', 'water')) if k in s]
+    if not parts:
+        return 'Not stated'
+    if len(parts) == 1:
+        return parts[0] + ' line'
+    words = [parts[0]] + [p.lower() for p in parts[1:]]
+    return ', '.join(words[:-1]) + ' and ' + words[-1] + ' lines'
+
+
+def rw_when(s):
+    """'06/05/2025' -> '2025-06-05'; 'Jan-Mar 2027' kept; 'TBD' or blank -> ''."""
+    s = (s or '').strip()
+    m = re.fullmatch(r'(\d\d?)/(\d\d?)/(\d{4})', s)
+    if m:
+        return f'{m.group(3)}-{int(m.group(1)):02d}-{int(m.group(2)):02d}'
+    return s if re.fullmatch(r'[A-Z][a-z]{2}-[A-Z][a-z]{2} \d{4}', s) else ''
+
+
+def build_roadwork(api, nbp):
+    api.require_columns(RW_DPW, RW_DPW_COLS, 'RoadWork DPW projects')
+    api.require_columns(RW_SWB, RW_SWB_COLS, 'RoadWork SWB projects')
+    dpw = fetch_all(api, RW_DPW, ','.join(RW_DPW_COLS), order='segmentid,projid')
+    swb = fetch_all(api, RW_SWB, ','.join(RW_SWB_COLS), order='segmentid,projid')
+    need(len(dpw) > 5000, f'RoadWork DPW projects: only {len(dpw)} rows')
+    need(len(swb) > 2000, f'RoadWork SWB projects: only {len(swb)} rows')
+    common = lambda vals: (ranked(Counter(v for v in vals if v)) or [''])[0]   # the value most segments give
+    txt = lambda r, c: re.sub(r'\s+', ' ', (r.get(c) or '').strip())
+    # projects: everything the page says about a project, once (its cost, dates and contractor repeat on each segment)
+    by, sby = defaultdict(list), defaultdict(list)
+    for r in dpw:
+        by[txt(r, 'projid')].append(r)
+    for r in swb:
+        sby[txt(r, 'projid')].append(r)
+    P, pix = [], {}
+    for pid in sorted((set(by) | set(sby)) - {''}):
+        rs, ss = by.get(pid, []), sby.get(pid, [])
+        # the phase most of its segments give (DPW's when the project is there, else SWB's); blanks don't vote
+        ph = Counter(rw_phase(r.get('current_phase')) for r in rs) if rs else Counter(rw_phase(r.get('ssstat')) for r in ss)
+        voted = Counter({k: v for k, v in ph.items() if k != 3}) or ph
+        cost = fnum(common(r.get('total_cost') for r in rs))
+        end = rw_when(common(r.get('endqtr') for r in rs))
+        pix[pid] = len(P)
+        P.append([pid, common(txt(r, 'project_name') for r in rs), ranked(voted)[0],
+                  rw_program(common(r.get('projtype') for r in rs)) if rs else '',
+                  common(txt(r, 'project_contractor') for r in rs if txt(r, 'project_contractor') != 'TBD'),
+                  round(cost) if cost and cost > 0 else 0, rw_when(common(r.get('startqtr') for r in rs)), end,
+                  int(end[-4:] if '-' in end[3:4] else end[:4]) if end else 0, (1 if rs else 0) + (2 if ss else 0)])
+    CT, ctx = dot_dict([txt(r, 'consttype') or 'Not stated' for r in dpw])
+    K, kx = dot_dict([rw_lines(r.get('sstype')) for r in swb])
+    ST, stx = dot_dict([txt(r, 'sstype') or 'Not stated' for r in swb])
+    seg = {}
+    pt = lambda r: (r.get('location') or {}).get('coordinates') or [None, None]
+    for i, r in enumerate(dpw):
+        seg[r['segmentid']] = {'pt': pt(r), 'p': pix.get(txt(r, 'projid'), -1), 'ph': rw_phase(r.get('current_phase')),
+                               'ct': ctx[i], 'sp': -1, 'sk': -1, 'ss': -1, 'st': -1}
+    both = 0
+    for i, r in enumerate(swb):
+        s = seg.get(r['segmentid'])
+        if s is None:
+            s = seg[r['segmentid']] = {'pt': pt(r), 'p': -1, 'ph': -1, 'ct': -1}
+        else:
+            both += 1
+        s.update(sp=pix.get(txt(r, 'projid'), -1), sk=kx[i], ss=rw_phase(r.get('ssstat')), st=stx[i])
+    keys = sorted(seg)
+    nbs, xy = dot_lonlat(nbp, [fnum(seg[k]['pt'][0]) for k in keys], [fnum(seg[k]['pt'][1]) for k in keys])
+    recs, no_loc = [], 0
+    for j, k in enumerate(keys):
+        if xy[j] is None or nbs[j] < 0:
+            no_loc += 1
+            continue
+        s = seg[k]
+        recs.append({'day': None, 'x': xy[j][0], 'y': xy[j][1], 'nb': nbs[j], **{c: s[c] for c in ('p', 'ph', 'ct', 'sp', 'sk', 'ss', 'st')}})
+    return {'ds': RW_DPW, 'swbDs': RW_SWB, 'phases': RW_PHASES, 'CT': CT, 'K': K, 'ST': ST,
+            'P': P, 'pcols': ['id', 'name', 'phase', 'program', 'contractor', 'cost', 'start', 'end', 'endYear', 'src'],
+            'dots': dot_pack(recs, ['p', 'ph', 'ct', 'sp', 'sk', 'ss', 'st']),
+            'dpwRows': len(dpw), 'swbRows': len(swb), 'both': both, 'total': len(keys), 'noLoc': no_loc,
+            'projects': [sum(1 for p in P if p[2] == k) for k in range(len(RW_PHASES))]}
 
 
 # Catch basins: the City's inventory, with the work recorded in its cleaning and inspection log. The log has its own
@@ -1886,7 +2037,7 @@ def build_biz(api, nbp):
 
 # Data files of the pages added with the 311 / housing / business set, and when each counts as stale
 # (file, label, field holding its newest record date, days without a new record before warning).
-NEW_FILES = ['311.json', 'treereq.json', 'drainreq.json', 'basins.json', 'str.json', 'blight.json', 'permits.json', 'biz.json']
+NEW_FILES = ['311.json', 'treereq.json', 'drainreq.json', 'basins.json', 'streetreq.json', 'roadwork.json', 'str.json', 'blight.json', 'permits.json', 'biz.json']
 STALE = [('311.json', '311 calls', 'last', 7), ('str.json', 'Short-term rental permit applications', 'last', 14),
          ('blight.json', 'Code enforcement cases', 'last', 14), ('permits.json', 'Permits', 'last', 14),
          ('biz.json', 'Business license applications', 'last', 14)]
@@ -1919,6 +2070,8 @@ DATASETS = {
     BIZ_NOW: ('Occupational business licenses', 'daily', 5),
     CB_DS: ('Catch basins', 'daily', None),                     # edited a few times a year
     CBW_DS: ('Catch basin cleanings', 'daily', None),           # reloaded every night; newest dated record January 2025
+    RW_DPW: ('RoadWork DPW projects', 'daily', None),           # updated nightly; no limit, the page shows its date
+    RW_SWB: ('RoadWork SWB projects', 'daily', None),
 }
 CFS_MAX_DAYS = 5   # the current year's Calls for Service dataset is reloaded every night
 
@@ -1986,6 +2139,15 @@ def validate(name, obj, prev, same_year=True):
         need(len(obj['G']) >= 2 and obj['noLoc'] < 0.1 * obj['total'], 'drainage requests: shape, or most failed to map')
         check_not_collapsed('311 drainage requests', obj['total'], prev and prev.get('total'))
         dots_ok('drainage requests', obj['dots'], 5000)
+    elif name == 'streetreq.json':
+        need(len(obj['G']) >= 2 and obj['noLoc'] < 0.1 * obj['total'], 'street requests: shape, or most failed to map')
+        check_not_collapsed('311 street requests', obj['total'], prev and prev.get('total'))
+        dots_ok('street requests', obj['dots'], 20000)
+    elif name == 'roadwork.json':
+        need(len(obj['P']) > 200 and all(len(p) == len(obj['pcols']) for p in obj['P']), 'road work: projects')
+        need(obj['noLoc'] < 0.1 * obj['total'], 'road work: most segments failed to map to a neighborhood')
+        check_not_collapsed('road work segments', obj['total'], prev and prev.get('total'), floor=0.8)
+        dots_ok('road work', obj['dots'], 8000)
     elif name == 'basins.json':
         need(obj['matched'] > 0.8 * (obj['matched'] + obj['unmatched']), 'basins: most logged visits matched no basin')
         need(len(obj['yw']) == len(obj['years']), 'basins: shape')
@@ -2203,12 +2365,18 @@ def main():
     attempt(['cpc.json'], cpc)
 
     # ---- pages added with the 311 / housing / business set: each file is rebuilt when its dataset(s) or geo changed
-    def sr():  # 311.json and the trees and drainage pages' requests come from the same rows
+    def sr():  # 311.json and the trees, drainage and streets pages' requests come from the same rows
         key = f'{api.version(SR_DS)}|{geo_key}'
-        if not (unchanged('311.json', key) & unchanged('treereq.json', key) & unchanged('drainreq.json', key)):
-            out['treereq.json'], out['drainreq.json'], out['311.json'] = build_311(api, P()[0])
+        if not (unchanged('311.json', key) & unchanged('treereq.json', key) & unchanged('drainreq.json', key) & unchanged('streetreq.json', key)):
+            out['treereq.json'], out['drainreq.json'], out['streetreq.json'], out['311.json'] = build_311(api, P()[0])
     print('311 requests ...', flush=True)
-    attempt(['311.json', 'treereq.json', 'drainreq.json'], sr)
+    attempt(['311.json', 'treereq.json', 'drainreq.json', 'streetreq.json'], sr)
+
+    def roadwork():  # both project lists are updated nightly: downloaded (one request each) when either version moves
+        if not unchanged('roadwork.json', f'{api.version(RW_DPW)}|{api.version(RW_SWB)}|{geo_key}'):
+            out['roadwork.json'] = build_roadwork(api, P()[0])
+    print('road work ...', flush=True)
+    attempt(['roadwork.json'], roadwork)
 
     def basins():  # the inventory by its version; the cleaning log, reloaded nightly, by its content (one small request)
         if not unchanged('basins.json', f'{api.version(CB_DS)}|{cb_fingerprint(api)}|{geo_key}'):
