@@ -1920,6 +1920,8 @@ DATASETS = {
     CB_DS: ('Catch basins', 'daily', None),                     # edited a few times a year
     CBW_DS: ('Catch basin cleanings', 'daily', None),           # reloaded every night; newest dated record January 2025
 }
+import addons   # smaller layers added to existing pages (pipeline/addons.py)
+DATASETS.update(addons.DATASETS)
 CFS_MAX_DAYS = 5   # the current year's Calls for Service dataset is reloaded every night
 
 # ---------------------------------------------------------------- sanity checks against the last good build
@@ -2018,6 +2020,8 @@ def validate(name, obj, prev, same_year=True):
         check_not_collapsed('current business licenses', obj['nowTotal'], prev and prev.get('nowTotal'), floor=0.8)
         dots_ok('business applications', obj['dots']['apps'], 0.8 * (obj['total'] - obj['noLoc']))
         dots_ok('current business licenses', obj['dots']['now'], 0.8 * (obj['nowTotal'] - obj['nowNoLoc']))
+    elif name in addons.ADDONS:
+        addons.ADDONS[name][4](obj, prev)
 
 
 def central_date(iso_utc):
@@ -2055,7 +2059,7 @@ def main():
     hist_versions = state.get('histVersions', {})  # year -> version of that year's dataset when hist.json last counted it
     copies = dict(state.get('copies', {}))         # ds -> last day its saved copy had to be downloaded again in full, unasked
     FOUND_IDS.update({int(y): i for y, i in state.get('cfsIds', {}).items()})
-    prev = {n: load_prev(n) for n in ['geo.json', 'streets.json', 'drone.json', 'cfs.json', 'hist.json', 'cpc.json', *NEW_FILES]}
+    prev = {n: load_prev(n) for n in ['geo.json', 'streets.json', 'drone.json', 'cfs.json', 'hist.json', 'cpc.json', *NEW_FILES, *addons.ADDONS]}
     out, keys, key_only, failed, alerts = {}, {}, {}, [], []
     watch = {ds: (label, days) for ds, (label, _, days) in DATASETS.items()}
 
@@ -2239,6 +2243,14 @@ def main():
             out['biz.json'] = build_biz(api, P()[0])
     print('new businesses ...', flush=True)
     attempt(['biz.json'], biz)
+
+    # Add-on layers (pipeline/addons.py): each rebuilt only when its datasets' "last updated" dates move
+    for name, (label, dss, with_geo, build, _) in addons.ADDONS.items():
+        def addon(name=name, dss=dss, with_geo=with_geo, build=build):
+            if not unchanged(name, '|'.join([api.version(d) for d in dss] + ([geo_key] if with_geo else []))):
+                out[name] = build(api, lambda: P()[0], geo)
+        print(label.lower(), '...', flush=True)
+        attempt([name], addon)
 
     for name in [n for n in out if n != 'geo.json']:
         same_year = (prev[name] or {}).get('year') == out[name].get('year') if name in ('drone.json', 'cfs.json') else True

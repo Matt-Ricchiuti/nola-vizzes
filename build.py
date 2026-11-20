@@ -51,13 +51,16 @@ listed = lambda: [(k, l) for k, (l, _) in PAGES.items() if k not in UNLISTED]
 css = open(P('src', 'lib.css'), encoding='utf-8').read()
 lib = open(P('src', 'lib.js'), encoding='utf-8').read()
 geo = load('geo.json')
+# Neighborhood groups (orgs.json) ride along with the neighborhoods, so every page's neighborhood picker can list them
+ORGS = os.path.exists(P('data', 'orgs.json'))
+if ORGS: geo['org'] = {k: v for k, v in load('orgs.json').items() if k in ('g', 'nb')}
 # Each page shows the date its own data last changed, from data/sources.json (written by pipeline/fetch.py).
 # A page's HTML then only changes when its data does, so days without new City data commit nothing.
 sources = load('sources.json').get('files', {}) if os.path.exists(P('data', 'sources.json')) else {}
 def changed(names):
     ds = [sources[n]['changed'] for n in names if sources.get(n, {}).get('changed')]
     return dt.date.fromisoformat(max(ds)) if ds else None
-page_date = {k: changed(['geo.json', *files.values()]) for k, (_, files) in PAGES.items()
+page_date = {k: changed(['geo.json', *(['orgs.json'] if ORGS else []), *files.values()]) for k, (_, files) in PAGES.items()
              if all(f in sources for f in files.values())}  # trees.json isn't built by the pipeline, so trees gets no date
 pulled = max(page_date.values(), default=None) or dt.date.fromisoformat(
     load('meta.json')['pulled'] if os.path.exists(P('data', 'meta.json')) else '2026-11-18')
@@ -154,6 +157,12 @@ def ds_dates(h):
         return m.group(0) + f'<span class="upd" title="Last updated by the City">{d}</span>'
     return re.sub(r'<aside class="srcbox".*?</aside>', lambda b: re.sub(r'(<a href="https://data\.nola\.gov/d/([a-z0-9]{4}-[a-z0-9]{4})">[^<]*</a>)', one, b.group(0)), h, count=1, flags=re.S)
 
+# Pages with a neighborhood picker list the groups' dataset in their sources box too.
+ORG_LINK = '<a href="https://data.nola.gov/d/bqyy-s7xy">Neighborhood Organizations</a>'
+def with_orgs(h, js):
+    if not ORGS or not re.search(r'nbPick|orgList', js): return h
+    return re.sub(r'(<aside class="srcbox".*?)(</aside>)', lambda m: m.group(1) + ORG_LINK + m.group(2), h, count=1, flags=re.S)
+
 def fill(h, key, extra=''):
     h = h.replace('{{CSS}}', css).replace('{{NAV}}', nav(key)).replace('{{D3}}', d3_tag() + STREETS_TAG + extra)
     h = h.replace('{{CITY_UPDATED}}', short(city_date.get(key) or max(filter(None, city_date.values()), default=pulled)))
@@ -170,6 +179,7 @@ for key, (label, files) in PAGES.items():
         for k, f in files.items():
             if k not in ext: data[k] = load(f)
         js = open(P('src', f'{key}.js'), encoding='utf-8').read()
+        h = with_orgs(h, js)
         # data/lib/js last, so placeholder-looking text inside the data is never touched
         h = fill(h, key, ''.join(static_tags[f] for f in ext.values()))
         dj = json.dumps(data, separators=(',', ':'), ensure_ascii=False)

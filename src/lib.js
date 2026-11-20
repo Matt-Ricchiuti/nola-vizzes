@@ -579,10 +579,30 @@ const NOLA = (() => {
     stepLegend(ml, arg, fmtf, none); ml.insertAdjacentHTML('afterbegin', `<div class="mlh">${label}</div>`);
     return leg;
   }
-  // neighborhood picker inside a panel section
+  // neighborhood picker inside a panel section; with a neighborhood picked, its neighborhood groups under it (orgList)
   function nbPick(sec, value, onSel, label = 'All neighborhoods') {
     const s = document.createElement('select'); s.className = 'fsel'; s.setAttribute('aria-label', 'Neighborhood'); sec.appendChild(s);
-    nbSelect(s, onSel, value, label); return s;
+    nbSelect(s, onSel, value, label); orgList(sec, value); return s;
+  }
+  // orgList(sec, i): neighborhood i's groups, from the City's list of self-reported neighborhood organizations (GEO.org,
+  // orgs.json): each name linked to its website, with when and where it meets. Folded behind one line so the panel stays
+  // short; open or closed, it stays that way across redraws. Contact people are never shown (see About).
+  let orgOpen = false;
+  const escH = v => String(v).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  function orgList(sec, i) {
+    const O = GEO && GEO.org; if (!O || !(i >= 0)) return null;
+    const L = (O.nb[i] || []).map(k => O.g[k]), d = document.createElement('details'); d.className = 'orgs';
+    if (!L.length) { d.className = 'orgs none'; d.innerHTML = '<summary>No neighborhood group on the City’s list</summary>'; sec.appendChild(d); return d; }
+    const site = u => /facebook\.com/i.test(u) ? 'Facebook' : 'Website';
+    d.open = orgOpen; d.ontoggle = () => { orgOpen = d.open; };
+    d.innerHTML = `<summary>${L.length} neighborhood group${L.length > 1 ? 's' : ''}</summary><ul>` + L.map(g => {
+      const w = g.w || [], name = w.length ? `<a href="${escH(w[0])}" target="_blank" rel="noopener">${escH(g.n)}</a>` : `<b>${escH(g.n)}</b>`;
+      const more = w.slice(1).map(u => `<a href="${escH(u)}" target="_blank" rel="noopener">${site(u)}</a>`)
+        .concat(g.e ? [`<a href="mailto:${escH(g.e)}">${escH(g.e)}</a>`] : []);
+      const meet = [g.m, g.l].filter(Boolean).map(escH).join(' · ');
+      return `<li>${name}${meet ? `<span>Meets: ${meet}</span>` : ''}${more.length ? `<span>${more.join(' · ')}</span>` : ''}</li>`;
+    }).join('') + '</ul>';
+    sec.appendChild(d); return d;
   }
   // on phones the panel collapses behind a "Filters" button
   function phoneToggle(panel) {
@@ -825,6 +845,6 @@ const NOLA = (() => {
   }
   const legendHTML = items => '<div class="legend">' + items.map(([c, l, round]) => `<span><i style="background:${c}${round ? ';border-radius:50%' : ''}"></i>${l}</span>`).join('') + '</div>';
 
-  return { css, S, fmt, pct, tip, row, setGeo, views, hashState, legendHTML, stage, fsec, flist, seg, ftabs, nbPick, kv, mapChecks, heatToggle, heatKey, dotData, addrRow, PERIODS, inPeriod, periodSeg, dotR, phoneToggle, popOf, perK, fmtRate, POP_NOTE, basisChips, shown, nbList, nbSelect, get FULL() { return FULL; }, get GEO() { return GEO; }, map, mapButtons, panelInset, seqVar, seqLegend, classes, stepLegend, short, frame, yGrid, chips, months, monthsLong,
+  return { css, S, fmt, pct, tip, row, setGeo, views, hashState, legendHTML, stage, fsec, flist, seg, ftabs, nbPick, kv, mapChecks, heatToggle, heatKey, orgList, dotData, addrRow, PERIODS, inPeriod, periodSeg, dotR, phoneToggle, popOf, perK, fmtRate, POP_NOTE, basisChips, shown, nbList, nbSelect, get FULL() { return FULL; }, get GEO() { return GEO; }, map, mapButtons, panelInset, seqVar, seqLegend, classes, stepLegend, short, frame, yGrid, chips, months, monthsLong,
     setYear, get YEAR() { return YEAR; }, monthTicks, doyTime, doyDate, doyISO, doyMonth, monthStarts, isoDate, share, numWord, cap, setText, setHTML, title };
 })();

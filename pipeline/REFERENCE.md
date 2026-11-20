@@ -443,3 +443,15 @@ Checked against the API on 2026-11-19: applications filed in 2025 and retail app
 ## Page copy that mentions specific numbers
 
 Pages no longer carry explanatory sentences: only titles, axis labels and legends. The year, dataset id and pull date are filled in by `build.py`, and axis limits and chart labels are computed from the data, so nothing goes stale as the data refreshes.
+
+## Add-on layers on existing pages (`pipeline/addons.py`)
+
+Smaller files that add a layer to pages that already exist. `fetch.py` runs them after the pages' own files, through the registry `addons.ADDONS` (file → label, datasets, whether `geo.json` is part of the key, builder, checks). Their datasets are in `DATASETS` (via `addons.DATASETS`), so the one catalog request covers their dates: a file is rebuilt only when one of its datasets' `rowsUpdatedAt` moves, and a quiet day costs nothing extra. A failed build keeps the last good file, like any other.
+
+### `data/orgs.json`: neighborhood groups (`bqyy-s7xy`, every page with a neighborhood picker)
+
+- One request for the whole dataset (77 rows, 0.4 MB with polygons), only when its date moves (it changed 2026-10-25) or `geo.json` changes. `build.py` adds `g` and `nb` to `geo` as `geo.org`, so every page that inlines `geo` carries it (about 6 KB).
+- `g`: `{n: name, w: [links], m: meeting dates, l: meeting place, e: email}`, sorted by name; `nb`: per neighborhood (geo.json order), indexes into `g`.
+- Matching: each group's polygon is sampled on a 40 m grid; a group is listed in every neighborhood holding at least 10% of its points, or at least 25% of whose area it covers, and otherwise in the one holding most. `unmatched` lists groups with no polygon inside any neighborhood (none as of 2026-11-20). Ten neighborhoods have no group.
+- Privacy: `poc` (a person) is never read. `email` is kept only when it's a role address (info@, president@, board@, …) on a domain that isn't a free-mail provider; 16 of 77 qualify. A meeting place that starts with a digit (a bare street address, possibly a home) is dropped, as are "varies", "depends", "N/A".
+- Only 15 groups give a website or Facebook page (the column is mostly "-").
