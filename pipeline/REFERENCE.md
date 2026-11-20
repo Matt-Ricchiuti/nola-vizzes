@@ -53,6 +53,8 @@ The workflow runs at 10:30 UTC. The City reloads most datasets between 04:30 and
 | `cpc.json` | `xxb5-5azv`'s `rowsUpdatedAt` or `geo.json` changed | "Today" for upcoming hearings and the 365-day window is the day the City loaded the data. |
 | `311.json` | `2jgv-pqrq`'s `rowsUpdatedAt` or `geo.json` changed | Incremental download (see below). "Today" is the newest request in the data. |
 | `treereq.json` | with `311.json` (same rows, same key) | No requests of its own: built from the 311 rows already downloaded. |
+| `drainreq.json` | with `311.json` (same rows, same key) | No requests of its own: built from the 311 rows already downloaded. |
+| `basins.json` | `se4p-ierc`'s `rowsUpdatedAt`, the cleaning log's content, or `geo.json` changed | The log (`2zer-6wpb`) is reloaded every night with the same rows (its newest dated record is from January 2025), so its version is useless as a key: one small request (`count(*)`, `max(mdate)`, `max(cbmaintid)`) stands in for it. Both datasets are downloaded whole only when one of them really changed (5 requests, 29 MB). |
 | `str.json` | any of `ufdg-ajws`, `en36-xvxg`, `2ei9-wqw2` or `geo.json` changed | All three are replaced by the City every night, so they're downloaded whole (3 requests). A dataset whose date didn't move is read from the saved answers. |
 | `permits.json` | `rcm3-fn58`'s `rowsUpdatedAt` or `geo.json` changed | The City rewrites 99% of rows every night, so incremental downloads don't help. API counts by year and code (with the newest issue date in the same request), plus the past 12 months' rows: 2 requests. |
 | `biz.json` | `abc4-h3u3`'s or `hjcd-grvu`'s `rowsUpdatedAt`, or `geo.json`, changed | Both replaced every night: two whole downloads. |
@@ -86,8 +88,9 @@ Measured 2026-11-19 (MB as the API sends it, uncompressed; about a sixth of that
 | Abatements `xv8z-gn8b` | in place, every week or two | daily (catalog) | all rows, 0.6 MB | 1 request, 0.6 MB | 0 (saved answer) |
 | Permits `rcm3-fn58` | 99% of rows rewritten nightly | daily (catalog) | counts by year + past 12 months' rows | 3 requests, 4.2 MB | 2 requests, 4.2 MB |
 | License applications `abc4-h3u3`, current licenses `hjcd-grvu` | replaced nightly | daily (catalog) | all rows of each | 2 requests, 10.8 MB | 2 requests, 10.8 MB |
-| **Typical day** | | | | **42 requests, 44.5 MB (6.8 MB transferred)** | **18 requests, 43.6 MB (6.7 MB transferred)** |
-| **Day without new City data** | | | | 21 requests, 0.8 MB | **1 request, 0.16 MB (20 KB transferred)** |
+| Catch basins `se4p-ierc`, cleaning log `2zer-6wpb` | inventory edited a few times a year; log reloaded nightly, unchanged since January 2025 | daily (catalog + 1 content check) | both whole, only when the inventory's date or the log's content moved | — | 1 request, under 1 KB (29 MB on a change) |
+| **Typical day** | | | | **42 requests, 44.5 MB (6.8 MB transferred)** | **19 requests, 43.6 MB (6.7 MB transferred)** |
+| **Day without new City data** | | | | 21 requests, 0.8 MB | **2 requests, 0.16 MB (21 KB transferred)**: the catalog and the catch basin log's content check |
 | **1st of the month** (on top of the day) | | | | everything again: 79 requests, 248 MB (53 MB transferred) | 4 requests: 2 boundary checks, row ids of 311 and calls, 22 MB (11 MB transferred) |
 | **Empty cache** (first run, or no run for 7 days) | | | | 79 requests, 248 MB | 46 requests, 237 MB (50 MB transferred), mostly the 311 and calls copies |
 
@@ -308,6 +311,23 @@ The "Tree requests (311)" map on the trees page. `build_311` keeps every 311 req
 - `last`: the newest 311 request, the page's "today" for the Month / 6 months / Year filter.
 
 Checked against the API on 2026-11-19: 1,706 tree requests filed in the 182 days to Nov 18, 846 still pending; the page shows 1,705 (one has no location) and 846 open.
+
+## `data/drainreq.json`: 311 drainage requests (drainage page)
+
+The "Drainage requests (311)" map and per-year chart. `build_311` keeps every 311 request of type `Drainage`, plus the drainage reasons filed under `Roads/Drainage` (used alongside it until August 2024) and `Roads and Streets` (`DR_GROUPS`): about 31,600 since February 2019, 4,970 still pending.
+
+- `G`: reason groups (`DR_GROUPS`): catch basin clogged or not draining; street flooding; broken basin or manhole cover; ditch or culvert; drainage issue, not specified; water main break or leaking hydrant; other.
+- `dots` (`dot_pack`): one per located request (31,343; 293 have no location). `g`: group; `c`: days from filing to the City's close date (-1 still pending, -2 closed with no close date).
+- `last`: the newest 311 request, the page's "today" for the Month / 6 months / Year filter.
+
+## `data/basins.json`: catch basins (drainage page)
+
+The City's catch basin inventory (`se4p-ierc`, about 80,500), with the work its cleaning and inspection log (`2zer-6wpb`) records. Served to the page as `site/basins-data.js` (`STATIC_DATA` in `build.py`), so browsers cache it.
+
+- The log's location ids (`gisid` like `393-462-0441`) don't match the inventory's (`CB130338`). Each log entry is matched to the inventory basin nearest its point within `CB_MATCH_M` (5 m): 61,711 of 65,742 entries with a work type (94%). `matched`, `unmatched`.
+- The log has 103,767 rows; 65,734 are dated, from `logFirst` (2017-01-09) to `logLast` (2025-01-02). About 38,000 rows have no date and no work type and are left out. Logged work by year (`years`, `yw`: cleaned, inspected, inaccessible) falls from about 19,000 entries in 2017 to about 2,000 in 2024.
+- `dots`: one per located basin. `day`: the last cleaning recorded (none: no day). `t`: type (`T`; IN, I and In are "Inlet"). `k`: cleanings recorded. `rs`: the reason given for the last one (`RS`). `v`, `vd`: a later visit that wasn't a cleaning (`W`: inspected or inaccessible) and its day (days since `epoch`), else -1. `s`: street (`S`).
+- Because the log stops in January 2025, the page shows the last cleaning *recorded*, never "time since cleaned", and the sources box shows "ends 01/02/25" for the log instead of its nightly reload date.
 
 ## `data/str.json`: short-term rentals
 

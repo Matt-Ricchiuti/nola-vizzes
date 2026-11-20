@@ -1160,8 +1160,9 @@ def build_311(api, nbp):
                     closeNb[nb][t].append(d)
     stat = lambda v: [len(v), median(v), p90(v)]
     trees = tree_requests(rows, created, closed, nbs, typ, reason, pending, last)
+    drain = drainage_requests(rows, created, closed, nbs, typ, reason, pending, last)
     dots = sr_dots(rows, created, closed, pending, recent, nbs, tix, reason, R)
-    return trees, {
+    return trees, drain, {
         'dots': dots,
         'ds': SR_DS, 'start': SR_START[:7], 'last': last.strftime('%Y-%m-%d'), 'winStart': win0.isoformat(),
         'T': T, 'R': R, 'mon': mon, 'years': years, 'nby': nby,
@@ -1228,6 +1229,164 @@ def tree_requests(rows, created, closed, nbs, typ, reason, pending, last):
         nb.append(nbs[i])
     return {'ds': SR_DS, 't0': t0.isoformat(), 'last': last.strftime('%Y-%m-%d'), 'R': R,
             'x': x, 'y': y, 'r': rr, 'd': d, 'c': c, 'nb': nb, 'total': len(idx), 'noLoc': no_loc}
+
+
+# ---------------------------------------------------------------- drainage
+# 311 drainage requests: every reason under the "Drainage" type, plus the drainage reasons filed under the older
+# "Roads/Drainage" type (used alongside it until 2024) and under "Roads and Streets". Reasons are grouped; anything
+# else under "Drainage" is "Other".
+DR_GROUPS = [
+    ('Catch basin clogged or not draining', ['Catch Basin Not Draining', 'Catch Basin Clogged', 'Catch Basin - Clogged', 'Illegal Dumping (Catch Basin)']),
+    ('Street flooding', ['Street Flooding', 'Street Flooding / Drainage', 'Alley Way Drainage Issue']),
+    ('Broken basin or manhole cover', ['Catch Basin Frame and Cover Missing or Damaged', 'Catch Basin Damaged', 'Catch Basin - Broken/Damage',
+                                       'Drainage Manhole Cover Missing or Damaged', 'Man hole cover issue']),
+    ('Ditch or culvert', ['Ditch and Culvert Maintenance', 'Ditch Issue', 'Culvert Issue']),
+    ('Drainage issue, not specified', ['Drainage Issue (Catch Basins, Culverts, Ditches, and Manhole Covers)']),
+    ('Water main break or leaking hydrant', ['WaterMain Break', 'Leaking Hydrant']),
+    ('Other', []),
+]
+DR_TYPE = 'Drainage'
+DR_REASON_GROUP = {r: g for g, (_, rs) in enumerate(DR_GROUPS) for r in rs}
+
+
+def drainage_requests(rows, created, closed, nbs, typ, reason, pending, last):
+    """The 311 drainage requests since SR_START, one dot each, for the drainage page. Built from the 311 rows already
+    downloaded, so it costs no extra API requests. Dots (dot_pack): g reason group (DR_GROUPS), c days to close
+    (-1 still open, -2 closed with no close date)."""
+    other = len(DR_GROUPS) - 1
+    idx = [i for i in range(len(rows)) if typ[i] == DR_TYPE or reason[i] in DR_REASON_GROUP]
+    need(len(idx) > 1000, f'311 drainage requests: only {len(idx)} found')
+    recs, no_loc = [], 0
+    for i in idx:
+        p = dot_xy(fnum(rows[i]['longitude']), fnum(rows[i]['latitude']))
+        if p is None or nbs[i] < 0:
+            no_loc += 1
+            continue
+        days = None if pending[i] else days_between(created[i], closed[i])
+        recs.append({'day': created[i].date(), 'x': p[0], 'y': p[1], 'nb': nbs[i], 'g': DR_REASON_GROUP.get(reason[i], other),
+                     'c': -1 if pending[i] else -2 if days is None else int(days + 0.5)})
+    return {'ds': SR_DS, 'start': SR_START, 'last': last.strftime('%Y-%m-%d'), 'G': [g for g, _ in DR_GROUPS],
+            'dots': dot_pack(recs, ['g', 'c']), 'total': len(idx), 'open': sum(pending[i] for i in idx), 'noLoc': no_loc}
+
+
+# Catch basins: the City's inventory, with the work recorded in its cleaning and inspection log. The log has its own
+# location ids, so each logged visit is matched to the inventory basin nearest its point, within CB_MATCH_M meters.
+# The log is reloaded every night but its newest dated record is from January 2025: the page says so, and the basin
+# map shows the last cleaning *recorded*, never "time since cleaned".
+CB_DS, CBW_DS = 'se4p-ierc', '2zer-6wpb'
+CB_MATCH_M = 5
+CB_TYPES = ['Vertical', 'Rollover', 'CB', 'Inlet', 'Not recorded']
+CB_TYPE_OF = {'vertical': 0, 'rollover': 1, 'cb': 2, 'in': 3, 'i': 3, 'inlet': 3}
+CB_WORK = ['Cleaned', 'Inspected', 'Inaccessible']   # CleanedInFront counts as Cleaned; Incomplete and blank are left out
+CB_WORK_OF = {'cleaned': 0, 'cleanedinfront': 0, 'inspected': 1, 'inaccessible': 2}
+CB_REASON = ['311 request', 'Routine maintenance', 'Emergency or storm', 'Special event', 'Other']
+
+
+def cb_reason(s):
+    s = re.sub(r'\s+', '', (s or '')).lower()
+    if s == '311case':
+        return 0
+    if 'maintenance' in s:
+        return 1
+    if 'emergency' in s or 'ida' in s or 'flood' in s:
+        return 2
+    if 'event' in s:
+        return 3
+    return 4
+
+
+def cb_fingerprint(api):
+    """The cleaning log's content, in one small request: the City reloads it every night (so its version moves daily)
+    while its rows stay the same. The basins file is rebuilt only when this or the inventory's version changes."""
+    r = api.get(f'/resource/{CBW_DS}.json', {'$select': 'count(*) as n, max(mdate) as last, max(cbmaintid) as id'}, cache=False)[0]
+    return f"{r.get('n')}/{(r.get('last') or '')[:10]}/{r.get('id')}"
+
+
+def title_street(s):
+    """'CONSTANTINOPLE ST' -> 'Constantinople St', '2ND ST' -> '2nd St' (the basin inventory's street names are in capitals)."""
+    s = re.sub(r'\s+', ' ', (s or '').strip())
+    if not s:
+        return 'Not recorded'
+    return ' '.join(w.lower() if re.fullmatch(r'\d+(St|Nd|Rd|Th)', w) else w for w in s.title().split(' '))
+
+
+def build_basins(api, nbp):
+    api.require_columns(CB_DS, ['the_geom', 'gisid', 'cbtype', 'stname'], 'Catch basins')
+    api.require_columns(CBW_DS, ['mdate', 'worktype', 'reason', 'x', 'y', 'nearestfu', 'gisid', 'cbmaintid'], 'Catch basin cleanings')
+    inv = fetch_all(api, CB_DS, 'the_geom,gisid,cbtype,stname')
+    log = fetch_all(api, CBW_DS, 'mdate,worktype,reason,x,y,nearestfu,gisid,cbmaintid')
+    need(len(inv) > 50000, f'Catch basins: only {len(inv)} rows')
+    need(len(log) > 50000, f'Catch basin cleanings: only {len(log)} rows')
+    coords = [((r.get('the_geom') or {}).get('coordinates') or [None, None]) for r in inv]
+    lon, lat = [fnum(c[0]) for c in coords], [fnum(c[1]) for c in coords]
+    nbs, xy = dot_lonlat(nbp, lon, lat)
+    # meters (east, north) for matching; a grid of CELL-meter cells holds the inventory
+    kx, ky, CELL = 111320 * math.cos(math.radians(29.97)), 110574, 10
+    grid = defaultdict(list)
+    for i, (a, b) in enumerate(zip(lon, lat)):
+        if a is not None and b is not None:
+            X, Y = a * kx, b * ky
+            grid[(int(X // CELL), int(Y // CELL))].append((i, X, Y))
+
+    def nearest(a, b):
+        X, Y = a * kx, b * ky
+        cx, cy, best, bd = int(X // CELL), int(Y // CELL), -1, CB_MATCH_M
+        for dx in (-1, 0, 1):
+            for dy in (-1, 0, 1):
+                for i, x2, y2 in grid.get((cx + dx, cy + dy), ()):
+                    d = math.hypot(X - x2, Y - y2)
+                    if d <= bd:
+                        best, bd = i, d
+        return best
+
+    n = len(inv)
+    last_clean, n_clean, last_visit, visit_kind, last_reason = [None] * n, [0] * n, [None] * n, [-1] * n, [-1] * n
+    years = Counter()            # (year, work) -> visits logged, matched or not
+    matched = unmatched = dated = 0
+    log_first = log_last = None
+    for r in log:
+        w = CB_WORK_OF.get(re.sub(r'\s+', '', (r.get('worktype') or '')).lower())
+        day = dt.date.fromisoformat(r['mdate'][:10]) if r.get('mdate') else None
+        if day:
+            dated += 1
+            log_first, log_last = min(log_first or day, day), max(log_last or day, day)
+            if w is not None:
+                years[(day.year, w)] += 1
+        if w is None:
+            continue
+        a, b = fnum(r.get('x')), fnum(r.get('y'))
+        i = nearest(a, b) if a is not None and b is not None else -1
+        if i < 0:
+            unmatched += 1
+            continue
+        matched += 1
+        if day is None:   # a few visits have a kind but no date: matched, but they say nothing about when
+            continue
+        if w == 0:
+            n_clean[i] += 1
+            if last_clean[i] is None or day > last_clean[i]:
+                last_clean[i], last_reason[i] = day, cb_reason(r.get('reason'))
+        if last_visit[i] is None or day >= last_visit[i]:
+            last_visit[i], visit_kind[i] = day, w
+    need(matched > 0.8 * (matched + unmatched), f'Catch basin cleanings: only {matched} of {matched + unmatched} visits matched a basin')
+    S, sx = dot_dict([title_street(r.get('stname')) for r in inv])
+    recs, no_loc = [], 0
+    for i, r in enumerate(inv):
+        if xy[i] is None or nbs[i] < 0:
+            no_loc += 1
+            continue
+        t = CB_TYPE_OF.get((r.get('cbtype') or '').strip().lower(), len(CB_TYPES) - 1)
+        lv = last_visit[i]
+        after = lv is not None and lv != last_clean[i]   # the last visit wasn't the last cleaning
+        recs.append({'day': last_clean[i], 'x': xy[i][0], 'y': xy[i][1], 'nb': nbs[i], 't': t, 'k': n_clean[i], 'rs': last_reason[i],
+                     'v': visit_kind[i] if after else -1, 'vd': (lv - DOT_EPOCH).days if after else -1, 's': sx[i]})
+    y0, y1 = min(y for y, _ in years), max(y for y, _ in years)
+    return {'ds': CB_DS, 'logDs': CBW_DS, 'T': CB_TYPES, 'W': CB_WORK, 'RS': CB_REASON, 'S': S,
+            'dots': dot_pack(recs, ['t', 'k', 'rs', 'v', 'vd', 's']),
+            'logFirst': log_first.isoformat(), 'logLast': log_last.isoformat(), 'logRows': len(log), 'logDated': dated,
+            'matched': matched, 'unmatched': unmatched, 'matchM': CB_MATCH_M,
+            'years': list(range(y0, y1 + 1)), 'yw': [[years[(y, w)] for w in range(len(CB_WORK))] for y in range(y0, y1 + 1)],
+            'total': n, 'noLoc': no_loc}
 
 
 # ---------------------------------------------------------------- short-term rentals
@@ -1727,7 +1886,7 @@ def build_biz(api, nbp):
 
 # Data files of the pages added with the 311 / housing / business set, and when each counts as stale
 # (file, label, field holding its newest record date, days without a new record before warning).
-NEW_FILES = ['311.json', 'treereq.json', 'str.json', 'blight.json', 'permits.json', 'biz.json']
+NEW_FILES = ['311.json', 'treereq.json', 'drainreq.json', 'basins.json', 'str.json', 'blight.json', 'permits.json', 'biz.json']
 STALE = [('311.json', '311 calls', 'last', 7), ('str.json', 'Short-term rental permit applications', 'last', 14),
          ('blight.json', 'Code enforcement cases', 'last', 14), ('permits.json', 'Permits', 'last', 14),
          ('biz.json', 'Business license applications', 'last', 14)]
@@ -1758,6 +1917,8 @@ DATASETS = {
     PERMITS: ('Permits', 'daily', 5),
     BIZ_APPS: ('Business license applications', 'daily', 5),
     BIZ_NOW: ('Occupational business licenses', 'daily', 5),
+    CB_DS: ('Catch basins', 'daily', None),                     # edited a few times a year
+    CBW_DS: ('Catch basin cleanings', 'daily', None),           # reloaded every night; newest dated record January 2025
 }
 CFS_MAX_DAYS = 5   # the current year's Calls for Service dataset is reloaded every night
 
@@ -1821,6 +1982,15 @@ def validate(name, obj, prev, same_year=True):
         need(all(len(obj[k]) == n for k in ('y', 'r', 'd', 'c', 'nb')) and len(obj['R']) >= 2, 'tree requests: shape')
         need(obj['noLoc'] < 0.1 * obj['total'], 'tree requests: most failed to map to a neighborhood')
         check_not_collapsed('311 tree requests', obj['total'], prev and prev.get('total'))
+    elif name == 'drainreq.json':
+        need(len(obj['G']) >= 2 and obj['noLoc'] < 0.1 * obj['total'], 'drainage requests: shape, or most failed to map')
+        check_not_collapsed('311 drainage requests', obj['total'], prev and prev.get('total'))
+        dots_ok('drainage requests', obj['dots'], 5000)
+    elif name == 'basins.json':
+        need(obj['matched'] > 0.8 * (obj['matched'] + obj['unmatched']), 'basins: most logged visits matched no basin')
+        need(len(obj['yw']) == len(obj['years']), 'basins: shape')
+        check_not_collapsed('catch basins', obj['total'], prev and prev.get('total'))
+        dots_ok('catch basins', obj['dots'], 50000)
     elif name == 'str.json':
         need(len(obj['nby']) == 72 and len(obj['yr']) == len(obj['years']) and all(len(p) == 9 for p in obj['pts']), 'str: shape')
         need(obj['total'] > 500 and len(obj['nc']['rows']) > 100, 'str: suspiciously few licenses')
@@ -2033,12 +2203,18 @@ def main():
     attempt(['cpc.json'], cpc)
 
     # ---- pages added with the 311 / housing / business set: each file is rebuilt when its dataset(s) or geo changed
-    def sr():  # 311.json and the trees page's tree requests come from the same rows
+    def sr():  # 311.json and the trees and drainage pages' requests come from the same rows
         key = f'{api.version(SR_DS)}|{geo_key}'
-        if not (unchanged('311.json', key) & unchanged('treereq.json', key)):
-            out['treereq.json'], out['311.json'] = build_311(api, P()[0])
+        if not (unchanged('311.json', key) & unchanged('treereq.json', key) & unchanged('drainreq.json', key)):
+            out['treereq.json'], out['drainreq.json'], out['311.json'] = build_311(api, P()[0])
     print('311 requests ...', flush=True)
-    attempt(['311.json', 'treereq.json'], sr)
+    attempt(['311.json', 'treereq.json', 'drainreq.json'], sr)
+
+    def basins():  # the inventory by its version; the cleaning log, reloaded nightly, by its content (one small request)
+        if not unchanged('basins.json', f'{api.version(CB_DS)}|{cb_fingerprint(api)}|{geo_key}'):
+            out['basins.json'] = build_basins(api, P()[0])
+    print('catch basins ...', flush=True)
+    attempt(['basins.json'], basins)
 
     def strs():
         if not unchanged('str.json', '|'.join([api.version(d) for d in (STR_ACTIVE, STR_APPS, STR_NC)] + [geo_key])):

@@ -67,6 +67,7 @@ How to build a view (`src/lib.js`): `NOLA.views([...])` lists the views; each vi
 | `biz.html` | Occupational Business License Data (`abc4-h3u3`, applications) and Occupational Business Licenses (`hjcd-grvu`, current) | daily |
 | `str.html` | Active Short-Term Rental Licenses (`ufdg-ajws`), Non-Commercial STR Licenses (`2ei9-wqw2`), STR Permit Applications (`en36-xvxg`) | daily |
 | `trees.html` | Tree Location (`3tyj-9x33`) + green space, Oct 2026 export in `data/trees.json`; 311 tree requests (`2jgv-pqrq`) in `data/treereq.json` | inventory static; requests daily with 311 |
+| `drain.html` | 311 drainage requests (`2jgv-pqrq`) in `data/drainreq.json`; Catch Basins (`se4p-ierc`) with the Catch Basin Cleanings / Inspections log (`2zer-6wpb`, ends January 2025) in `data/basins.json` | requests daily with 311; basins when the inventory or log changes |
 | `about.html` | About the site, sources, disclaimer | with each build |
 
 Pages listed in `UNLISTED` in `build.py` are still refreshed and built, so old links work, but are left out of the header and home-page menus. Remove a page from that set to list it again.

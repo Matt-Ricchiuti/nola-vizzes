@@ -40,6 +40,7 @@ PAGES = {'drone': ('NOPD drone flights', {'drone': 'drone.json'}),
          'blight': ('Blight/Code-enforcement', {'ce': 'blight.json'}),
          'permits': ('Permits', {'permits': 'permits.json'}),
          'trees': ('Trees', {'trees': 'trees.json', 'treq': 'treereq.json'}),
+         'drain': ('Drainage', {'dr': 'drainreq.json', 'cb': 'basins.json'}),
          'biz': ('New Businesses', {'biz': 'biz.json'})}
 EXTRA = {'about': 'About'}
 # Pages still built (so old links keep working and they can come back) but left out of the header and home-page
@@ -117,7 +118,7 @@ if os.path.exists(P('data', 'streets.json')):
 
 # Data that rarely changes goes in its own file too, so a page whose other data changes daily (trees: the 311 tree
 # requests) doesn't make every visitor download it again: data file -> (script, global it sets).
-STATIC_DATA = {'trees.json': ('trees-data.js', 'TREES_DATA')}
+STATIC_DATA = {'trees.json': ('trees-data.js', 'TREES_DATA'), 'basins.json': ('basins-data.js', 'BASINS_DATA')}
 static_tags = {}
 for f, (js_name, var) in STATIC_DATA.items():
     if not os.path.exists(P('data', f)): continue
@@ -139,8 +140,15 @@ city_date = {k: city_updated(files.values()) for k, (_, files) in PAGES.items() 
 VERSIONS = load('sources.json').get('versions', {}) if os.path.exists(P('data', 'sources.json')) else {}
 STATIC_VERSIONS = {'3tyj-9x33': '2025-04-17T17:00:00Z'}   # the tree inventory isn't fetched daily; its City date
 def short(d): return d.strftime('%m/%d/%y')
+# A dataset the City reloads every night without new records shows where its records end instead of the reload date:
+# the catch basin cleaning log (its newest dated record, from basins.json).
+ENDS = {}
+if os.path.exists(P('data', 'basins.json')):
+    ENDS['2zer-6wpb'] = dt.date.fromisoformat(load('basins.json')['logLast'])
 def ds_dates(h):
     def one(m):
+        if m.group(2) in ENDS:
+            return m.group(0) + f'<span class="upd" title="The newest record in the City\'s log">ends {short(ENDS[m.group(2)])}</span>'
         t = VERSIONS.get(m.group(2)) or STATIC_VERSIONS.get(m.group(2))
         d = short(central(dt.datetime.fromisoformat(t.replace('Z', '')))) if t else '—'
         return m.group(0) + f'<span class="upd" title="Last updated by the City">{d}</span>'

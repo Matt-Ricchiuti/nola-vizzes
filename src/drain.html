@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Drainage · Nola Vizzes</title>
+<style>{{CSS}}
+/* the Drainage requests / Catch basins switch floats at the top center of the map, as on the trees page */
+.ftabs.tmode{position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:3;width:max-content;max-width:calc(100% - 120px);background:var(--surface);border:1px solid var(--ring);box-shadow:0 4px 14px rgb(0 0 0 / .14)}
+.ftabs.tmode button{flex:0 0 auto;padding:6px 14px;white-space:nowrap}
+.ftabs.tmode button[aria-selected="true"]{background:var(--ink);color:var(--surface);box-shadow:none}
+@media(max-width:760px){.ftabs.tmode{top:10px;left:10px;transform:none;max-width:calc(100% - 70px)}.ftabs.tmode button{padding:6px 10px}}
+</style>
+{{D3}}
+</head><body><div class="wrap">
+{{NAV}}
+<div class="phead"><h1>Drainage</h1>
+<aside class="srcbox" aria-label="Data sources"><span class="sbl">Source</span><span class="sbl r">Updated</span><a href="https://data.nola.gov/d/2jgv-pqrq">311 OPCD Calls</a><a href="https://data.nola.gov/d/se4p-ierc">Catch Basins</a><a href="https://data.nola.gov/d/2zer-6wpb">Catch Basin Cleanings / Inspections</a></aside></div>
+<div id="chart"></div>
+{{FOOT}}
+</div>
+<script>const DATA={{DATA}};</script>
+<script>{{LIB}}</script>
+<script>{{JS}}</script>
+</body></html>
