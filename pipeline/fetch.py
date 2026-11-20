@@ -1025,6 +1025,27 @@ def clean_addr(s):
 NAME_CAPS = {'LLC', 'L.L.C.', 'LLP', 'PLLC', 'LP', 'PC', 'P.C.', 'DBA', 'USA', 'NOLA', 'II', 'III', 'IV', 'TV', 'AC', 'BBQ', 'CPA', 'MD', 'DDS', 'ATM', 'ABC'}
 
 
+# words that mark an owner as a company, not a person
+OWNER_CO = re.compile(r'\b(LLC|L\.L\.C|INC|CORP|CORPORATION|CO|COMPANY|LTD|LIMITED|LLP|PLLC|LP|PC|APC|TRUST|GROUP|HOLDINGS|PARTNERS|PARTNERSHIP|'
+                      r'ASSOCIATES|ASSOCIATION|ENTERPRISES?|FOUNDATION|CHURCH|UNIVERSITY|SCHOOL|CITY|STATE|PARISH|BANK|SERVICES?|AUTHORITY|CLUB)\b')
+NAME_SKIP = {'JR', 'SR', 'II', 'III', 'IV', 'DBA', 'MR', 'MRS', 'MS', 'DR'}
+
+
+def name_tokens(s):
+    """Upper-case words of a name, without initials, generational suffixes or titles."""
+    return [w for w in re.findall(r"[A-Z][A-Z'\-]*", (s or '').upper()) if len(w) > 1 and w not in NAME_SKIP]
+
+
+def just_a_person(name, owner):
+    """True when a business name is only its owner's own name: the owner is a person (no company words) and every
+    word of the name, apart from initials and suffixes, is a word of the owner's name ('Joan T Baker' owned by
+    'BAKER, JOAN'). The owner's name is used only for this check and is never kept."""
+    if not owner or OWNER_CO.search(owner.upper()):
+        return False
+    nt, ot = name_tokens(name), set(name_tokens(owner))
+    return len(nt) >= 2 and all(w in ot for w in nt)
+
+
 def clean_name(s):
     """A business name, whitespace collapsed and cut to 60 characters; one in all capitals is put in mixed case,
     keeping company suffixes, initials and words without vowels in capitals ('JOE'S BBQ LLC' -> 'Joe's BBQ LLC')."""
@@ -1604,7 +1625,7 @@ def biz_type_key(s):
 
 def build_biz(api, nbp):
     a_cols = ['application_filed', 'currentstatus', 'category', 'businesstype', 'ishome', 'longitude', 'latitude', 'address']
-    n_cols = ['businesstype', 'businessstartdate', 'longitude', 'latitude', 'address', 'businessname']
+    n_cols = ['businesstype', 'businessstartdate', 'longitude', 'latitude', 'address', 'businessname', 'ownername']
     api.require_columns(BIZ_APPS, a_cols, 'Business license applications')
     api.require_columns(BIZ_NOW, n_cols, 'Occupational business licenses')
     apps = fetch_all(api, BIZ_APPS, ','.join(a_cols))
@@ -1646,6 +1667,9 @@ def build_biz(api, nbp):
             t2s[biz_type_key(r['businesstype'])][c] += 1
     now = fetch_all(api, BIZ_NOW, ','.join(n_cols))
     need(len(now) > 10000, f'Occupational business licenses: only {len(now)} rows')
+    # owner names are what keep business names that are only a person's name off the map (just_a_person)
+    no_owner = sum(not (r.get('ownername') or '').strip() for r in now)
+    need(no_owner < len(now) * 0.05, f'Occupational business licenses: {no_owner} rows without an owner name, so business names that are only a person\'s name could not be left out')
     S2 = S[:-2] + ['Other sectors', BIZ_VENDOR, 'Other or not stated']
     s2i = {c: k for k, c in enumerate(S2)}
     nnb, _ = points_to_nb(nbp, now)
@@ -1688,7 +1712,8 @@ def build_biz(api, nbp):
             dn.append({'day': sd.date() if sd and sd.year > 1900 else None,   # 1900-01-01 stands for 'not recorded'
                        'x': p[0], 'y': p[1], 'nb': nb, 's': s, 'tn': tn(r.get('businesstype')),
                        'ad': None if home_now(r) else clean_addr(r.get('address')),
-                       'bn': None if home_now(r) else clean_name(r.get('businessname'))})
+                       # a name that is only the owner's own name is left out ('' = no name); ownername isn't kept
+                       'bn': None if home_now(r) else '' if just_a_person(r.get('businessname'), r.get('ownername')) else clean_name(r.get('businessname'))})
     return {
         'dots': {'apps': dot_typed(da, ['s', 'o', 'h', 't'], addr=True), 'now': dot_typed(dn, ['s', 't'], addr=True)},
         'ds': [BIZ_APPS, BIZ_NOW], 'last': today.isoformat(), 'winStart': win0.isoformat(),
