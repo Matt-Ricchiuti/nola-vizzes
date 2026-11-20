@@ -94,12 +94,11 @@ def nav(key):
             f'<button type="button" class="ddbtn{" on" if key in PAGES else ""}" aria-haspopup="true" aria-expanded="false">Visualizations<span aria-hidden="true">▾</span></button>'
             f'<ul class="dd1">{pages}</ul></div>{extra}</nav>' + NAV_JS + '</div>')
 
-# The home-page menu lists the listed pages; each page stacks all of its charts.
+# The home-page menu lists the listed pages (About is in the footer).
 def menu():
     e = html.escape
     pages = ''.join(f'<li><a href="{k}.html">{e(l)}</a></li>' for k, l in listed())
-    extra = ''.join(f'<a href="{k}.html">{e(l)}</a>' for k, l in EXTRA.items())
-    return f'<ul class="vlist">{pages}</ul><div class="vextra">{extra}</div>'
+    return f'<ul class="vlist">{pages}</ul>'   # About is linked in the footer
 TOKENS['{{MENU}}'] = menu()
 # last day each of the newer pages' data reaches (the file's 'last' field), e.g. {{SR_THRU}}
 for tok, f in [('SR', '311.json'), ('STR', 'str.json'), ('CE', 'blight.json'), ('PERMIT', 'permits.json'), ('BIZ', 'biz.json')]:
