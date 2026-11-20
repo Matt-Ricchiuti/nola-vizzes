@@ -55,6 +55,7 @@ The workflow runs at 10:30 UTC. The City reloads most datasets between 04:30 and
 | `treereq.json` | with `311.json` (same rows, same key) | No requests of its own: built from the 311 rows already downloaded. |
 | `drainreq.json` | with `311.json` (same rows, same key) | No requests of its own: built from the 311 rows already downloaded. |
 | `basins.json` | `se4p-ierc`'s `rowsUpdatedAt`, the cleaning log's content, or `geo.json` changed | The log (`2zer-6wpb`) is reloaded every night with the same rows (its newest dated record is from January 2025), so its version is useless as a key: one small request (`count(*)`, `max(mdate)`, `max(cbmaintid)`) stands in for it. Both datasets are downloaded whole only when one of them really changed (5 requests, 29 MB). |
+| `land.json` | `5ktx-e9wc`'s, `hpm5-48nj`'s or `bsqt-btyi`'s `rowsUpdatedAt`, or `geo.json`, changed | All three are small and downloaded whole (3 requests, 3.6 MB), plus one request to the Parcels layer (`v9q5-fz7t`) for the outlines of NORA's lots (0.07 MB). The parcel layer's own date isn't in the key: it only places lots. |
 | `str.json` | any of `ufdg-ajws`, `en36-xvxg`, `2ei9-wqw2` or `geo.json` changed | All three are replaced by the City every night, so they're downloaded whole (3 requests). A dataset whose date didn't move is read from the saved answers. |
 | `permits.json` | `rcm3-fn58`'s `rowsUpdatedAt` or `geo.json` changed | The City rewrites 99% of rows every night, so incremental downloads don't help. API counts by year and code (with the newest issue date in the same request), plus the past 12 months' rows: 2 requests. |
 | `biz.json` | `abc4-h3u3`'s or `hjcd-grvu`'s `rowsUpdatedAt`, or `geo.json`, changed | Both replaced every night: two whole downloads. |
@@ -89,6 +90,7 @@ Measured 2026-11-19 (MB as the API sends it, uncompressed; about a sixth of that
 | Permits `rcm3-fn58` | 99% of rows rewritten nightly | daily (catalog) | counts by year + past 12 months' rows | 3 requests, 4.2 MB | 2 requests, 4.2 MB |
 | License applications `abc4-h3u3`, current licenses `hjcd-grvu` | replaced nightly | daily (catalog) | all rows of each | 2 requests, 10.8 MB | 2 requests, 10.8 MB |
 | Catch basins `se4p-ierc`, cleaning log `2zer-6wpb` | inventory edited a few times a year; log reloaded nightly, unchanged since January 2025 | daily (catalog + 1 content check) | both whole, only when the inventory's date or the log's content moved | — | 1 request, under 1 KB (29 MB on a change) |
+| NORA uncommitted inventory `5ktx-e9wc`, NORA sold `hpm5-48nj`, Public Land `bsqt-btyi`, Parcels `v9q5-fz7t` | the NORA lists a few times a year (both 2026-11-10); Public Land last 2025-11-10; parcels about monthly | daily (catalog) | all three whole + NORA's parcels, only when one of the three moved | — | 0 (4 requests, 3.7 MB on a change) |
 | **Typical day** | | | | **42 requests, 44.5 MB (6.8 MB transferred)** | **19 requests, 43.6 MB (6.7 MB transferred)** |
 | **Day without new City data** | | | | 21 requests, 0.8 MB | **2 requests, 0.16 MB (21 KB transferred)**: the catalog and the catch basin log's content check |
 | **1st of the month** (on top of the day) | | | | everything again: 79 requests, 248 MB (53 MB transferred) | 4 requests: 2 boundary checks, row ids of 311 and calls, 22 MB (11 MB transferred) |
@@ -328,6 +330,19 @@ The City's catch basin inventory (`se4p-ierc`, about 80,500), with the work its 
 - The log has 103,767 rows; 65,734 are dated, from `logFirst` (2017-01-09) to `logLast` (2025-01-02). About 38,000 rows have no date and no work type and are left out. Logged work by year (`years`, `yw`: cleaned, inspected, inaccessible) falls from about 19,000 entries in 2017 to about 2,000 in 2024.
 - `dots`: one per located basin. `day`: the last cleaning recorded (none: no day). `t`: type (`T`; IN, I and In are "Inlet"). `k`: cleanings recorded. `rs`: the reason given for the last one (`RS`). `v`, `vd`: a later visit that wasn't a cleaning (`W`: inspected or inaccessible) and its day (days since `epoch`), else -1. `s`: street (`S`).
 - Because the log stops in January 2025, the page shows the last cleaning *recorded*, never "time since cleaned", and the sources box shows "ends 01/02/25" for the log instead of its nightly reload date.
+
+## `data/land.json`: vacant and public land, NORA sales (vacant land page)
+
+Three small datasets, each downloaded whole: NORA's Uncommitted Property Inventory (`5ktx-e9wc`, 214 lots: 213 vacant lots and 1 structure), the City's Public Land list (`bsqt-btyi`, 2,149 sites, last updated November 2025) and NORA Sold Properties (`hpm5-48nj`, 5,626 sales, 1980 to September 2026).
+
+- NORA's inventory has no coordinates. Each lot is placed at a point inside its parcel: its `geopin_2` looked up in the Parcels layer (`v9q5-fz7t`, `geopin`, `the_geom`) with one `$where geopin in (...)` request per 300 lots (`land_parcels`). All 214 matched on 2026-11-20. Sales without a geocoded point (12) are looked up there too; 11 matched.
+- Public land rows carry MultiPolygons: the dot is the area centroid of the largest part, or, when that falls outside it, the middle of the widest stretch of the part along the centroid's latitude (`ring_point`). 4 of 2,149 fall outside every neighborhood or have no outline. Size: the City's `acerage` when given, else the outline's area.
+- A NORA lot whose geopin is also on the public land list (135 of 214) is one dot, `src` 0, with the list's type, agencies and note.
+- `land` (`dot_addresses`; no dates): `src` 0 NORA lot, 1 public land. `g`: public land group (`G`, from the City's `type`, spellings joined: `LAND_TYPE_GROUP`); NORA lots not on the City's list count as vacant land. `t`: the City's type (`TY`). `z`: NORA zoning (`Z`). `m`: managing agency (`M`), `o`, `u`, `l`: owned, used and leased by (`O`; agency spellings joined by `LAND_AGENCY`; all organizations). `nm`: site name (`N`). `k`: the City's note, only the four status notes in `LAND_NOTES` (the rest are deed references). `s`: square feet (-1 none), `sb`: size class (`sizes`). `sd`, `c`: the parcel's newest NORA sale, as days since `epoch` and channel (`SC`), else -1.
+- 420 public land sites have a NORA sale on record for their geopin, nearly all dated before the list's November 2025 update; the page draws them faded, and can hide them or show only them.
+- `sold` (`dot_addresses`): one per sale with a location (5,625 of 5,626). `day`: sale date. `c`: channel group (`CH`: Auction, Lot Next Door, Development, Alternative Land Use, Other = Special Transfer and Affordable Housing Development). `e`: the exact channel (`CHX`). `i`: 1 when the parcel is on NORA's uncommitted list again.
+- `years`, `yc`: every sale by year (from 2000) and channel group; `pre`: the 18 sales before 2000. `first`, `last`: oldest and newest sale. `inv`/`invNoLoc`, `pub`/`pubNoLoc`, `total`/`noLoc`, `byParcel`, `merged`: counts for the checks and About.
+- Buyers aren't in the City's file. NORA describes its lists at https://noraworks.org; "uncommitted" means not under contract or committed to a program, not that a lot is for sale.
 
 ## `data/str.json`: short-term rentals
 
