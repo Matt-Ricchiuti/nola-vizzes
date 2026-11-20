@@ -99,6 +99,7 @@ Most of a typical day's bytes are the datasets the City replaces every night. Th
 { "files": { "cfs.json": {"key": "<inputs it was built from>", "changed": "2026-11-18"}, ... },
   "histVersions": { "2026": "<rowsUpdatedAt when hist.json last counted that year>", ... },
   "cfsIds": { "2027": "<id found in the catalog>" },        # years not in CFS_IDS, so the catalog is searched once
+  "versions": { "2jgv-pqrq": "<rowsUpdatedAt>", ... },  # each dataset's last City update as last seen; build.py shows it as (MM/DD/YY) after the dataset's link
   "copies": { "2jgv-pqrq": "2026-11-19" } }                 # last day a saved copy had to be downloaded again in full, unasked
 ```
 

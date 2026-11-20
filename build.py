@@ -132,11 +132,21 @@ def city_updated(names):
     return central(max(ts)).date() if ts else None
 city_date = {k: city_updated(files.values()) for k, (_, files) in PAGES.items() if files}
 
+# After each dataset link in a page's source line, the date the City last updated that dataset, e.g. "(11/19/26)"
+# (data/sources.json 'versions', written by fetch.py; New Orleans time).
+VERSIONS = load('sources.json').get('versions', {}) if os.path.exists(P('data', 'sources.json')) else {}
+def short(d): return d.strftime('%m/%d/%y')
+def ds_dates(h):
+    def one(m):
+        t = VERSIONS.get(m.group(2))
+        return m.group(0) + (f' <span class="upd" title="Last updated by the City">({short(central(dt.datetime.fromisoformat(t.replace("Z", ""))))})</span>' if t else '')
+    return re.sub(r'<div class="src">.*?</div>', lambda src: re.sub(r'(<a href="https://data\.nola\.gov/d/([a-z0-9]{4}-[a-z0-9]{4})">[^<]*</a>)', one, src.group(0)), h, count=1, flags=re.S)
+
 def fill(h, key, extra=''):
     h = h.replace('{{CSS}}', css).replace('{{NAV}}', nav(key)).replace('{{D3}}', d3_tag() + STREETS_TAG + extra)
-    h = h.replace('{{CITY_UPDATED}}', fdate(city_date.get(key) or max(filter(None, city_date.values()), default=pulled)))
+    h = h.replace('{{CITY_UPDATED}}', short(city_date.get(key) or max(filter(None, city_date.values()), default=pulled)))
     for k, v in TOKENS.items(): h = h.replace(k, v)
-    return h
+    return ds_dates(h)
 
 os.makedirs(P('site'), exist_ok=True)
 for key, (label, files) in PAGES.items():

@@ -2130,7 +2130,9 @@ def main():
     # sources.json is rewritten only along with a data change (or a full re-download to remember), so an idle day commits nothing.
     if changed or copies != state.get('copies', {}) or not os.path.exists(os.path.join(a.out, 'sources.json')):
         state = {'files': dict(sorted(files.items())), 'histVersions': dict(sorted(hist_versions.items())),
-                 'cfsIds': {str(y): i for y, i in sorted(FOUND_IDS.items())}}
+                 'cfsIds': {str(y): i for y, i in sorted(FOUND_IDS.items())},
+                 # each dataset's "data last updated" time on data.nola.gov, as last seen; build.py prints it by its link
+                 'versions': dict(sorted({**state.get('versions', {}), **api.vers}.items()))}
         if copies:
             state['copies'] = dict(sorted(copies.items()))
         with open(os.path.join(a.out, 'sources.json'), 'w', encoding='utf-8', newline='\n') as f:
