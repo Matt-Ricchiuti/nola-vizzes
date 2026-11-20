@@ -455,3 +455,10 @@ Smaller files that add a layer to pages that already exist. `fetch.py` runs them
 - Matching: each group's polygon is sampled on a 40 m grid; a group is listed in every neighborhood holding at least 10% of its points, or at least 25% of whose area it covers, and otherwise in the one holding most. `unmatched` lists groups with no polygon inside any neighborhood (none as of 2026-11-20). Ten neighborhoods have no group.
 - Privacy: `poc` (a person) is never read. `email` is kept only when it's a role address (info@, president@, board@, …) on a domain that isn't a free-mail provider; 16 of 77 qualify. A meeting place that starts with a digit (a bare street address, possibly a home) is dropped, as are "varies", "depends", "N/A".
 - Only 15 groups give a website or Facebook page (the column is mostly "-").
+
+### `data/historic.json`: historic districts and landmarks (`vgpk-2scb`, `25e8-s5xx`, permits map)
+
+- Two requests (whole datasets: 22 districts, 2.5 MB of polygons; 347 landmarks, 0.13 MB), only when either date moves (`vgpk-2scb` last changed 2025-02-16, `25e8-s5xx` 2026-11-10). `build.py` serves it as `historic-data.js` (41 KB), like `basins-data.js`, so browsers cache it.
+- Why `vgpk-2scb` and not the newer "Local Historic District" `hea7-kccz` (updated 2026-07-09): the newer one returns the same 22 names with no geometry through the API (`the_geom` is null on every row), and has no `control` or `jurisdiction`.
+- `d`: `{n: name, c: 1 full control / 0 partial, j: commission, r: rings}`; rings are delta-encoded in map units × `q` (4, about 5 m), simplified with Douglas–Peucker at 3 m (`addons.enc_geom`). `lm`: `[x, y, name, address, architect ('' when "Unknown"), date, 1 designated / 0 nominated]`.
+- The page tests permits against the outlines in the browser; a permit within a few meters of a line may land on either side.

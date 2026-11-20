@@ -174,3 +174,49 @@ def _check_orgs(o, prev):
 
 ADDONS['orgs.json'] = ('Neighborhood groups', [ORG_DS], True, lambda api, nbp, geo: build_orgs(api, nbp(), geo), _check_orgs)
 DATASETS[ORG_DS] = ('Neighborhood organizations', 'daily', None)
+
+
+# ---------------------------------------------------------------- B. historic districts and landmarks (permits map)
+HD_DS = 'vgpk-2scb'       # Local Historic Districts (the newer hea7-kccz has no geometry in the API)
+LM_DS = '25e8-s5xx'       # HDLC Landmarks
+HD_TOL = 0.6   # 3 m
+JURIS = {'NOHDLC': 'HDLC', 'CBDHDLC': 'HDLC (CBD)', 'VCC': 'Vieux Carré Commission'}
+
+
+def build_historic(api):
+    api.require_columns(HD_DS, ['name', 'control', 'jurisdiction', 'the_geom'], 'Local historic districts')
+    api.require_columns(LM_DS, ['name', 'addr', 'architect', 'nom_des', 'date', 'the_geom'], 'HDLC landmarks')
+    fc = api.get(f'/resource/{HD_DS}.geojson', {'$limit': 500, '$order': ':id'}, kind='geojson')
+    lm = api.get(f'/resource/{LM_DS}.json', {'$limit': 2000, '$order': ':id'})
+    need(15 <= len(fc.get('features', [])) < 500, 'Local historic districts: unexpected number of districts')
+    need(200 <= len(lm) < 2000, f'HDLC landmarks: {len(lm)} rows')
+    d = []
+    for ft in fc['features']:
+        p = ft['properties']
+        r = enc_geom(ft.get('geometry'), HD_TOL)
+        if r:
+            d.append({'n': clean(p.get('name')), 'c': 1 if (p.get('control') or '').lower().startswith('full') else 0,
+                      'j': JURIS.get((p.get('jurisdiction') or '').strip(), clean(p.get('jurisdiction'))), 'r': r})
+    pts = []
+    for r in lm:
+        c = ((r.get('the_geom') or {}).get('coordinates') or [None, None])
+        lon, lat = fnum(c[0]), fnum(c[1])
+        if lon is None or lat is None:
+            continue
+        x, y = xy(lon, lat)
+        arch = clean(r.get('architect'))
+        pts.append([round(x), round(y), clean(r.get('name')), clean(r.get('addr')),
+                    '' if arch.lower() in ('unknown', 'n/a') else arch, clean(r.get('date')),
+                    1 if (r.get('nom_des') or '').lower().startswith('des') else 0])
+    return {'ds': HD_DS, 'lmDs': LM_DS, 'q': DOT_Q, 'd': d, 'lm': pts}
+
+
+def _check_historic(o, prev):
+    need(len(o['d']) >= 15 and len(o['lm']) >= 200, 'historic: too few districts or landmarks')
+    if prev:
+        need(len(o['lm']) >= 0.9 * len(prev['lm']), 'historic: landmarks dropped by more than 10%')
+
+
+ADDONS['historic.json'] = ('Historic districts and landmarks', [HD_DS, LM_DS], False, lambda api, nbp, geo: build_historic(api), _check_historic)
+DATASETS[HD_DS] = ('Local historic districts', 'daily', None)
+DATASETS[LM_DS] = ('HDLC landmarks', 'daily', None)
