@@ -132,7 +132,7 @@ a.btn{text-decoration:none;display:inline-block}
 .halo{paint-order:stroke;stroke:var(--surface);stroke-width:5px;stroke-linejoin:round}
 .maplab{font-weight:600;letter-spacing:.02em}
 /* ---------- filters live on the chart: a panel of legend-style rows (see NOLA.stage / fsec / flist) ---------- */
-/* one tab per chart (NOLA.views): tabs and the open chart's Copy link / Source Data in one row, the chart below */
+/* one tab per chart (NOLA.views): the tabs in one row, the open chart below */
 .vbar{display:flex;align-items:flex-start;gap:10px 18px;padding:0 0 12px;border-bottom:1px solid var(--grid);scroll-margin-top:12px}
 .vtabs{display:flex;flex-wrap:wrap;gap:4px;flex:1 1 auto;min-width:0}
 .vtabs button{font:inherit;font-size:13px;line-height:1.3;border:1px solid transparent;border-radius:999px;background:none;color:var(--ink2);padding:5px 12px;cursor:pointer;white-space:nowrap}
@@ -142,17 +142,25 @@ a.btn{text-decoration:none;display:inline-block}
 .vsec{margin:26px 0 0}
 /* a page with one chart: its heading sits in the bar where the tabs would be */
 .vbar.one{align-items:center}
-.vbar.one h2{flex:1 1 auto;min-width:0;margin:0;font-family:"Young Serif",Georgia,"Times New Roman",serif;font-weight:400;font-size:21px}
+.vbar.one h2{flex:0 1 auto;min-width:0;margin:0;font-family:"Young Serif",Georgia,"Times New Roman",serif;font-weight:400;font-size:21px}
 .vbar.one+.vsec{margin-top:14px}
-.vsec-h{margin:0 0 12px}
+.vsec-h{display:flex;align-items:center;gap:10px;margin:0 0 12px}
 .vsec-h h2{font-size:21px;margin:0}
-.tools{display:flex;gap:6px;flex:0 0 auto;padding-top:3px}
+/* the square share button just right of the open chart's title (NOLA.views) */
+.share{position:relative;flex:0 0 auto;display:inline-grid;place-items:center;width:30px;height:30px;padding:0;border-radius:8px;cursor:pointer;
+  color:var(--accent);background:color-mix(in srgb,var(--accent) 10%,var(--surface));border:1px solid color-mix(in srgb,var(--accent) 32%,var(--ring));
+  transition:background .15s,border-color .15s,color .15s}
+.share:hover{background:color-mix(in srgb,var(--accent) 18%,var(--surface));border-color:color-mix(in srgb,var(--accent) 55%,var(--ring))}
+.share:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.share.done{color:var(--surface);background:var(--accent);border-color:var(--accent)}
+.share .shok{position:absolute;left:calc(100% + 8px);top:50%;transform:translateY(-50%);white-space:nowrap;font-size:12px;color:var(--ink2);pointer-events:none}
+.share .shok:empty{display:none}
+@media (prefers-reduced-motion:reduce){.share{transition:none}}
 @media(max-width:640px){
   .vbar{flex-direction:column;gap:10px}
   .vbar.one{flex-direction:row;flex-wrap:wrap;align-items:center}
   .vtabs{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin:0 -16px;padding:0 16px;width:calc(100% + 32px)}
   .vtabs::-webkit-scrollbar{display:none}
-  .tools{padding-top:0}
 }
 .stage{position:relative}
 .stage.chartstage{display:grid;grid-template-columns:260px minmax(0,1fr);gap:18px;align-items:start}
@@ -315,7 +323,10 @@ table.static tbody tr{cursor:auto}
 .tmap.drag{cursor:grabbing}
 /* no visible chart title: the switch on the map says which map it is (the heading stays for screen readers) */
 .vbar.one h2{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
-.vbar.one .tools{margin-left:auto}
+/* the share button sits beside the page title; the chart bar (only a hidden heading) takes no room */
+.ptitle{display:flex;align-items:center;gap:10px;min-width:0}
+.vbar.one{display:none}
+.vbar.one+.vsec{margin-top:0}
 /* the Trees / Tree requests switch floats at the top center of the map */
 .ftabs.tmode{position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:3;width:max-content;max-width:calc(100% - 120px);background:var(--surface);border:1px solid var(--ring);box-shadow:0 4px 14px rgb(0 0 0 / .14)}
 .ftabs.tmode button{flex:0 0 auto;padding:6px 14px;white-space:nowrap}
@@ -334,7 +345,7 @@ table.static tbody tr{cursor:auto}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script><script src="streets.js"></script><script src="trees-data.js"></script>
 </head><body><div class="wrap">
 <div class="site"><b><a href="index.html" style="color:inherit;text-decoration:none">Nola Vizzes</a></b><nav class="topnav" aria-label="Site"><div class="dd"><button type="button" class="ddbtn on" aria-haspopup="true" aria-expanded="false">Visualizations<span aria-hidden="true">▾</span></button><ul class="dd1"><li><a href="cpc.html">City Planning Cases</a></li><li><a href="311.html">311 Requests</a></li><li><a href="str.html">Short-Term Rentals (STRs)</a></li><li><a href="blight.html">Blight/Code-enforcement</a></li><li><a href="permits.html">Permits</a></li><li><a href="trees.html" class="on" aria-current="page">Trees</a></li><li><a href="biz.html">New Businesses</a></li></ul></div><a class="xlink" href="about.html">About</a></nav><script>(()=>{const dd=document.currentScript.closest(".site").querySelector(".dd"),b=dd.querySelector(".ddbtn");const set=o=>{dd.classList.toggle("open",o);b.setAttribute("aria-expanded",o)};b.onclick=e=>{e.stopPropagation();set(!dd.classList.contains("open"))};document.addEventListener("click",e=>{if(!dd.contains(e.target))set(false)});dd.addEventListener("keydown",e=>{if(e.key==="Escape"){set(false);b.focus()}})})()</script></div>
-<div class="phead"><h1>Street trees</h1>
+<div class="phead"><div class="ptitle"><h1>Street trees</h1></div>
 <aside class="srcbox" aria-label="Data sources"><span class="sbl">Source data</span><span class="sbl r">Updated</span><a href="https://data.nola.gov/d/3tyj-9x33">Tree Location</a><span class="upd" title="Last updated by the City">04/17/25</span><a href="https://data.nola.gov/d/2jgv-pqrq">311 OPCD Calls (tree requests)</a><span class="upd" title="Last updated by the City">11/19/26</span><span class="thru">Requests through Nov 18, 2026</span></aside></div>
 <div id="chart"></div>
 <div class="foot">Data: <a id="dataLink" href="https://data.nola.gov">data.nola.gov</a> · Not affiliated with the City of New Orleans · <a href="about.html">About</a></div>
@@ -1051,10 +1062,11 @@ const NOLA = (() => {
     return o;
   }
   // views(list, { state, ds }) -- list: [{ id, label, tab, cls, keep, draw(el, first), ds: [id, name] or () => [id, name] }]
-  // A bar at the top of #chart holds a tab per chart (`tab`, or `label`) and Copy link / Source Data for the open one.
-  // Source Data links to the open chart's City dataset on data.nola.gov (its export is there): the view's `ds`, which
-  // can be a function of the filters when one chart switches between datasets, else the page's `opts.ds`.
-  // Below it, each chart is its own section (heading `label`, then the chart); only the open one shows.
+  // A bar at the top of #chart holds a tab per chart (`tab`, or `label`). Below it, each chart is its own section
+  // (heading `label`, then the chart); only the open one shows. A square share button sits just right of the open
+  // chart's heading: it copies a link to that chart with its filters (on phones, the system share sheet).
+  // The page's datasets are listed in the sources box beside the page title (build.py); `ds` names the footer link.
+  // `shareAfter`: an element to put the share button after instead (a page whose chart heading is hidden).
   // `label` can be a function, for a chart whose subject follows its filters; the heading is set again on each draw
   // (give such a chart a `tab`). Redrawing keeps the filter panel's scroll and the page's, so a click low in a long
   // panel doesn't jump it back to the top.
@@ -1062,6 +1074,9 @@ const NOLA = (() => {
   // Filters are shared page state: refresh() redraws the open chart, and the others redraw when next opened.
   // state() returns the filters that differ from their defaults; they're written into the link.
   // A page can open a chart with location.hash = 'chartId'.
+  // an arrow curving up out of an open tray: the share button's icon
+  const SHARE_ICON = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+    + '<path d="M3 9v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-1"/><path d="M7 17A10 10 0 0 1 17 7h3"/><path d="M16 3l4 4-4 4"/></svg>';
   function views(list, opts = {}) {
     const host = document.getElementById('chart');
     const panes = {}, secs = {}, tabs = {}, drawn = new Set(), stale = new Set();
@@ -1073,26 +1088,25 @@ const NOLA = (() => {
     let cur = list.find(v => v.id === h0) || list[0];
     const linkFor = () => location.href.split('#')[0] + '#' + cur.id + stateKV();
     const writeHash = () => history.replaceState(null, '', '#' + cur.id + stateKV());
-    const btn = t => { const b = document.createElement('button'); b.className = 'btn'; b.type = 'button'; b.textContent = t; return b; };
-    // the bar: tabs, then the open chart's Copy link / Source Data
+    // the bar: one tab per chart
     const bar = document.createElement('div'); bar.className = 'vbar';
     const tabRow = document.createElement('div'); tabRow.className = 'vtabs'; tabRow.setAttribute('role', 'tablist'); tabRow.setAttribute('aria-label', 'Charts');
-    const tools = document.createElement('div'); tools.className = 'tools';
-    const linkB = btn('Copy link'), csvB = document.createElement('a');
-    csvB.className = 'btn'; csvB.textContent = 'Source Data'; csvB.target = '_blank'; csvB.rel = 'noopener';
-    const dsOf = v => (typeof v.ds === 'function' ? v.ds() : v.ds) || opts.ds;
-    const setDs = () => { const d = dsOf(cur); csvB.href = 'https://data.nola.gov/d/' + d[0]; csvB.title = `Open the ${d[1]} dataset on data.nola.gov`; };
-    linkB.onclick = async () => {
+    // the share button, moved beside the open chart's heading
+    const shareB = document.createElement('button'); shareB.type = 'button'; shareB.className = 'share';
+    shareB.setAttribute('aria-label', 'Share a link to this chart'); shareB.title = 'Share a link to this chart, with its filters';
+    shareB.innerHTML = SHARE_ICON + '<span class="shok" role="status"></span>';
+    const said = shareB.querySelector('.shok');
+    shareB.onclick = async () => {
       writeHash(); const url = linkFor();
-      try { await navigator.clipboard.writeText(url); linkB.textContent = 'Link copied'; }
+      if (navigator.share && matchMedia('(pointer:coarse)').matches) { try { await navigator.share({ title: document.title, url }); } catch (e) {} return; }
+      try { await navigator.clipboard.writeText(url); said.textContent = 'Link copied'; shareB.classList.add('done'); }
       catch (e) { prompt('Copy this link:', url); }
-      setTimeout(() => linkB.textContent = 'Copy link', 1600);
+      clearTimeout(shareB.t); shareB.t = setTimeout(() => { said.textContent = ''; shareB.classList.remove('done'); }, 1600);
     };
-    tools.append(linkB, csvB);
     // a page with a single chart has no tabs: the bar holds that chart's heading instead
     const one = list.length === 1;
     if (one) bar.classList.add('one');
-    bar.append(one ? document.createElement('h2') : tabRow, tools); host.appendChild(bar);
+    bar.append(one ? document.createElement('h2') : tabRow); host.appendChild(bar);
     const labelOf = v => typeof v.label === 'function' ? v.label() : v.label, heads = {};
     list.forEach(v => {
       const t = document.createElement('button'); t.type = 'button'; t.textContent = v.tab || labelOf(v);
@@ -1127,11 +1141,11 @@ const NOLA = (() => {
       if (fp && fp.scrollTop !== keep[0]) fp.scrollTop = keep[0];
       if (scrollY !== keep[2] || scrollX !== keep[1]) scrollTo(keep[1], keep[2]);
     };
-    const draw = () => { tip.hide(); list.forEach(v => { if (v !== cur && drawn.has(v.id)) stale.add(v.id); }); drawOne(cur); writeHash(); setDs(); };
+    const draw = () => { tip.hide(); list.forEach(v => { if (v !== cur && drawn.has(v.id)) stale.add(v.id); }); drawOne(cur); writeHash(); };
     function show(v) {
       cur = v;
       list.forEach(x => { secs[x.id].hidden = x !== v; tabs[x.id].setAttribute('aria-selected', x === v); tabs[x.id].tabIndex = x === v ? 0 : -1; });
-      setDs();
+      (opts.shareAfter || heads[v.id]).after(shareB);
       if (!drawn.has(v.id) || stale.has(v.id)) drawOne(v);
       // on phones the tab row scrolls sideways: bring the open tab into view
       const r = tabRow.getBoundingClientRect(), t = tabs[v.id].getBoundingClientRect();
@@ -1679,7 +1693,7 @@ const NOLA = (() => {
   const V = NOLA.views([
     { id: 'map', label: 'Map of every tree', keep: true, draw: drawMap,
       ds: () => mode === 'req' ? ['2jgv-pqrq', '311 OPCD Calls'] : ['3tyj-9x33', 'Tree Location'] },
-  ], { ds: ['3tyj-9x33', 'Tree Location'],
+  ], { ds: ['3tyj-9x33', 'Tree Location'], shareAfter: document.querySelector('.ptitle h1'),
        state: () => mode === 'req'
          ? ({ m: 'req', nb: selNb >= 0 ? selNb : null, rs: rStat !== 'all' ? rStat : null, rp: rPer !== '6' ? rPer : null,
               ro: RS.some(r => !r.on) ? RS.map((r, i) => r.on ? null : i).filter(i => i != null).join('.') : null })

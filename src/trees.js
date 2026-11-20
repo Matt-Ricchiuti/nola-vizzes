@@ -506,7 +506,7 @@
   const V = NOLA.views([
     { id: 'map', label: 'Map of every tree', keep: true, draw: drawMap,
       ds: () => mode === 'req' ? ['2jgv-pqrq', '311 OPCD Calls'] : ['3tyj-9x33', 'Tree Location'] },
-  ], { ds: ['3tyj-9x33', 'Tree Location'],
+  ], { ds: ['3tyj-9x33', 'Tree Location'], shareAfter: document.querySelector('.ptitle h1'),
        state: () => mode === 'req'
          ? ({ m: 'req', nb: selNb >= 0 ? selNb : null, rs: rStat !== 'all' ? rStat : null, rp: rPer !== '6' ? rPer : null,
               ro: RS.some(r => !r.on) ? RS.map((r, i) => r.on ? null : i).filter(i => i != null).join('.') : null })

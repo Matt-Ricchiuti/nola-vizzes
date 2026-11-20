@@ -709,10 +709,11 @@ const NOLA = (() => {
     return o;
   }
   // views(list, { state, ds }) -- list: [{ id, label, tab, cls, keep, draw(el, first), ds: [id, name] or () => [id, name] }]
-  // A bar at the top of #chart holds a tab per chart (`tab`, or `label`) and Copy link / Source Data for the open one.
-  // Source Data links to the open chart's City dataset on data.nola.gov (its export is there): the view's `ds`, which
-  // can be a function of the filters when one chart switches between datasets, else the page's `opts.ds`.
-  // Below it, each chart is its own section (heading `label`, then the chart); only the open one shows.
+  // A bar at the top of #chart holds a tab per chart (`tab`, or `label`). Below it, each chart is its own section
+  // (heading `label`, then the chart); only the open one shows. A square share button sits just right of the open
+  // chart's heading: it copies a link to that chart with its filters (on phones, the system share sheet).
+  // The page's datasets are listed in the sources box beside the page title (build.py); `ds` names the footer link.
+  // `shareAfter`: an element to put the share button after instead (a page whose chart heading is hidden).
   // `label` can be a function, for a chart whose subject follows its filters; the heading is set again on each draw
   // (give such a chart a `tab`). Redrawing keeps the filter panel's scroll and the page's, so a click low in a long
   // panel doesn't jump it back to the top.
@@ -720,6 +721,9 @@ const NOLA = (() => {
   // Filters are shared page state: refresh() redraws the open chart, and the others redraw when next opened.
   // state() returns the filters that differ from their defaults; they're written into the link.
   // A page can open a chart with location.hash = 'chartId'.
+  // an arrow curving up out of an open tray: the share button's icon
+  const SHARE_ICON = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+    + '<path d="M3 9v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-1"/><path d="M7 17A10 10 0 0 1 17 7h3"/><path d="M16 3l4 4-4 4"/></svg>';
   function views(list, opts = {}) {
     const host = document.getElementById('chart');
     const panes = {}, secs = {}, tabs = {}, drawn = new Set(), stale = new Set();
@@ -731,26 +735,25 @@ const NOLA = (() => {
     let cur = list.find(v => v.id === h0) || list[0];
     const linkFor = () => location.href.split('#')[0] + '#' + cur.id + stateKV();
     const writeHash = () => history.replaceState(null, '', '#' + cur.id + stateKV());
-    const btn = t => { const b = document.createElement('button'); b.className = 'btn'; b.type = 'button'; b.textContent = t; return b; };
-    // the bar: tabs, then the open chart's Copy link / Source Data
+    // the bar: one tab per chart
     const bar = document.createElement('div'); bar.className = 'vbar';
     const tabRow = document.createElement('div'); tabRow.className = 'vtabs'; tabRow.setAttribute('role', 'tablist'); tabRow.setAttribute('aria-label', 'Charts');
-    const tools = document.createElement('div'); tools.className = 'tools';
-    const linkB = btn('Copy link'), csvB = document.createElement('a');
-    csvB.className = 'btn'; csvB.textContent = 'Source Data'; csvB.target = '_blank'; csvB.rel = 'noopener';
-    const dsOf = v => (typeof v.ds === 'function' ? v.ds() : v.ds) || opts.ds;
-    const setDs = () => { const d = dsOf(cur); csvB.href = 'https://data.nola.gov/d/' + d[0]; csvB.title = `Open the ${d[1]} dataset on data.nola.gov`; };
-    linkB.onclick = async () => {
+    // the share button, moved beside the open chart's heading
+    const shareB = document.createElement('button'); shareB.type = 'button'; shareB.className = 'share';
+    shareB.setAttribute('aria-label', 'Share a link to this chart'); shareB.title = 'Share a link to this chart, with its filters';
+    shareB.innerHTML = SHARE_ICON + '<span class="shok" role="status"></span>';
+    const said = shareB.querySelector('.shok');
+    shareB.onclick = async () => {
       writeHash(); const url = linkFor();
-      try { await navigator.clipboard.writeText(url); linkB.textContent = 'Link copied'; }
+      if (navigator.share && matchMedia('(pointer:coarse)').matches) { try { await navigator.share({ title: document.title, url }); } catch (e) {} return; }
+      try { await navigator.clipboard.writeText(url); said.textContent = 'Link copied'; shareB.classList.add('done'); }
       catch (e) { prompt('Copy this link:', url); }
-      setTimeout(() => linkB.textContent = 'Copy link', 1600);
+      clearTimeout(shareB.t); shareB.t = setTimeout(() => { said.textContent = ''; shareB.classList.remove('done'); }, 1600);
     };
-    tools.append(linkB, csvB);
     // a page with a single chart has no tabs: the bar holds that chart's heading instead
     const one = list.length === 1;
     if (one) bar.classList.add('one');
-    bar.append(one ? document.createElement('h2') : tabRow, tools); host.appendChild(bar);
+    bar.append(one ? document.createElement('h2') : tabRow); host.appendChild(bar);
     const labelOf = v => typeof v.label === 'function' ? v.label() : v.label, heads = {};
     list.forEach(v => {
       const t = document.createElement('button'); t.type = 'button'; t.textContent = v.tab || labelOf(v);
@@ -785,11 +788,11 @@ const NOLA = (() => {
       if (fp && fp.scrollTop !== keep[0]) fp.scrollTop = keep[0];
       if (scrollY !== keep[2] || scrollX !== keep[1]) scrollTo(keep[1], keep[2]);
     };
-    const draw = () => { tip.hide(); list.forEach(v => { if (v !== cur && drawn.has(v.id)) stale.add(v.id); }); drawOne(cur); writeHash(); setDs(); };
+    const draw = () => { tip.hide(); list.forEach(v => { if (v !== cur && drawn.has(v.id)) stale.add(v.id); }); drawOne(cur); writeHash(); };
     function show(v) {
       cur = v;
       list.forEach(x => { secs[x.id].hidden = x !== v; tabs[x.id].setAttribute('aria-selected', x === v); tabs[x.id].tabIndex = x === v ? 0 : -1; });
-      setDs();
+      (opts.shareAfter || heads[v.id]).after(shareB);
       if (!drawn.has(v.id) || stale.has(v.id)) drawOne(v);
       // on phones the tab row scrolls sideways: bring the open tab into view
       const r = tabRow.getBoundingClientRect(), t = tabs[v.id].getBoundingClientRect();
