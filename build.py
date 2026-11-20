@@ -132,15 +132,17 @@ def city_updated(names):
     return central(max(ts)).date() if ts else None
 city_date = {k: city_updated(files.values()) for k, (_, files) in PAGES.items() if files}
 
-# After each dataset link in a page's source line, the date the City last updated that dataset, e.g. "(11/19/26)"
-# (data/sources.json 'versions', written by fetch.py; New Orleans time).
+# The sources box beside each data page's title lists the page's datasets, each with the date the City last updated
+# it (data/sources.json 'versions', written by fetch.py; New Orleans time), e.g. "11/19/26".
 VERSIONS = load('sources.json').get('versions', {}) if os.path.exists(P('data', 'sources.json')) else {}
+STATIC_VERSIONS = {'3tyj-9x33': '2025-04-17T17:00:00Z'}   # the tree inventory isn't fetched daily; its City date
 def short(d): return d.strftime('%m/%d/%y')
 def ds_dates(h):
     def one(m):
-        t = VERSIONS.get(m.group(2))
-        return m.group(0) + (f' <span class="upd" title="Last updated by the City">({short(central(dt.datetime.fromisoformat(t.replace("Z", ""))))})</span>' if t else '')
-    return re.sub(r'<div class="src">.*?</div>', lambda src: re.sub(r'(<a href="https://data\.nola\.gov/d/([a-z0-9]{4}-[a-z0-9]{4})">[^<]*</a>)', one, src.group(0)), h, count=1, flags=re.S)
+        t = VERSIONS.get(m.group(2)) or STATIC_VERSIONS.get(m.group(2))
+        d = short(central(dt.datetime.fromisoformat(t.replace('Z', '')))) if t else '—'
+        return m.group(0) + f'<span class="upd" title="Last updated by the City">{d}</span>'
+    return re.sub(r'<aside class="srcbox".*?</aside>', lambda b: re.sub(r'(<a href="https://data\.nola\.gov/d/([a-z0-9]{4}-[a-z0-9]{4})">[^<]*</a>)', one, b.group(0)), h, count=1, flags=re.S)
 
 def fill(h, key, extra=''):
     h = h.replace('{{CSS}}', css).replace('{{NAV}}', nav(key)).replace('{{D3}}', d3_tag() + STREETS_TAG + extra)
