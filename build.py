@@ -5,7 +5,8 @@
 
 Templates can use these placeholders, filled in at build time:
     {{CSS}} {{NAV}} {{DATA}} {{LIB}} {{JS}} {{D3}}
-    {{PULLED}}      on a data page, the date that page's data last changed (data/sources.json), e.g. "Nov 18, 2026";
+    {{CITY_UPDATED}} on a data page, the last day the City updated one of its datasets (data/sources.json), e.g. "Nov 18, 2026";
+    {{PULLED}}      the newest date any page's data changed;
                     elsewhere the latest of those dates
     {{CFS_YEAR}} {{CFS_DS}} {{CFS_PREV}}   year, dataset id and previous year of the Calls for Service page
     {{DRONE_YEAR}}  year covered by the drone page
@@ -122,9 +123,18 @@ for f, (js_name, var) in STATIC_DATA.items():
     static_tags[f] = '<script>' + body + '</script>' if mode == 'preview' else f'<script src="{js_name}"></script>'
     print('built', js_name, len(body), '' if write(js_name, body) else '(unchanged)')
 
+# "City updated" on each data page: the newest time the City changed one of the page's own datasets on data.nola.gov
+# (the times fetch.py saves in each file's key in data/sources.json), as a date in New Orleans. Not the neighborhood
+# or street layers, and not when our copy or code changed.
+CITY_TS = re.compile(r'\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d')
+def city_updated(names):
+    ts = [dt.datetime.fromisoformat(t) for n in names for t in CITY_TS.findall(sources.get(n, {}).get('key') or '')]
+    return central(max(ts)).date() if ts else None
+city_date = {k: city_updated(files.values()) for k, (_, files) in PAGES.items() if files}
+
 def fill(h, key, extra=''):
     h = h.replace('{{CSS}}', css).replace('{{NAV}}', nav(key)).replace('{{D3}}', d3_tag() + STREETS_TAG + extra)
-    h = h.replace('{{PULLED}}', fdate(page_date.get(key) or pulled))  # a data page shows when its own data last changed
+    h = h.replace('{{CITY_UPDATED}}', fdate(city_date.get(key) or max(filter(None, city_date.values()), default=pulled)))
     for k, v in TOKENS.items(): h = h.replace(k, v)
     return h
 
