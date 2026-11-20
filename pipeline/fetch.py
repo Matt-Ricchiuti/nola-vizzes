@@ -1017,19 +1017,51 @@ def clean_addr(s):
     s = re.sub(r'\s+', ' ', (s or '').strip())[:48]
     if s and not re.search(r'[a-z]', s):
         s = ' '.join(w[:1] + w[1:].lower() for w in s.split(' '))
-        s = re.sub(r"O'([a-z])", lambda m: "O'" + m.group(1).upper(), s)
+        s = re.sub(r"\bO'([a-z])", lambda m: "O'" + m.group(1).upper(), s)
     return s
 
 
-def dot_addresses(recs, cols):
-    """dot_pack, with each record's street address `ad` stored as an index `a` into the list `A` (most shared first;
-    -1 when missing, -2 when withheld: `ad` None)."""
-    A, _ = dot_dict([r['ad'] for r in recs if r['ad']])
-    ix = {v: k for k, v in enumerate(A)}
+# words kept in capitals when an all-capitals business name is put in mixed case
+NAME_CAPS = {'LLC', 'L.L.C.', 'LLP', 'PLLC', 'LP', 'PC', 'P.C.', 'DBA', 'USA', 'NOLA', 'II', 'III', 'IV', 'TV', 'AC', 'BBQ', 'CPA', 'MD', 'DDS', 'ATM', 'ABC'}
+
+
+def clean_name(s):
+    """A business name, whitespace collapsed and cut to 60 characters; one in all capitals is put in mixed case,
+    keeping company suffixes, initials and words without vowels in capitals ('JOE'S BBQ LLC' -> 'Joe's BBQ LLC')."""
+    s = re.sub(r'\s+', ' ', (s or '').strip())[:60].strip()
+    if s and not re.search(r'[a-z]', s):
+        def word(w):
+            core = w.strip(',()')
+            if re.fullmatch(r'\d+(ST|ND|RD|TH)', core):
+                return w.lower()
+            if core in NAME_CAPS or not re.search(r'[AEIOUY]', core) or re.fullmatch(r'(?:[A-Z]\.)+|[A-Z]{1,2}&[A-Z]{1,2}', core):
+                return w
+            return re.sub(r"(^|[-/(&])([A-Z])([A-Z']*)", lambda m: m.group(1) + m.group(2) + m.group(3).lower(), w)
+        s = ' '.join(word(w) for w in s.split(' '))
+        s = re.sub(r"\b(O'|Mc)([a-z])", lambda m: m.group(1) + m.group(2).upper(), s)
+    return s
+
+
+def dot_lookup(recs, key, col):
+    """Each record's text `key` -> index `col` into the returned list (most shared first; -1 when missing, -2 when
+    withheld: the text is None)."""
+    L, _ = dot_dict([r[key] for r in recs if r[key]])
+    ix = {v: k for k, v in enumerate(L)}
     for r in recs:
-        r['a'] = -2 if r['ad'] is None else ix.get(r['ad'], -1)
-    out = dot_pack(recs, cols + ['a'])
+        r[col] = -2 if r[key] is None else ix.get(r[key], -1)
+    return L
+
+
+def dot_addresses(recs, cols):
+    """dot_pack, with each record's street address `ad` stored as an index `a` into the list `A` (and, when records
+    carry a business name `bn`, that as `m` into `M`), as dot_lookup."""
+    A = dot_lookup(recs, 'ad', 'a')
+    names = recs and 'bn' in recs[0]
+    M = dot_lookup(recs, 'bn', 'm') if names else None
+    out = dot_pack(recs, cols + ['a'] + (['m'] if names else []))
     out['A'] = A
+    if names:
+        out['M'] = M
     return out
 
 
@@ -1572,7 +1604,7 @@ def biz_type_key(s):
 
 def build_biz(api, nbp):
     a_cols = ['application_filed', 'currentstatus', 'category', 'businesstype', 'ishome', 'longitude', 'latitude', 'address']
-    n_cols = ['businesstype', 'businessstartdate', 'longitude', 'latitude', 'address']
+    n_cols = ['businesstype', 'businessstartdate', 'longitude', 'latitude', 'address', 'businessname']
     api.require_columns(BIZ_APPS, a_cols, 'Business license applications')
     api.require_columns(BIZ_NOW, n_cols, 'Occupational business licenses')
     apps = fetch_all(api, BIZ_APPS, ','.join(a_cols))
@@ -1632,11 +1664,15 @@ def build_biz(api, nbp):
     sparse = lambda c: [v for key in sorted(c) for v in ((*key, c[key]) if isinstance(key, tuple) else (key, c[key]))]
     # dots: every located application since BIZ_START (s sector, o outcome, h home-based 1 / not 0 / not stated -1,
     # t business type), and every located business licensed now (day licensed since, s sector in S2, t type).
-    # Street addresses are kept except where the business may be someone's home: applications marked home-based, and
-    # current licenses at an address that a home-based application names.
+    # Street addresses (and, for current licenses, business names) are kept except where the business may be
+    # someone's home: applications marked home-based; current licenses at an address that a home-based application
+    # names, of a home-based license type, or at an apartment. (The current-license number doesn't match the
+    # applications' numbers, so their home-based flag can't be carried over directly.)
     tn = lambda v: re.sub(r'\s+', ' ', (v or '').strip()) or 'Not stated'
     akey = lambda v: clean_addr(v).upper()
     homes = {akey(r.get('address')) for r in apps if (r.get('ishome') or '').strip() == 'True'} - {''}
+    home_now = lambda r: (akey(r.get('address')) in homes or tn(r.get('businesstype')).lower().startswith('home based')
+                          or re.search(r'\b(APT|APARTMENT)\b', akey(r.get('address'))) is not None)
     da, dn = [], []
     for r, f, c, nb in zip(apps, filed, cat, nbs):
         p = dot_xy(fnum(r.get('longitude')), fnum(r.get('latitude'))) if nb >= 0 and f and BIZ_START <= f.year and f.date() <= today else None
@@ -1651,7 +1687,8 @@ def build_biz(api, nbp):
             sd = parse_ts(r.get('businessstartdate'))
             dn.append({'day': sd.date() if sd and sd.year > 1900 else None,   # 1900-01-01 stands for 'not recorded'
                        'x': p[0], 'y': p[1], 'nb': nb, 's': s, 'tn': tn(r.get('businesstype')),
-                       'ad': None if akey(r.get('address')) in homes else clean_addr(r.get('address'))})
+                       'ad': None if home_now(r) else clean_addr(r.get('address')),
+                       'bn': None if home_now(r) else clean_name(r.get('businessname'))})
     return {
         'dots': {'apps': dot_typed(da, ['s', 'o', 'h', 't'], addr=True), 'now': dot_typed(dn, ['s', 't'], addr=True)},
         'ds': [BIZ_APPS, BIZ_NOW], 'last': today.isoformat(), 'winStart': win0.isoformat(),
@@ -1716,7 +1753,7 @@ def check_not_collapsed(label, new, old, floor=0.9):
 
 def dots_ok(label, d, least):
     """A dots object: every column as long as the record count, and at least `least` records."""
-    cols = [k for k, v in d.items() if isinstance(v, list) and k not in ('R', 'T', 'A')]
+    cols = [k for k, v in d.items() if isinstance(v, list) and k not in ('R', 'T', 'A', 'M')]
     need(all(len(d[k]) == d['n'] for k in cols), f'{label} dots: columns of different lengths')
     need(d['n'] >= least, f'{label} dots: only {d["n"]} records')
 
