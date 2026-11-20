@@ -240,6 +240,41 @@
     f.g.append('line').attr('x1', 0).attr('x2', f.iw).attr('y1', f.ih).attr('y2', f.ih).attr('stroke', 'var(--axis)');
   }
 
+  // ---------- fines and fees per year (DATA.fines, from fines.json) ----------
+  // by year assessed; each year's bar splits into paid, not paid on an open case, and not paid on a closed case
+  const FN = DATA.fines || null;
+  const FS_C = ['var(--s3)', 'var(--s2)', 'color-mix(in srgb,var(--s2) 40%,var(--surface))'];
+  st.fm = H.fm === 'n' ? 'n' : 'amt'; st.fg = H.fg != null && +H.fg >= 0 && FN && +H.fg < FN.G.length ? +H.fg : -1;
+  const usd = v => v >= 1e6 ? '$' + (v / 1e6).toFixed(v >= 1e7 ? 0 : 1) + 'M' : v >= 1e3 ? '$' + Math.round(v / 1e3) + 'K' : '$' + Math.round(v);
+  function drawFines(pane, first) {
+    const { panel, plot } = staged(pane, first);
+    panel.innerHTML = '';
+    const amt = st.fm === 'amt', vi = amt ? 1 : 0, fv = amt ? usd : fmt, NY = FN.years.length;
+    const gs = g => st.fg < 0 || g === st.fg;
+    const cell = (yi, s) => d3.sum(FN.G, (g, k) => gs(k) ? FN.by[k][yi][s][vi] : 0);   // yi NY: before FINE_START or undated
+    NOLA.seg(NOLA.fsec(panel, 'Show'), [['amt', 'Dollars'], ['n', 'Number of fees']], st.fm, v => set('fm', v));
+    NOLA.flist(NOLA.fsec(panel, 'Kind', st.fg >= 0 ? ['Show all', () => set('fg', -1)] : null),
+      FN.G.map((g, k) => ({ key: k, name: g, color: 'var(--ink2)', count: amt ? null : d3.sum(FN.by[k], yr => d3.sum(yr, c => c[0])) })), { pressed: k => st.fg === k, onClick: toggle('fg') });
+    const tot = s => d3.sum(d3.range(NY + 1), yi => cell(yi, s));
+    NOLA.kv(NOLA.fsec(panel, `Since ${FN.years[0]}` + (amt ? ' · dollars' : ' · fees')), FN.S.map((l, s) => [l, FS_C[s], fv(d3.sum(d3.range(NY), yi => cell(yi, s)))]));
+    NOLA.kv(NOLA.fsec(panel, `Before ${FN.years[0]}, or no date`), FN.S.map((l, s) => [l, FS_C[s], fv(cell(NY, s))]));
+    plot.innerHTML = '';
+    const data = d3.range(NY).map(yi => FN.S.map((_, s) => cell(yi, s))), partial = y => y === +FN.last; // the City adds fees nightly, so the newest year is still going
+    const f = NOLA.frame(plot, { h: 340, m: { t: 18, r: 10, b: 28, l: 52 } });
+    const x = d3.scaleBand().domain(FN.years).range([0, f.iw]).paddingInner(.22);
+    const y = d3.scaleLinear().domain([0, Math.max(4, (d3.max(data, d => d3.sum(d)) || 0) * 1.05)]).range([f.ih, 0]).nice();
+    NOLA.yGrid(f, y, 5, amt ? v => usd(v) : d3.format(',~d'));
+    data.forEach((d, k) => { let y0 = 0; d.forEach((v, s) => { if (!v) return;
+      f.g.append('rect').attr('x', x(FN.years[k])).attr('width', x.bandwidth()).attr('y', y(y0 + v)).attr('height', Math.max(.5, y(y0) - y(y0 + v))).attr('fill', FS_C[s]); y0 += v; }); });
+    data.forEach((d, k) => { if (partial(FN.years[k])) f.g.append('text').attr('class', 'halo').attr('x', x(FN.years[k]) + x.bandwidth()).attr('y', y(d3.sum(d)) - 5).attr('text-anchor', 'end').style('fill', 'var(--ink2)').text('so far'); });
+    f.g.selectAll('rect.h').data(FN.years).join('rect').attr('class', 'h').attr('x', yy => x(yy) - x.step() * x.paddingInner() / 2).attr('width', x.step()).attr('height', f.ih).attr('fill', 'transparent')
+      .on('mousemove', (ev, yy) => { const k = FN.years.indexOf(yy), n = FN.S.map((_, s) => d3.sum(FN.G, (g, j) => gs(j) ? FN.by[j][k][s][0] : 0)), a = FN.S.map((_, s) => d3.sum(FN.G, (g, j) => gs(j) ? FN.by[j][k][s][1] : 0));
+        tip.show(`<b>Assessed in ${yy}${partial(yy) ? ', so far' : ''}</b>` + (st.fg >= 0 ? `<div style="color:var(--ink2)">${FN.G[st.fg]}</div>` : '') + row('Total', `${usd(d3.sum(a))} · ${fmt(d3.sum(n))} fees`)
+          + FN.S.map((l, s) => row(sw(FS_C[s]) + l, `${usd(a[s])} · ${fmt(n[s])}`)).join(''), ev); }).on('mouseleave', tip.hide);
+    f.g.selectAll('text.x').data(FN.years).join('text').attr('class', 'x').attr('x', yy => x(yy) + x.bandwidth() / 2).attr('y', f.ih + 18).attr('text-anchor', 'middle').text(yy => f.iw < 520 ? "'" + String(yy).slice(2) : yy);
+    f.g.append('line').attr('x1', 0).attr('x2', f.iw).attr('y1', f.ih).attr('y2', f.ih).attr('stroke', 'var(--axis)');
+  }
+
   // each chart's City dataset
   const DS = { cases: [D.ds[0], 'Code Enforcement All Cases'], viol: [D.ds[1], 'Code Enforcement All Violations'], insp: [D.ds[2], 'Code Enforcement All Inspections'],
                hear: [D.ds[3], 'Code Enforcement All Hearings'], grass: [D.ds[4], 'Grass Cutting (Lot Abatement/Chapter 66)'], abate: [D.ds[5], 'Code Enforcement - Abatements'] };
@@ -250,8 +285,11 @@
     { id: 'violations', label: 'Most cited violations, past 12 months', tab: 'Violations', draw: drawViol, ds: DS.viol },
     { id: 'hearings', label: 'Hearing results per year', tab: 'Hearings', draw: drawHear, ds: DS.hear },
     { id: 'inspections', label: 'Inspections per month', tab: 'Inspections', draw: drawInsp, ds: DS.insp },
-  ], { ds: DS.cases,
+    FN && { id: 'fines', label: () => (st.fg >= 0 ? FN.G[st.fg] : 'Fines and fees') + ' per year assessed, paid and not paid', tab: 'Fines', draw: drawFines,
+      ds: [FN.ds, 'Adjudication Enforcement Fines and Fees'] },
+  ].filter(Boolean), { ds: DS.cases,
        state: () => ({ measure: st.measure !== 'open' ? st.measure : null, stage: st.stage >= 0 ? st.stage : null, res: st.res >= 0 ? st.res : null, basis: st.basis !== 'n' ? st.basis : null,
                        kind: st.kind !== 'ce' ? st.kind : null, ig: st.ig >= 0 ? st.ig : null, nb: st.nb >= 0 ? st.nb : null,
-                       p: st.per !== '12' ? st.per : null, stat: st.stat !== 'all' ? st.stat : null, age: st.age >= 0 ? st.age : null, heat: st.heat ? 1 : null }) });
+                       p: st.per !== '12' ? st.per : null, stat: st.stat !== 'all' ? st.stat : null, age: st.age >= 0 ? st.age : null, heat: st.heat ? 1 : null,
+                       fm: st.fm !== 'amt' ? st.fm : null, fg: st.fg >= 0 ? st.fg : null }) });
 })();

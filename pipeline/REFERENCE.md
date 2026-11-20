@@ -468,3 +468,11 @@ Smaller files that add a layer to pages that already exist. `fetch.py` runs them
 - One request (whole dataset: 1,496 polygons, 4.9 MB as GeoJSON), only when its date moves (last 2026-10-18). Served as `zoning-data.js`: 186 KB (about 60 KB gzipped) after simplifying outlines with Douglas–Peucker at 5 m and delta-encoding them in map units × 4.
 - `Z`: district codes (sorted); `zd`: the City's description for each code (its most common one: the dataset spells some differently from row to row); `zg`: each code's broad group in `G` (`addons.zone_group`: residential, commercial and mixed use, downtown CBD, industrial, campus and planned, open space; the site's grouping, not the City's); `f`: `[code index, rings]`.
 - Not used: "Conditional Use" `ecst-qwxv` (1,458 polygons). Conditional uses are already planning cases on the same map.
+
+### `data/fines.json`: code enforcement fines and fees (`f5zm-xkyr`, blight page "Fines" tab)
+
+- One aggregate request when the dataset's date moves (nightly, so about once a day; 0.1 MB, about 1,100 groups): `count(*)` and `sum(amount)` grouped by `date_extract_y(d_create)`, `type`, `ispaid` and `o_c`. No rows are downloaded (about 225,000).
+- Kept fee types (`addons.FINE_TYPES`), in three kinds: fines (one-time, daily); court and administrative costs (court costs, administrative, recorder of mortgages, notarial archives, CE lien filing, curator, research, notice, OPSO and similar); abatement and demolition costs (grass cutting and lot work, graffiti, demolition, correction and contract work). Every "OSS …" type (One Stop Shop: permits, zoning, HDLC, VCC, STR), GTB, fire inspection, MVIB, booting, dumpster and other types are left out: 25 types, about 10,700 fees (`otherRows`).
+- `by[kind][year][status] = [fees, dollars]`, years from 2012 to the newest, plus one last slot for earlier years and placeholder dates. Status: paid (`ispaid`), not paid on an open case, not paid on a closed case (`o_c`, which carries a trailing space in "Closed ").
+- `d_create` is 2000-01-01 on about 129,500 kept fees (`placeholder`): 99.9% are on cases established 2009–2012, the records moved from the old system. They go in the "before 2012, or no date" slot.
+- The dataset has no field saying why a fee is unpaid (waived, reduced, liened, appealed, owed), so the page says only paid / not paid and whether the case is open.

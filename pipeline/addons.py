@@ -273,3 +273,67 @@ def _check_zoning(o, prev):
 
 ADDONS['zoning.json'] = ('Zoning districts', [ZONE_DS], False, lambda api, nbp, geo: build_zoning(api), _check_zoning)
 DATASETS[ZONE_DS] = ('Zoning districts', 'daily', None)
+
+
+# ---------------------------------------------------------------- D. fines and fees (blight page)
+FINE_DS = 'f5zm-xkyr'     # Adjudication Enforcement Fines and Fees
+# The dataset mixes programs; the fee type says which. Kept: code enforcement (blight) fines, the costs and fees
+# added to those cases, and the City's own abatement work billed to the owner. Left out: One Stop Shop (permits,
+# zoning, HDLC, Vieux Carré, short-term rentals), GTB, fire inspections, MVIB, booting, dumpsters and the like.
+FINE_GROUPS = ['Fines', 'Court and administrative costs', 'Abatement and demolition costs']
+FINE_TYPES = {
+    'One Time Fine': 0, 'Daily Fines': 0, 'Partial Payment on One Time Fine': 0,
+    'Court Costs': 1, 'Court Cost': 1, 'Administrative': 1, 'Recorder of Mortgages Fee': 1, 'Notarial Archives Fee': 1,
+    'Filing Fee - CE Lien': 1, 'Abstract-Examination': 1, 'Research Fee': 1, 'Notice Fee': 1, 'Curator Costs': 1,
+    'Curator Appointment': 1, 'OPSO Costs': 1, 'Copy Fee': 1, 'Deposit': 1,
+    'Grass Abatement': 2, 'Grass Abatement Estimate': 2, 'Abatement Grass Cut Initial': 2, 'Abatement Grass Cut Recut': 2,
+    'Chapter 66 - Initial Cut - Lot Cost': 2, 'Chapter 66 - Monthly Maintenance - Lot Cost': 2, 'Lot Maintenance': 2,
+    'Graffiti Abatement': 2, 'Demolition': 2, 'Correction Costs': 2, 'Contractual Work': 2,
+}
+FINE_START = 2012     # yearly bars from here; earlier years, and records without a real date, are one "earlier" bar
+FINE_STATUS = ['Paid', 'Not paid, case open', 'Not paid, case closed']
+
+
+def build_fines(api):
+    api.require_columns(FINE_DS, ['type', 'amount', 'ispaid', 'd_create', 'o_c'], 'Fines and fees')
+    # one aggregate request: count and dollars by year created, type, paid, and whether the case is open
+    rows = api.get(f'/resource/{FINE_DS}.json', {
+        '$select': 'date_extract_y(d_create) as y, type, ispaid, o_c, count(*) as n, sum(amount) as a',
+        '$group': 'y, type, ispaid, o_c', '$order': 'y, type, ispaid, o_c', '$limit': 50000})
+    need(100 < len(rows) < 50000, f'Fines and fees: {len(rows)} groups')
+    last = max(int(r['y']) for r in rows if r.get('y'))
+    years = list(range(FINE_START, last + 1))
+    # by[group][year index, then one "earlier" slot][status] = [count, dollars]
+    by = [[[[0, 0.0] for _ in FINE_STATUS] for _ in range(len(years) + 1)] for _ in FINE_GROUPS]
+    other = Counter()
+    placeholder = 0
+    for r in rows:
+        g = FINE_TYPES.get((r.get('type') or '').strip())
+        n, a = int(r['n']), float(r.get('a') or 0)
+        if g is None:
+            other[(r.get('type') or '').strip()] += n
+            continue
+        y = int(r['y']) if r.get('y') else None
+        if y is None or y <= 2000:   # 2000-01-01 is a placeholder (records moved in from the old system, cases of 2009-2011)
+            placeholder += n
+            y = None
+        st = 0 if r.get('ispaid') in (True, 'true') else 1 if (r.get('o_c') or '').strip() == 'Open' else 2
+        cell = by[g][years.index(y) if y and y >= FINE_START else len(years)][st]
+        cell[0] += n
+        cell[1] += a
+    need(placeholder < 0.8 * sum(c[0] for g in by for yr in g for c in yr), 'Fines and fees: most rows have no real date')
+    return {'ds': FINE_DS, 'G': FINE_GROUPS, 'S': FINE_STATUS, 'years': years, 'last': str(last),
+            'by': [[[[c[0], round(c[1])] for c in yr] for yr in g] for g in by],
+            'placeholder': placeholder, 'otherRows': sum(other.values()), 'otherTypes': len(other),
+            'total': sum(c[0] for g in by for yr in g for c in yr)}
+
+
+def _check_fines(o, prev):
+    need(len(o['by']) == len(FINE_GROUPS) and all(len(g) == len(o['years']) + 1 for g in o['by']), 'fines: shape')
+    need(o['total'] > 100000, 'fines: suspiciously few fees')
+    if prev:
+        need(o['total'] >= 0.9 * prev['total'], f"fines: {o['total']} fees now vs {prev['total']} in the last good build")
+
+
+ADDONS['fines.json'] = ('Fines and fees', [FINE_DS], False, lambda api, nbp, geo: build_fines(api), _check_fines)
+DATASETS[FINE_DS] = ('Code enforcement fines and fees', 'daily', None)
