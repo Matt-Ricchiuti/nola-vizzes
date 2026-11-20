@@ -322,10 +322,10 @@ table.static tbody tr{cursor:auto}
 .tmap.drag{cursor:grabbing}
 /* no visible chart title: the switch on the map says which map it is (the heading stays for screen readers) */
 .vbar.one h2{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
-/* the share button sits beside the page title; the chart bar (only a hidden heading) takes no room */
+/* the share button sits beside the page title; the chart bar (only a hidden heading) is just a divider */
 .ptitle{display:flex;align-items:center;gap:10px;min-width:0}
-.vbar.one{display:none}
-.vbar.one+.vsec{margin-top:0}
+.vbar.one{padding:0;min-height:0}   /* just the divider, like the line under the other pages' tabs */
+.vbar.one+.vsec{margin-top:16px}
 /* the Trees / Tree requests switch floats at the top center of the map */
 .ftabs.tmode{position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:3;width:max-content;max-width:calc(100% - 120px);background:var(--surface);border:1px solid var(--ring);box-shadow:0 4px 14px rgb(0 0 0 / .14)}
 .ftabs.tmode button{flex:0 0 auto;padding:6px 14px;white-space:nowrap}
