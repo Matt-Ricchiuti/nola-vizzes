@@ -712,7 +712,7 @@ const NOLA = (() => {
   // A bar at the top of #chart holds a tab per chart (`tab`, or `label`). Below it, each chart is its own section
   // (heading `label`, then the chart); only the open one shows. A square share button sits just right of the open
   // chart's heading: it copies a link to that chart with its filters (on phones, the system share sheet).
-  // The page's datasets are listed in the sources box beside the page title (build.py); `ds` names the footer link.
+  // The page's datasets are listed in the sources box beside the page title (build.py).
   // `shareAfter`: an element to put the share button after instead (a page whose chart heading is hidden).
   // `label` can be a function, for a chart whose subject follows its filters; the heading is set again on each draw
   // (give such a chart a `tab`). Redrawing keeps the filter panel's scroll and the page's, so a click low in a long
@@ -769,9 +769,6 @@ const NOLA = (() => {
       }
       host.appendChild(sec); panes[v.id] = p; secs[v.id] = sec;
     });
-    // footer "Data:" link goes to the page's City dataset
-    const dataLink = document.getElementById('dataLink'), ds = opts.ds || (list.find(v => v.ds) || {}).ds;
-    if (dataLink && ds) { dataLink.href = 'https://data.nola.gov/d/' + ds[0]; dataLink.textContent = ds[1] + ' on data.nola.gov'; }
     // charts are drawn only while shown (hidden ones have no size); a hidden chart whose filters changed redraws when opened
     // keyboard focus survives a redraw: the control with the same label (or in the same place) takes it back
     const focusKey = el => el.tagName + '|' + (el.getAttribute('aria-label') || (el.querySelector('.nm>span') || el).textContent.trim());

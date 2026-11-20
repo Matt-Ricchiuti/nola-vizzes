@@ -76,7 +76,7 @@ TOKENS = {'{{PULLED}}': fdate(pulled),
           '{{DRONE_THRU}}': fdate(drone_last), '{{CFS_THRU}}': fdate(cfs_last), '{{CPC_THRU}}': fdate(cpc_last),
           '{{CFS_YEAR}}': str(cfs_year), '{{CFS_PREV}}': str(cfs_year - 1), '{{CFS_DS}}': cfs_meta.get('ds', 'es9j-6y5d'),
           '{{DRONE_YEAR}}': str(drone_year),
-          '{{FOOT}}': '<div class="foot">Data: <a id="dataLink" href="https://data.nola.gov">data.nola.gov</a> · Not affiliated with the City of New Orleans</div>'}
+          '{{FOOT}}': '<div class="foot">Not affiliated with the City of New Orleans</div>'}
 
 # Header: the site name, then one "Visualizations" menu that opens downward to the listed pages.
 # Hover, keyboard (Tab / Escape) and tap all work.
