@@ -862,6 +862,12 @@ const NOLA = (() => {
     Object.keys(d).forEach(k => { if (!(k in out) && !['q', 'epoch', 'd', 'd0'].includes(k)) out[k] = Array.isArray(d[k]) && d[k].length === n && typeof d[k][0] === 'number' ? Int32Array.from(d[k]) : d[k]; });
     return out;
   }
+  // a dot's street address as a tooltip row (P.a indexes P.A; -1 none: no row; -2 withheld, shown as `withheld`)
+  const addrRow = (P, i, withheld = 'Not shown') => {
+    const a = P.a ? P.a[i] : -1;
+    return a >= 0 ? row('Address', String(P.A[a]).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])))
+      : a === -2 ? row('Address', `<span style="color:var(--ink2)">${withheld}</span>`) : '';
+  };
   // the time-period switch on dot maps: records from the last month, 6 months, year, or all the map holds.
   // inPeriod(day, last, p): day and last as day numbers
   const PERIODS = [['1', 'Month'], ['6', '6 months'], ['12', 'Year'], ['all', 'All']], PER_DAYS = { 1: 30, 6: 182, 12: 365 };
@@ -1126,7 +1132,7 @@ const NOLA = (() => {
   }
   const legendHTML = items => '<div class="legend">' + items.map(([c, l, round]) => `<span><i style="background:${c}${round ? ';border-radius:50%' : ''}"></i>${l}</span>`).join('') + '</div>';
 
-  return { css, S, fmt, pct, tip, row, setGeo, views, hashState, legendHTML, stage, fsec, flist, seg, ftabs, nbPick, kv, mapChecks, heatToggle, heatKey, dotData, PERIODS, inPeriod, periodSeg, dotR, phoneToggle, popOf, perK, fmtRate, POP_NOTE, basisChips, shown, nbList, nbSelect, get FULL() { return FULL; }, get GEO() { return GEO; }, map, mapButtons, panelInset, seqVar, seqLegend, classes, stepLegend, short, frame, yGrid, chips, months, monthsLong,
+  return { css, S, fmt, pct, tip, row, setGeo, views, hashState, legendHTML, stage, fsec, flist, seg, ftabs, nbPick, kv, mapChecks, heatToggle, heatKey, dotData, addrRow, PERIODS, inPeriod, periodSeg, dotR, phoneToggle, popOf, perK, fmtRate, POP_NOTE, basisChips, shown, nbList, nbSelect, get FULL() { return FULL; }, get GEO() { return GEO; }, map, mapButtons, panelInset, seqVar, seqLegend, classes, stepLegend, short, frame, yGrid, chips, months, monthsLong,
     setYear, get YEAR() { return YEAR; }, monthTicks, doyTime, doyDate, doyISO, doyMonth, monthStarts, isoDate, share, numWord, cap, setText, setHTML, title };
 })();
 </script>
