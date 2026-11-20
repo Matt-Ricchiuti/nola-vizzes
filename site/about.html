@@ -373,6 +373,10 @@ table.static tbody tr{cursor:auto}
 // A page's notes are its own list plus the General notes whose data-p names it; shared notes come after its own.
 const sel=document.getElementById('notePick'),box=document.getElementById('notes'),keys=[...sel.options].map(o=>o.value);
 const read=()=>{const m=/notes=([\w-]+)/.exec(location.hash);return m&&keys.includes(m[1])?m[1]:'all'};
+// opened from a page's header (#from=page), or else arriving from one of the site's pages: that page's notes, without scrolling
+const from=()=>{let m=/from=([\w-]+)/.exec(location.hash);
+  if(!m&&!location.hash&&document.referrer){try{const r=new URL(document.referrer);if(r.origin===location.origin)m=/([\w-]+)\.html$/.exec(r.pathname)}catch(e){}}
+  return m&&keys.includes(m[1])&&m[1]!=='all'?m[1]:null};
 const show=v=>{
   sel.value=v;box.classList.toggle('one',v!=='all');
   box.querySelectorAll('h3').forEach(h=>h.hidden=v!=='all');
@@ -381,11 +385,12 @@ const show=v=>{
 };
 sel.onchange=()=>{show(sel.value);history.replaceState(null,'',sel.value==='all'?location.pathname+location.search:'#notes='+sel.value)};
 addEventListener('hashchange',()=>show(read()));
-const v0=read();show(v0);if(v0!=='all')sel.scrollIntoView();
+const f0=from(),v0=f0||read();show(v0);
+if(f0)history.replaceState(null,'',location.pathname+location.search+'#notes='+f0);else if(v0!=='all')sel.scrollIntoView();
 })()</script>
 
 <h2>Pages not in the menu</h2>
 <p>The police calls for service and drone flights pages are off the menu for now. They are still updated daily, and links to them still work.</p>
 </div>
-<div class="foot">Data: <a id="dataLink" href="https://data.nola.gov">data.nola.gov</a> · Not affiliated with the City of New Orleans · <a href="about.html">About</a></div>
+<div class="foot">Data: <a id="dataLink" href="https://data.nola.gov">data.nola.gov</a> · Not affiliated with the City of New Orleans</div>
 </div></body></html>

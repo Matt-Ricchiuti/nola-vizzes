@@ -76,7 +76,7 @@ TOKENS = {'{{PULLED}}': fdate(pulled),
           '{{DRONE_THRU}}': fdate(drone_last), '{{CFS_THRU}}': fdate(cfs_last), '{{CPC_THRU}}': fdate(cpc_last),
           '{{CFS_YEAR}}': str(cfs_year), '{{CFS_PREV}}': str(cfs_year - 1), '{{CFS_DS}}': cfs_meta.get('ds', 'es9j-6y5d'),
           '{{DRONE_YEAR}}': str(drone_year),
-          '{{FOOT}}': '<div class="foot">Data: <a id="dataLink" href="https://data.nola.gov">data.nola.gov</a> · Not affiliated with the City of New Orleans · <a href="about.html">About</a></div>'}
+          '{{FOOT}}': '<div class="foot">Data: <a id="dataLink" href="https://data.nola.gov">data.nola.gov</a> · Not affiliated with the City of New Orleans</div>'}
 
 # Header: the site name, then one "Visualizations" menu that opens downward to the listed pages.
 # Hover, keyboard (Tab / Escape) and tap all work.
@@ -89,13 +89,15 @@ def nav(key):
     e = html.escape
     cur = ' class="on" aria-current="page"'
     pages = ''.join(f'<li><a href="{k}.html"{cur if k == key else ""}>{e(l)}</a></li>' for k, l in listed())
-    extra = ''.join(f'<a class="xlink{" on" if k == key else ""}" href="{k}.html">{e(l)}</a>' for k, l in EXTRA.items())
+    # About opens with the notes for the page it was clicked from already picked (about.html reads #from=)
+    frm = f'#from={key}' if key in PAGES else ''
+    extra = ''.join(f'<a class="xlink{" on" if k == key else ""}" href="{k}.html{frm if k == "about" else ""}">{e(l)}</a>' for k, l in EXTRA.items())
     return ('<div class="site"><b><a href="index.html" style="color:inherit;text-decoration:none">Nola Vizzes</a></b>'
             '<nav class="topnav" aria-label="Site"><div class="dd">'
             f'<button type="button" class="ddbtn{" on" if key in PAGES else ""}" aria-haspopup="true" aria-expanded="false">Visualizations<span aria-hidden="true">▾</span></button>'
             f'<ul class="dd1">{pages}</ul></div>{extra}</nav>' + NAV_JS + '</div>')
 
-# The home-page menu lists the listed pages (About is in the footer).
+# The home-page menu lists the listed pages (the home page has no header, so its footer links About).
 def menu():
     e = html.escape
     pages = ''.join(f'<li><a href="{k}.html">{e(l)}</a></li>' for k, l in listed())
