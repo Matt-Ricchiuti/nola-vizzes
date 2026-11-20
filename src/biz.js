@@ -87,7 +87,10 @@
     const p = P(), sec = SEC()[p.s[i]];
     const head = `<b>${esc(p.T[p.t[i]])}</b><div style="color:var(--ink2)">${sw(colorOf(sec))}${esc(nm(sec))}</div>`;
     if (isNew()) return head + NOLA.addrRow(PA, i, 'Not shown for home-based businesses') + row('Filed', NOLA.isoDate(PA.iso(PA.day[i]))) + row('Status now', D.out[PA.o[i]]) + row('Home-based', HOME_L[PA.h[i]]) + row('Neighborhood', nbName(PA.nb[i]));
-    return head + NOLA.addrRow(PW, i, 'Not shown: a home-based business is registered there') + row('Licensed since', PW.day[i] >= 0 ? NOLA.isoDate(PW.iso(PW.day[i])) : 'Not recorded') + row('Neighborhood', nbName(PW.nb[i]));
+    // licensed now: the business name as the title, its license type below (name and address withheld where it may be a home)
+    const m = PW.m ? PW.m[i] : -1, type = `<div>${esc(PW.T[PW.t[i]])}</div>`;
+    const top = (m >= 0 ? `<b>${esc(PW.M[m])}</b>${type}` : `<b>${esc(PW.T[PW.t[i]])}</b>`) + `<div style="color:var(--ink2)">${sw(colorOf(sec))}${esc(nm(sec))}</div>`;
+    return top + (m === -2 ? row('Name and address', '<span style="color:var(--ink2)">Not shown: may be home-based</span>') : NOLA.addrRow(PW, i)) + row('Licensed since', PW.day[i] >= 0 ? NOLA.isoDate(PW.iso(PW.day[i])) : 'Not recorded') + row('Neighborhood', nbName(PW.nb[i]));
   }
   function mapTip(i) {
     return `<b>${GEO.nb[i].name}</b>` + row(isNew() ? 'Applications shown' : 'Businesses shown', fmt(nbCnt[i]));
