@@ -34,7 +34,7 @@ def write(name, text):
 
 PAGES = {'drone': ('NOPD drone flights', {'drone': 'drone.json'}),
          'cfs': ('Calls for service', {'cfs': 'cfs.json', 'hist': 'hist.json'}),
-         'cpc': ('City Planning Cases', {'cpc': 'cpc.json'}),
+         'cpc': ('City Planning Cases', {'cpc': 'cpc.json', 'zn': 'zoning.json'}),
          '311': ('311 Requests', {'sr': '311.json'}),
          'str': ('Short-Term Rentals (STRs)', {'str': 'str.json'}),
          'blight': ('Blight/Code-enforcement', {'ce': 'blight.json'}),
@@ -122,7 +122,7 @@ if os.path.exists(P('data', 'streets.json')):
 # Data that rarely changes goes in its own file too, so a page whose other data changes daily (trees: the 311 tree
 # requests) doesn't make every visitor download it again: data file -> (script, global it sets).
 STATIC_DATA = {'trees.json': ('trees-data.js', 'TREES_DATA'), 'basins.json': ('basins-data.js', 'BASINS_DATA'),
-               'historic.json': ('historic-data.js', 'HISTORIC_DATA')}
+               'historic.json': ('historic-data.js', 'HISTORIC_DATA'), 'zoning.json': ('zoning-data.js', 'ZONING_DATA')}
 static_tags = {}
 for f, (js_name, var) in STATIC_DATA.items():
     if not os.path.exists(P('data', f)): continue

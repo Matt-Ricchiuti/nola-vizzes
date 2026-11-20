@@ -220,3 +220,56 @@ def _check_historic(o, prev):
 ADDONS['historic.json'] = ('Historic districts and landmarks', [HD_DS, LM_DS], False, lambda api, nbp, geo: build_historic(api), _check_historic)
 DATASETS[HD_DS] = ('Local historic districts', 'daily', None)
 DATASETS[LM_DS] = ('HDLC landmarks', 'daily', None)
+
+
+# ---------------------------------------------------------------- C. zoning (planning cases map)
+ZONE_DS = 'bizp-xi7c'     # Zoning Districts
+ZONE_TOL = 1.0   # 5 m: district lines mostly follow streets and lot lines
+ZONE_GROUPS = ['Residential', 'Commercial and mixed use', 'Downtown (CBD)', 'Industrial', 'Campus and planned', 'Open space']
+
+
+def zone_group(z):
+    z = (z or '').upper()
+    if z.startswith('CBD'):
+        return 2
+    if z in ('LI', 'HI', 'MI', 'BIP'):
+        return 3
+    if z in ('EC', 'MC', 'MS', 'GPD', 'LS'):
+        return 4
+    if z.startswith('OS') or z in ('NA', 'VCP', 'S-LP'):
+        return 5
+    if re.search(r'(^|-)(R[SDM]|RE|LR[SDM]|HMR|VCR)', z) or z.startswith(('HMR', 'VCR', 'S-LR', 'R-')):
+        return 0
+    return 1
+
+
+def build_zoning(api):
+    api.require_columns(ZONE_DS, ['zoneclass', 'zonedesc', 'the_geom'], 'Zoning districts')
+    fc = api.get(f'/resource/{ZONE_DS}.geojson', {'$limit': 5000, '$order': ':id'}, kind='geojson')
+    feats = fc.get('features', [])
+    need(1000 < len(feats) < 5000, f'Zoning districts: {len(feats)} rows')
+    desc = defaultdict(Counter)
+    for ft in feats:
+        p = ft['properties']
+        if p.get('zoneclass') and p.get('zonedesc'):
+            desc[p['zoneclass'].strip()][re.sub(r'\s+', ' ', p['zonedesc'].strip())] += 1
+    Z = sorted({(ft['properties'].get('zoneclass') or '').strip() for ft in feats} - {''})
+    zi = {z: i for i, z in enumerate(Z)}
+    out = []
+    for ft in feats:
+        z = (ft['properties'].get('zoneclass') or '').strip()
+        r = enc_geom(ft.get('geometry'), ZONE_TOL)
+        if z and r:
+            out.append([zi[z], r])
+    return {'ds': ZONE_DS, 'q': DOT_Q, 'G': ZONE_GROUPS, 'Z': Z, 'zg': [zone_group(z) for z in Z],
+            'zd': [desc[z].most_common(1)[0][0] if desc[z] else '' for z in Z], 'f': out}
+
+
+def _check_zoning(o, prev):
+    need(len(o['f']) > 1000 and len(o['zg']) == len(o['Z']) == len(o['zd']), 'zoning: shape')
+    if prev:
+        need(len(o['f']) >= 0.9 * len(prev['f']), 'zoning: districts dropped by more than 10%')
+
+
+ADDONS['zoning.json'] = ('Zoning districts', [ZONE_DS], False, lambda api, nbp, geo: build_zoning(api), _check_zoning)
+DATASETS[ZONE_DS] = ('Zoning districts', 'daily', None)

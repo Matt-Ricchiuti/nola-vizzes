@@ -462,3 +462,9 @@ Smaller files that add a layer to pages that already exist. `fetch.py` runs them
 - Why `vgpk-2scb` and not the newer "Local Historic District" `hea7-kccz` (updated 2026-07-09): the newer one returns the same 22 names with no geometry through the API (`the_geom` is null on every row), and has no `control` or `jurisdiction`.
 - `d`: `{n: name, c: 1 full control / 0 partial, j: commission, r: rings}`; rings are delta-encoded in map units × `q` (4, about 5 m), simplified with Douglas–Peucker at 3 m (`addons.enc_geom`). `lm`: `[x, y, name, address, architect ('' when "Unknown"), date, 1 designated / 0 nominated]`.
 - The page tests permits against the outlines in the browser; a permit within a few meters of a line may land on either side.
+
+### `data/zoning.json`: zoning districts (`bizp-xi7c`, planning cases map)
+
+- One request (whole dataset: 1,496 polygons, 4.9 MB as GeoJSON), only when its date moves (last 2026-10-18). Served as `zoning-data.js`: 186 KB (about 60 KB gzipped) after simplifying outlines with Douglas–Peucker at 5 m and delta-encoding them in map units × 4.
+- `Z`: district codes (sorted); `zd`: the City's description for each code (its most common one: the dataset spells some differently from row to row); `zg`: each code's broad group in `G` (`addons.zone_group`: residential, commercial and mixed use, downtown CBD, industrial, campus and planned, open space; the site's grouping, not the City's); `f`: `[code index, rings]`.
+- Not used: "Conditional Use" `ecst-qwxv` (1,458 polygons). Conditional uses are already planning cases on the same map.

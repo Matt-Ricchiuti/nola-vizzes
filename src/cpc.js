@@ -38,6 +38,10 @@
   const H = NOLA.hashState();
   const st = { tab: H.tab === 'filed' ? 'filed' : 'up', from: hashDay(H.from) ?? DEF_FROM, to: hashDay(H.to) ?? LAST,
     fold: H.fold != null ? +H.fold : -1, theme: H.theme != null ? +H.theme : -1, nb: H.nb != null ? +H.nb : -1, heat: H.heat === '1' };
+  // zoning districts (DATA.zn, from zoning.json): an optional layer under the cases, a checkbox on the map
+  const ZN = DATA.zn || null, ZNF = ZN ? ZN.f.map(([z, r]) => ({ z, r })) : [];
+  st.zone = !!ZN && H.zone === '1';
+  const zTip = f => `<b>${ZN.Z[f.z]}</b><div style="color:var(--ink2)">${ZN.zd[f.z] || ''}</div>` + row('Zoning group', ZN.G[ZN.zg[f.z]]);
   if (st.from > st.to) [st.from, st.to] = [st.to, st.from];
   const defRange = () => st.from === DEF_FROM && st.to === LAST;
   const rangeTxt = () => defRange() ? 'past 12 months' : `${pDate(st.from)} – ${pDate(st.to)}`;
@@ -155,7 +159,10 @@
     if (filed) drawFiled(panel); else drawUpcoming(panel);
     // the heatmap (a checkbox on the map): the cases shown, counted by neighborhood (every neighborhood stays shaded
     // when one is picked, for comparison)
-    NOLA.heatToggle(plot, st.heat, on => set('heat', on), null);
+    NOLA.heatToggle(plot, st.heat, on => set('heat', on), null,
+      ZN ? [{ key: 'zone', label: 'Zoning', checked: st.zone, onChange: on => set('zone', on), title: 'Zoning districts, colored by broad group' }] : []);
+    if (mp.znOn !== st.zone) { mp.overlay('zone', st.zone ? { feats: ZNF, q: ZN.q, cls: f => 'ovz z' + ZN.zg[f.z], tip: zTip } : null); mp.znOn = st.zone; }
+    if (st.zone) NOLA.kv(NOLA.fsec(panel, 'Zoning'), ZN.G.map((g, i) => [g, `var(--zg${i})`, ''])).classList.add('zkey');
     const cnt = d3.range(72).map(i => nbCnt[i] || 0), cl = st.heat ? NOLA.classes(cnt) : null;
     mp.setFill(cl ? i => cl.color(cnt[i]) : () => null);
     NOLA.heatKey(panel, plot, cl, filed ? 'Cases filed, by neighborhood' : 'Upcoming hearings, by neighborhood');
@@ -291,5 +298,5 @@
     { id: 'topics', label: 'Cases per year mentioning each topic', draw: drawTopics },
   ], { ds: ['xxb5-5azv', 'CPC Projects'],
        state: () => ({ tab: st.tab === 'filed' ? 'filed' : null, date: st.day !== NEXT ? st.day : null, from: st.from !== DEF_FROM ? isoOf(st.from) : null, to: st.to !== LAST ? isoOf(st.to) : null,
-         fold: st.fold >= 0 ? st.fold : null, theme: st.theme >= 0 ? st.theme : null, nb: st.nb >= 0 ? st.nb : null, heat: st.heat ? 1 : null }) });
+         fold: st.fold >= 0 ? st.fold : null, theme: st.theme >= 0 ? st.theme : null, nb: st.nb >= 0 ? st.nb : null, heat: st.heat ? 1 : null, zone: st.zone ? 1 : null }) });
 })();
