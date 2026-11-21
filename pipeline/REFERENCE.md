@@ -54,6 +54,8 @@ The workflow runs at 10:30 UTC. The City reloads most datasets between 04:30 and
 | `311.json` | `2jgv-pqrq`'s `rowsUpdatedAt` or `geo.json` changed | Incremental download (see below). "Today" is the newest request in the data. |
 | `treereq.json` | with `311.json` (same rows, same key) | No requests of its own: built from the 311 rows already downloaded. |
 | `drainreq.json` | with `311.json` (same rows, same key) | No requests of its own: built from the 311 rows already downloaded. |
+| `streetreq.json` | with `311.json` (same rows, same key) | No requests of its own: built from the 311 rows already downloaded. |
+| `roadwork.json` | `u5mk-y9z4`'s or `bsnu-de3a`'s `rowsUpdatedAt`, or `geo.json`, changed | Both lists are updated nightly, so most days both are downloaded whole: 2 requests, 7.1 MB (0.8 MB transferred). The columns are named in the query, so the outreach contact column is never downloaded. |
 | `basins.json` | `se4p-ierc`'s `rowsUpdatedAt`, the cleaning log's content, or `geo.json` changed | The log (`2zer-6wpb`) is reloaded every night with the same rows (its newest dated record is from January 2025), so its version is useless as a key: one small request (`count(*)`, `max(mdate)`, `max(cbmaintid)`) stands in for it. Both datasets are downloaded whole only when one of them really changed (5 requests, 29 MB). |
 | `str.json` | any of `ufdg-ajws`, `en36-xvxg`, `2ei9-wqw2` or `geo.json` changed | All three are replaced by the City every night, so they're downloaded whole (3 requests). A dataset whose date didn't move is read from the saved answers. |
 | `permits.json` | `rcm3-fn58`'s `rowsUpdatedAt` or `geo.json` changed | The City rewrites 99% of rows every night, so incremental downloads don't help. API counts by year and code (with the newest issue date in the same request), plus the past 12 months' rows: 2 requests. |
@@ -89,7 +91,8 @@ Measured 2026-11-19 (MB as the API sends it, uncompressed; about a sixth of that
 | Permits `rcm3-fn58` | 99% of rows rewritten nightly | daily (catalog) | counts by year + past 12 months' rows | 3 requests, 4.2 MB | 2 requests, 4.2 MB |
 | License applications `abc4-h3u3`, current licenses `hjcd-grvu` | replaced nightly | daily (catalog) | all rows of each | 2 requests, 10.8 MB | 2 requests, 10.8 MB |
 | Catch basins `se4p-ierc`, cleaning log `2zer-6wpb` | inventory edited a few times a year; log reloaded nightly, unchanged since January 2025 | daily (catalog + 1 content check) | both whole, only when the inventory's date or the log's content moved | — | 1 request, under 1 KB (29 MB on a change) |
-| **Typical day** | | | | **42 requests, 44.5 MB (6.8 MB transferred)** | **19 requests, 43.6 MB (6.7 MB transferred)** |
+| RoadWork DPW `u5mk-y9z4`, SWB `bsnu-de3a` (roadwork.json; the 311 street requests come from the 311 rows above) | updated nightly | daily (catalog) | all rows of each that moved (14,300 + 8,400 rows) | — | 2 requests, 7.1 MB (0.8 MB transferred) |
+| **Typical day** | | | | **42 requests, 44.5 MB (6.8 MB transferred)** | **21 requests, 50.7 MB (7.5 MB transferred)** with road work; 19 requests, 43.6 MB before it |
 | **Day without new City data** | | | | 21 requests, 0.8 MB | **2 requests, 0.16 MB (21 KB transferred)**: the catalog and the catch basin log's content check |
 | **1st of the month** (on top of the day) | | | | everything again: 79 requests, 248 MB (53 MB transferred) | 4 requests: 2 boundary checks, row ids of 311 and calls, 22 MB (11 MB transferred) |
 | **Empty cache** (first run, or no run for 7 days) | | | | 79 requests, 248 MB | 46 requests, 237 MB (50 MB transferred), mostly the 311 and calls copies |
@@ -319,6 +322,25 @@ The "Drainage requests (311)" map and per-year chart. `build_311` keeps every 31
 - `G`: reason groups (`DR_GROUPS`): catch basin clogged or not draining; street flooding; broken basin or manhole cover; ditch or culvert; drainage issue, not specified; water main break or leaking hydrant; other.
 - `dots` (`dot_pack`): one per located request (31,343; 293 have no location). `g`: group; `c`: days from filing to the City's close date (-1 still pending, -2 closed with no close date).
 - `last`: the newest 311 request, the page's "today" for the Month / 6 months / Year filter.
+
+## `data/streetreq.json`: 311 street and streetlight requests (streets page)
+
+The "Street requests (311)" map and per-year chart. `street_requests` keeps the 311 requests whose reason is in `SQ_GROUPS`, under the types `Roads and Streets`, `Streetlights` and the ones they replaced (`Roads/Drainage` until 2024, `Traffic Signals/Signs/Striping/Streetlights` until 2023): 92,209 since February 2019 (as of Nov 18, 2026), 15,376 still pending. Drainage reasons (including "Ditch and Culvert Maintenance") stay on the drainage page; signs and striping are left out.
+
+- `G`: reason groups: pothole; street sinking; sidewalk, curb or ramp; shoulder or pavement damage; utility cut left unpaved; debris in the road; streetlight out; streetlight down or leaning; new streetlight wanted. Groups from `lights` (6) on are streetlights.
+- `dots` (`dot_pack`): one per located request (91,444; 765 have no location). `g`: group; `c`: days from filing to the City's close date (-1 still pending, -2 closed with no close date).
+- `last`: the newest 311 request, the page's "today" for the Month / 6 months / Year filter.
+- The 311 copy has no address column, so tooltips show no address (adding one would mean re-downloading every 311 row once).
+
+## `data/roadwork.json`: City road, sewer and water work (streets page)
+
+The City's RoadWork project lists, one row per street segment of a project, each a point: DPW paving projects (`u5mk-y9z4`, 14,297 rows, 508 projects) and SWB sewer, water and drainage line work (`bsnu-de3a`, 8,416 rows). Most SWB rows carry a DPW project id (6,918) and segment id (7,264): they are the lines under the same streets. `build_roadwork` merges both by `segmentid`: 15,449 segments, 15,446 mapped.
+
+- `P`: one row per project id in either list (542), with the columns in `pcols`: `id`, `name` (blank for 58), `phase` (index into `phases`: under construction, planned, complete, not stated; the phase most of its segments give, DPW's when the project is there; blanks don't vote), `program` (`projtype` codes expanded: RR FEMA Recovery Roads, DPW Public Works, SELA, HMGP, NDR, DOTD, RTA; unknown codes kept), `contractor` (a company), `cost`, `start`, `end` (`YYYY-MM-DD`, or the City's quarter text like `Jan-Mar 2027`; blank for TBD), `endYear` (0 when none), `src` (1 DPW, 2 SWB, 3 both). Projects by phase (`projects`): 17 under construction, 112 planned, 389 complete, 24 not stated.
+- **Cost:** `total_cost` is the whole project's cost repeated on every segment (summing rows gives about $77 billion). It's kept once per project here and the page never adds it up.
+- `outreach_contact` (often a person's name) is never downloaded. `lookahead_*` columns are mostly empty or from 2023 and aren't used.
+- `dots`: one per segment, no dates. `p`, `ph`, `ct`: DPW project (index into `P`), phase, construction type (`CT`), or -1 when the segment isn't in the DPW list. `sp`, `ss`, `sk`, `st`: SWB project, phase, kind of lines (`K`: the 75 spellings of `sstype` grouped by the lines they name) and the City's own wording (`ST`), or -1.
+- The page matches each road request to the nearest segment point within 60 m (in the browser, not here), so the two files stay independent.
 
 ## `data/basins.json`: catch basins (drainage page)
 
