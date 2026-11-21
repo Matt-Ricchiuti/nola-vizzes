@@ -98,6 +98,15 @@ svg text{fill:var(--muted);font-size:11px;font-family:inherit}
 .map{position:relative}
 .map>canvas.mapdots,.map>svg.maptop{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;background:none}
 .dothot{fill:none;stroke:var(--ink);stroke-width:1.6;vector-effect:non-scaling-stroke}
+/* map overlays (NOLA.map().overlay): shapes under the dots, points above them; pages color them by class */
+.overlays path{vector-effect:non-scaling-stroke;pointer-events:none}
+.ovhover{fill:none;stroke:var(--ink);stroke-width:1.6;vector-effect:non-scaling-stroke}
+.ovpts circle{stroke:var(--surface)}
+.ovshapes .ovf{fill:var(--s7);fill-opacity:.13;stroke:var(--s7);stroke-width:1.5;stroke-opacity:.9}
+.ovshapes .ovf.lite{fill-opacity:.06;stroke-dasharray:5 3}
+.ovlm circle{fill:var(--ink)}
+.ovlm circle.nom{fill:var(--surface);stroke:var(--ink)}
+.kvl.ovkey span:nth-child(2) i{border:1.5px dashed var(--s7)}
 .streets{pointer-events:none}
 .st{fill:none;vector-effect:non-scaling-stroke;stroke-linecap:round;stroke-linejoin:round}
 .st3{stroke:var(--road);stroke-width:.5}
@@ -200,6 +209,14 @@ a.btn{text-decoration:none;display:inline-block}
 .ftabs.grid{display:grid;grid-template-columns:1fr 1fr}
 .ftabs button[aria-selected="true"]{background:var(--surface);color:var(--ink);font-weight:600;box-shadow:0 1px 3px rgb(0 0 0 / .12)}
 .ftabs button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+/* a neighborhood's groups, under the neighborhood picker (NOLA.orgList) */
+.orgs summary{font-size:12px;color:var(--accent);cursor:pointer;width:max-content;max-width:100%}
+.orgs.none summary{color:var(--muted);cursor:default;list-style:none}
+.orgs.none summary::-webkit-details-marker{display:none}
+.orgs ul{list-style:none;margin:6px 0 0;padding:0;display:flex;flex-direction:column;gap:7px;font-size:12px;line-height:1.35}
+.orgs li>a,.orgs li>b{font-weight:600}
+.orgs li span{display:block;color:var(--ink2);font-size:11.5px;overflow-wrap:anywhere}
+.orgs li span a{color:var(--ink2)}
 .seg{display:flex;border:1px solid var(--ring);border-radius:8px;overflow:hidden;width:max-content;max-width:100%}
 .seg button{font:inherit;font-size:12px;border:0;background:var(--surface);color:var(--ink2);padding:5px 10px;cursor:pointer}
 .seg button+button{border-left:1px solid var(--ring)}
@@ -351,7 +368,7 @@ table.static tbody tr{cursor:auto}
 <h1>NOLA Vizzes<span>Visualized Data from data.nola.gov</span></h1>
 <details class="vmenu" id="vmenu">
 <summary aria-label="Visualizations"><svg width="14" height="9" viewBox="0 0 12 8" aria-hidden="true"><path d="M1 1.5l5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></summary>
-<nav class="vpanel" aria-label="Visualizations"><ul class="vlist"><li><a href="cpc.html">City Planning Cases</a></li><li><a href="311.html">311 Requests</a></li><li><a href="str.html">Short-Term Rentals (STRs)</a></li><li><a href="blight.html">Blight/Code-enforcement</a></li><li><a href="permits.html">Permits</a></li><li><a href="trees.html">Trees</a></li><li><a href="drain.html">Drainage</a></li><li><a href="biz.html">New Businesses</a></li></ul></nav>
+<nav class="vpanel" aria-label="Visualizations"><ul class="vlist"><li><a href="cpc.html">City Planning Cases</a></li><li><a href="311.html">311 Requests</a></li><li><a href="str.html">Short-Term Rentals (STRs)</a></li><li><a href="blight.html">Blight/Code-enforcement</a></li><li><a href="permits.html">Permits</a></li><li><a href="trees.html">Trees</a></li><li><a href="drain.html">Drainage</a></li><li><a href="streets.html">Streets</a></li><li><a href="land.html">Vacant Land</a></li><li><a href="biz.html">New Businesses</a></li></ul></nav>
 </details>
 </div>
 <div class="foot">Data: <a href="https://data.nola.gov">data.nola.gov</a> · Not affiliated with the City of New Orleans · <a href="about.html">About</a></div>
