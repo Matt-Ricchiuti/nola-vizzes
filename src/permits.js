@@ -25,6 +25,14 @@
   const P = NOLA.dotData(D.dots), LASTD = P.dayOf(D.last);
   st.per = ['1', '6', '12'].includes(H.p) ? H.p : '12';
   st.heat = H.heat === '1';
+  // historic districts and HDLC landmarks (DATA.hd, from historic.json): optional layers, checkboxes on the map
+  const HD = DATA.hd || null;
+  st.hd = !!HD && H.hd === '1'; st.lm = !!HD && H.lm === '1';
+  const HDF = HD ? HD.d.map(d => ({ ...d })) : [], LMF = HD ? HD.lm.map(([x, y, n, a, ar, dt, des]) => ({ p: [x, y], n, a, ar, dt, des })) : [];
+  let inHD = null; // per permit dot: 1 inside a district (worked out the first time the layer is shown)
+  const hdTip = f => `<b>${esc(f.n)} historic district</b>` + row('Review', f.c ? 'Full control' : 'Partial control') + (f.j ? row('Commission', esc(f.j)) : '');
+  const lmTip = f => `<b>${esc(f.n)}</b><div style="color:var(--ink2)">HDLC landmark${f.des ? '' : ', nominated'}</div>` + (f.a ? row('Address', esc(f.a)) : '')
+    + (f.dt ? row('Built', esc(f.dt)) : '') + (f.ar ? row('Architect', esc(f.ar)) : '');
   const okPer = i => NOLA.inPeriod(P.day[i], LASTD, st.per), okCat = i => st.cat < 0 || P.c[i] === st.cat, okLu = i => st.lu < 0 || P.lu[i] === st.lu;
   const okNb = i => st.nb < 0 || P.nb[i] === st.nb;
   // drawn in reverse so the rarer types (listed first) sit on top
@@ -57,8 +65,23 @@
       m = NOLA.map(plot, { panel, label: 'Map of building permits', tip: mapTip });
       m.lastNb = -1;
     }
-    m.dots({ x: P.x, y: P.y, n: P.n, colors: COLORS, color: i => cIdx[P.c[i]], visible: i => okPer(i) && okCat(i) && okLu(i) && okNb(i), r: NOLA.dotR, tip: dotTip });
-    NOLA.heatToggle(plot, st.heat, on => set('heat', on), { label: 'Per 1k homes', checked: st.basis === 'hu', onChange: on => set('basis', on ? 'hu' : 'n') });
+    const vis = i => okPer(i) && okCat(i) && okLu(i) && okNb(i);
+    m.dots({ x: P.x, y: P.y, n: P.n, colors: COLORS, color: i => cIdx[P.c[i]], visible: vis, r: NOLA.dotR, tip: dotTip });
+    if (m.hdOn !== st.hd) { m.overlay('hd', st.hd ? { feats: HDF, q: HD.q, cls: f => 'ovf' + (f.c ? '' : ' lite'), tip: hdTip } : null); m.hdOn = st.hd; }
+    if (m.lmOn !== st.lm) { m.overlay('lm', st.lm ? { feats: LMF, q: HD.q, pts: true, r: 3.5, className: 'ovlm', cls: f => f.des ? '' : 'nom', tip: lmTip } : null); m.lmOn = st.lm; }
+    if (st.hd || st.lm) {
+      const rows = [];
+      if (st.hd) {
+        if (!inHD) { inHD = new Uint8Array(P.n); for (let i = 0; i < P.n; i++) inHD[i] = m.overlayAt(P.x[i], P.y[i]).some(x => x.ov.feats === HDF) ? 1 : 0; }
+        let n = 0; for (let i = 0; i < P.n; i++) if (inHD[i] && vis(i)) n++;
+        rows.push(['Full control', 'var(--s7)', ''], ['Partial control', 'color-mix(in srgb,var(--s7) 45%,var(--surface))', ''], ['Permits inside', null, `${fmt(n)} of ${fmt(shown)}`]);
+      }
+      if (st.lm) rows.push(['Landmark', 'var(--ink)', fmt(LMF.length)]);
+      NOLA.kv(NOLA.fsec(panel, st.hd ? 'Historic districts' : 'HDLC landmarks'), rows).classList.add('ovkey');
+    }
+    NOLA.heatToggle(plot, st.heat, on => set('heat', on), { label: 'Per 1k homes', checked: st.basis === 'hu', onChange: on => set('basis', on ? 'hu' : 'n') },
+      HD ? [{ key: 'hd', label: 'Historic districts', checked: st.hd, onChange: on => set('hd', on), title: 'Local historic districts (HDLC and Vieux Carré Commission)' },
+        { key: 'lm', label: 'Landmarks', checked: st.lm, onChange: on => set('lm', on), title: 'HDLC landmarks' }] : []);
     const cl = st.heat ? NOLA.classes(d3.range(72).map(heatVal)) : null;
     m.setFill(cl ? i => cl.color(heatVal(i)) : () => null);
     NOLA.heatKey(panel, plot, cl, keyLabel(), NOLA.short, cl && d3.range(72).some(i => heatVal(i) == null) ? `Under ${MIN_HU} homes` : null);
@@ -66,8 +89,10 @@
   }
   function dotTip(i) {
     const f = P.f[i];
+    const h = st.hd ? m.overlayAt(P.x[i], P.y[i]).find(x => x.ov.feats === HDF) : null;
     return `<b>${esc(P.T[P.t[i]])}</b><div style="color:var(--ink2)">${sw(CCOL[P.c[i]])}${D.cats[P.c[i]]}</div>` + NOLA.addrRow(P, i) + row('Issued', NOLA.isoDate(P.iso(P.day[i])))
-      + (f >= 0 ? row('Days from application', f === 0 ? 'Same day' : fmt(f)) : '') + row('Land use', D.lu[P.lu[i]]) + row('Neighborhood', nbName(P.nb[i]));
+      + (f >= 0 ? row('Days from application', f === 0 ? 'Same day' : fmt(f)) : '') + row('Land use', D.lu[P.lu[i]]) + row('Neighborhood', nbName(P.nb[i]))
+      + (h ? row('Historic district', `${esc(h.f.n)} (${h.f.c ? 'full' : 'partial'})`) : '');
   }
   function mapTip(i) {
     const r = perHU(nbCnt[i], i);
@@ -139,5 +164,5 @@
     { id: 'days', label: 'Days from application to permit, past 12 months', tab: 'Days to permit', draw: drawDays },
   ], { ds: [D.ds, 'Permits'],
        state: () => ({ cat: st.cat >= 0 ? st.cat : null, lu: st.lu >= 0 ? st.lu : null, basis: st.basis !== 'n' ? st.basis : null, nb: st.nb >= 0 ? st.nb : null,
-                       p: st.per !== '12' ? st.per : null, heat: st.heat ? 1 : null }) });
+                       p: st.per !== '12' ? st.per : null, heat: st.heat ? 1 : null, hd: st.hd ? 1 : null, lm: st.lm ? 1 : null }) });
 })();

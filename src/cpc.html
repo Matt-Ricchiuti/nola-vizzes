@@ -16,12 +16,18 @@
 .sms.one{grid-template-columns:1fr}
 .smh{font-size:13px;margin-bottom:2px}
 .offday{font-weight:500;font-size:11px;color:var(--s8);margin-left:4px;white-space:nowrap}
+/* zoning layer: residential, commercial and mixed use, downtown, industrial, campus and planned, open space */
+:root{--zg0:var(--s4);--zg1:var(--s8);--zg2:var(--s5);--zg3:var(--s7);--zg4:var(--s1);--zg5:var(--s6)}
+.ovz{fill-opacity:.2;stroke-width:.7;stroke-opacity:.7}
+.ovz.z0{fill:var(--zg0);stroke:var(--zg0)}.ovz.z1{fill:var(--zg1);stroke:var(--zg1)}.ovz.z2{fill:var(--zg2);stroke:var(--zg2)}
+.ovz.z3{fill:var(--zg3);stroke:var(--zg3)}.ovz.z4{fill:var(--zg4);stroke:var(--zg4)}.ovz.z5{fill:var(--zg5);stroke:var(--zg5)}
+.zkey i{opacity:.6}
 </style>
 {{D3}}
 </head><body><div class="wrap">
 {{NAV}}
 <div class="phead"><h1>City Planning Commission cases</h1>
-<aside class="srcbox" aria-label="Data sources"><span class="sbl">Source</span><span class="sbl r">Updated</span><a href="https://data.nola.gov/d/xxb5-5azv">CPC Projects</a></aside></div>
+<aside class="srcbox" aria-label="Data sources"><span class="sbl">Source</span><span class="sbl r">Updated</span><a href="https://data.nola.gov/d/xxb5-5azv">CPC Projects</a><a href="https://data.nola.gov/d/bizp-xi7c">Zoning Districts</a></aside></div>
 <div id="chart"></div>
 {{FOOT}}
 </div>

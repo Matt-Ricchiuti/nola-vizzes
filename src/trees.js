@@ -141,7 +141,8 @@
     const s = document.createElement('select'); s.className = 'fsel'; s.setAttribute('aria-label', 'Neighborhood');
     s.innerHTML = '<option value="-1">All neighborhoods</option>' + hoodList.map(([h, i]) => `<option value="${i}">${esc(h.name)}</option>`).join('');
     s.value = selNb; s.onchange = () => { selNb = +s.value; refresh(); };
-    NOLA.fsec(panel, 'Neighborhood').appendChild(s);
+    const sec = NOLA.fsec(panel, 'Neighborhood'); sec.appendChild(s);
+    if (selNb >= 0) NOLA.orgList(sec, geoToHood.indexOf(selNb)); // its neighborhood groups (geo.json's numbering)
   }
   function findSection(panel) {
     const sec = NOLA.fsec(panel, 'Find a species', selSp >= 0 ? ['Clear', () => { selSp = -1; refresh(); }] : null);

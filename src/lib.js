@@ -99,6 +99,8 @@ const NOLA = (() => {
       sg.append('path').attr('class', 'st st0').attr('d', ST.d[0]);
     }
     const streetZoom = k => { if (localSt) localSt.style('opacity', Math.max(0.35, Math.min(1, (k - 0.6) / 2.4))); };
+    // optional overlays (api.overlay): shapes over the streets, under the page's marks and the dots
+    const ovG = root.append('g').attr('class', 'overlays');
     // pages' own SVG marks (a few hundred at most; larger sets use the dot layer below)
     const layer = root.append('g');
     // Layers, bottom to top: this svg (neighborhood fills, streets, the page's layer), a canvas of dots (api.dots, made
@@ -111,25 +113,32 @@ const NOLA = (() => {
     const focusG = troot.append('g');
     if (o.districts) troot.append('g').selectAll('path').data(GEO.pd).join('path').attr('d', f => f.d)
       .attr('fill', 'none').attr('stroke', 'var(--ink2)').attr('stroke-width', 1.4).attr('vector-effect', 'non-scaling-stroke').attr('opacity', .55);
+    const ovHot = troot.append('path').attr('class', 'ovhover').attr('d', null), ovPtG = troot.append('g'); // overlays' hovered shape, points
     const stLabG = troot.append('g');
     const ringG = troot.append('g'); // the hovered dot
     let DL = null, hot = -1; // the dot layer (made by api.dots) and the hovered dot
     // Hover: the nearest dot under the pointer shows its own tooltip; otherwise the neighborhood's (o.tip(i), which can
     // return nothing to show none). The page's own SVG marks handle their own hover.
-    const unhover = () => { tip.hide(); hoverP.datum(null).attr('d', null); setHot(-1); };
+    const unhover = () => { tip.hide(); hoverP.datum(null).attr('d', null); ovHot.attr('d', null); setHot(-1); };
     let ptrType = 'mouse';
     svg.on('pointerdown.hover', ev => { ptrType = ev.pointerType || 'mouse'; });
     function hover(ev, tap) {
       if (layer.node().contains(ev.target)) return;
+      const pt = OV.size ? mapPt(ev) : null, P = pt && ovPoint(pt, tap);
+      if (P) { hoverP.datum(null).attr('d', null); ovHot.attr('d', null); setHot(-1); tip.show(P.ov.tip(P.f), ev); return; }
       const d = DL ? DL.hit(ev, tap) : -1; // (not DL && …: null >= 0 is true)
       if (d >= 0) { // records at the very same spot draw as one dot: say how many more are under it
-        hoverP.datum(null).attr('d', null); setHot(d); const more = DL.o.stack === false ? 0 : DL.here(d) - 1;
+        hoverP.datum(null).attr('d', null); ovHot.attr('d', null); setHot(d); const more = DL.o.stack === false ? 0 : DL.here(d) - 1;
         tip.show(DL.o.tip(d) + (more > 0 ? `<div class="more">${fmt(more)} more at this spot</div>` : ''), ev); return;
       }
       setHot(-1);
       const f = ev.target.classList && ev.target.classList.contains('nbpath') ? ev.target.__data__ : null, h = f && o.tip && o.tip(f.idx);
-      if (!h) return unhover();
-      tip.show(h, ev); if (hoverP.datum() !== f) hoverP.datum(f).attr('d', f.d);
+      // overlay shapes under the pointer: their tooltips first, the neighborhood's under them
+      const S = pt ? api.overlayAt(pt[0], pt[1], true) : [], sh = S.map(x => x.ov.tip(x.f)).filter(Boolean).join('<div class="more"></div>');
+      ovHot.attr('d', S.length ? S[0].ov.pathOf(S[0].f) : null).attr('transform', S.length ? `scale(${1 / S[0].ov.q})` : null);
+      if (!h && !sh) return unhover();
+      tip.show(sh + (sh && h ? '<div class="more"></div>' : '') + (h || ''), ev);
+      if (!h) hoverP.datum(null).attr('d', null); else if (hoverP.datum() !== f) hoverP.datum(f).attr('d', f.d);
     }
     svg.on('mousemove.hover', ev => hover(ev, false)).on('mouseleave.hover', unhover)
       .on('click.hover', ev => { if (ptrType !== 'mouse') hover(ev, true); }); // a tap on a touch screen
@@ -341,7 +350,61 @@ const NOLA = (() => {
       onTheme(L.theme);
       return L;
     }
+    // ---- overlays: a page's optional shapes (e.g. historic districts) or points (landmarks), each under its own key ----
+    // Shapes sit under the dots and take no input: hover finds them by position once no dot is under the pointer, and
+    // puts their tooltip above the neighborhood's. Points are drawn above the dots and are found before them.
+    const OV = new Map();
+    const mapPt = ev => { const rc = el.getBoundingClientRect(), s = rc.width / W, t = d3.zoomTransform(svg.node());
+      return [((ev.clientX - rc.left) / s - t.x) / t.k, ((ev.clientY - rc.top) / s - t.y) / t.k]; };
+    function ovPoint([mx, my], tap) {
+      const s = (el.clientWidth / W) || 1;
+      for (const ov of OV.values()) {
+        if (!ov.pts) continue;
+        let best = null, bd = (Math.max(ov.r + 2, tap ? 14 : 4) / (k * s)) ** 2;
+        for (const f of ov.feats) { const d = (f.p[0] / ov.q - mx) ** 2 + (f.p[1] / ov.q - my) ** 2; if (d < bd) { bd = d; best = f; } }
+        if (best) return { ov, f: best };
+      }
+      return null;
+    }
+    // points keep their size in CSS px at any zoom
+    const placePts = () => { const s = (el.clientWidth / W) || 1; ovPtG.selectAll('circle').attr('r', function () { return this.__r / (k * s); }).style('stroke-width', 1 / (k * s)); };
+    listeners.push(placePts);
     const api = {
+      // overlay(key, { feats, q, pts, r, className, cls(f), tip(f) }) draws a layer; overlay(key, null) removes it.
+      // Shapes: feats [{ r: rings, ... }], each ring delta-encoded [x0, y0, dx1, dy1, ...] in map units × q.
+      // Points (pts: true): feats [{ p: [x, y] in map units × q, ... }], r CSS px in radius at any zoom.
+      // cls(f): a class per feature (colors live in the page's CSS); tip(f): its tooltip, or nothing for none.
+      overlay(key, opt) {
+        const old = OV.get(key); if (old) { old.g.remove(); OV.delete(key); ovHot.attr('d', null); }
+        if (!opt) return null;
+        const q = opt.q || 1, ov = { ...opt, q, r: opt.r || 4 };
+        if (ov.pts) {
+          ov.g = ovPtG.append('g').attr('class', 'ovpts ' + (opt.className || ''));
+          ov.g.selectAll('circle').data(ov.feats).join('circle').attr('cx', f => f.p[0] / q).attr('cy', f => f.p[1] / q)
+            .attr('class', f => opt.cls ? opt.cls(f) : null).each(function () { this.__r = ov.r; });
+          placePts();
+        } else {
+          ov.feats.forEach(f => { if (!f._rings) { f._rings = f.r.map(decode); f._bb = bboxOf(f.r); } });
+          ov.pathOf = f => f._d || (f._d = f._rings.map(r => 'M' + r.join('L') + 'Z').join(''));
+          ov.g = ovG.append('g').attr('class', 'ovshapes ' + (opt.className || '')).attr('transform', `scale(${1 / q})`);
+          ov.g.selectAll('path').data(ov.feats).join('path').attr('d', ov.pathOf).attr('class', f => opt.cls ? opt.cls(f) : null);
+        }
+        OV.set(key, ov); return ov;
+      },
+      // the overlay shapes at a map point (map units): [{ ov, f }], top layer first; tipped: only overlays with a tooltip
+      overlayAt(x, y, tipped = false) {
+        const out = [];
+        for (const ov of [...OV.values()].reverse()) {
+          if (ov.pts || (tipped && !ov.tip)) continue;
+          const X = x * ov.q, Y = y * ov.q;
+          for (const f of ov.feats) {
+            const b = f._bb; if (X < b[0] || X > b[2] || Y < b[1] || Y > b[3]) continue;
+            let n = 0; for (const r of f._rings) if (d3.polygonContains(r, [X, Y])) n++;
+            if (n % 2) out.push({ ov, f });
+          }
+        }
+        return out;
+      },
       svg, layer, nbSel, zoomTo, k: () => k, onZoom: f => listeners.push(f), home,
       // dots(opts): the map's dot layer (see dotLayer.set); returns it, with update() to call after filters change and
       // shown (how many are drawn). dots(null) clears it.
@@ -579,10 +642,30 @@ const NOLA = (() => {
     stepLegend(ml, arg, fmtf, none); ml.insertAdjacentHTML('afterbegin', `<div class="mlh">${label}</div>`);
     return leg;
   }
-  // neighborhood picker inside a panel section
+  // neighborhood picker inside a panel section; with a neighborhood picked, its neighborhood groups under it (orgList)
   function nbPick(sec, value, onSel, label = 'All neighborhoods') {
     const s = document.createElement('select'); s.className = 'fsel'; s.setAttribute('aria-label', 'Neighborhood'); sec.appendChild(s);
-    nbSelect(s, onSel, value, label); return s;
+    nbSelect(s, onSel, value, label); orgList(sec, value); return s;
+  }
+  // orgList(sec, i): neighborhood i's groups, from the City's list of self-reported neighborhood organizations (GEO.org,
+  // orgs.json): each name linked to its website, with when and where it meets. Folded behind one line so the panel stays
+  // short; open or closed, it stays that way across redraws. Contact people are never shown (see About).
+  let orgOpen = false;
+  const escH = v => String(v).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  function orgList(sec, i) {
+    const O = GEO && GEO.org; if (!O || !(i >= 0)) return null;
+    const L = (O.nb[i] || []).map(k => O.g[k]), d = document.createElement('details'); d.className = 'orgs';
+    if (!L.length) { d.className = 'orgs none'; d.innerHTML = '<summary>No neighborhood group on the City’s list</summary>'; sec.appendChild(d); return d; }
+    const site = u => /facebook\.com/i.test(u) ? 'Facebook' : 'Website';
+    d.open = orgOpen; d.ontoggle = () => { orgOpen = d.open; };
+    d.innerHTML = `<summary>${L.length} neighborhood group${L.length > 1 ? 's' : ''}</summary><ul>` + L.map(g => {
+      const w = g.w || [], name = w.length ? `<a href="${escH(w[0])}" target="_blank" rel="noopener">${escH(g.n)}</a>` : `<b>${escH(g.n)}</b>`;
+      const more = w.slice(1).map(u => `<a href="${escH(u)}" target="_blank" rel="noopener">${site(u)}</a>`)
+        .concat(g.e ? [`<a href="mailto:${escH(g.e)}">${escH(g.e)}</a>`] : []);
+      const meet = [g.m, g.l].filter(Boolean).map(escH).join(' · ');
+      return `<li>${name}${meet ? `<span>Meets: ${meet}</span>` : ''}${more.length ? `<span>${more.join(' · ')}</span>` : ''}</li>`;
+    }).join('') + '</ul>';
+    sec.appendChild(d); return d;
   }
   // on phones the panel collapses behind a "Filters" button
   function phoneToggle(panel) {
@@ -825,6 +908,6 @@ const NOLA = (() => {
   }
   const legendHTML = items => '<div class="legend">' + items.map(([c, l, round]) => `<span><i style="background:${c}${round ? ';border-radius:50%' : ''}"></i>${l}</span>`).join('') + '</div>';
 
-  return { css, S, fmt, pct, tip, row, setGeo, views, hashState, legendHTML, stage, fsec, flist, seg, ftabs, nbPick, kv, mapChecks, heatToggle, heatKey, dotData, addrRow, PERIODS, inPeriod, periodSeg, dotR, phoneToggle, popOf, perK, fmtRate, POP_NOTE, basisChips, shown, nbList, nbSelect, get FULL() { return FULL; }, get GEO() { return GEO; }, map, mapButtons, panelInset, seqVar, seqLegend, classes, stepLegend, short, frame, yGrid, chips, months, monthsLong,
+  return { css, S, fmt, pct, tip, row, setGeo, views, hashState, legendHTML, stage, fsec, flist, seg, ftabs, nbPick, kv, mapChecks, heatToggle, heatKey, orgList, dotData, addrRow, PERIODS, inPeriod, periodSeg, dotR, phoneToggle, popOf, perK, fmtRate, POP_NOTE, basisChips, shown, nbList, nbSelect, get FULL() { return FULL; }, get GEO() { return GEO; }, map, mapButtons, panelInset, seqVar, seqLegend, classes, stepLegend, short, frame, yGrid, chips, months, monthsLong,
     setYear, get YEAR() { return YEAR; }, monthTicks, doyTime, doyDate, doyISO, doyMonth, monthStarts, isoDate, share, numWord, cap, setText, setHTML, title };
 })();

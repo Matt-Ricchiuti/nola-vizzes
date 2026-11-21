@@ -480,3 +480,36 @@ Checked against the API on 2026-11-19: applications filed in 2025 and retail app
 ## Page copy that mentions specific numbers
 
 Pages no longer carry explanatory sentences: only titles, axis labels and legends. The year, dataset id and pull date are filled in by `build.py`, and axis limits and chart labels are computed from the data, so nothing goes stale as the data refreshes.
+
+## Add-on layers on existing pages (`pipeline/addons.py`)
+
+Smaller files that add a layer to pages that already exist. `fetch.py` runs them after the pages' own files, through the registry `addons.ADDONS` (file → label, datasets, whether `geo.json` is part of the key, builder, checks). Their datasets are in `DATASETS` (via `addons.DATASETS`), so the one catalog request covers their dates: a file is rebuilt only when one of its datasets' `rowsUpdatedAt` moves, and a quiet day costs nothing extra. A failed build keeps the last good file, like any other.
+
+### `data/orgs.json`: neighborhood groups (`bqyy-s7xy`, every page with a neighborhood picker)
+
+- One request for the whole dataset (77 rows, 0.4 MB with polygons), only when its date moves (it changed 2026-10-25) or `geo.json` changes. `build.py` adds `g` and `nb` to `geo` as `geo.org`, so every page that inlines `geo` carries it (about 6 KB).
+- `g`: `{n: name, w: [links], m: meeting dates, l: meeting place, e: email}`, sorted by name; `nb`: per neighborhood (geo.json order), indexes into `g`.
+- Matching: each group's polygon is sampled on a 40 m grid; a group is listed in every neighborhood holding at least 10% of its points, or at least 25% of whose area it covers, and otherwise in the one holding most. `unmatched` lists groups with no polygon inside any neighborhood (none as of 2026-11-20). Ten neighborhoods have no group.
+- Privacy: `poc` (a person) is never read. `email` is kept only when it's a role address (info@, president@, board@, …) on a domain that isn't a free-mail provider; 16 of 77 qualify. A meeting place that starts with a digit (a bare street address, possibly a home) is dropped, as are "varies", "depends", "N/A".
+- Only 15 groups give a website or Facebook page (the column is mostly "-").
+
+### `data/historic.json`: historic districts and landmarks (`vgpk-2scb`, `25e8-s5xx`, permits map)
+
+- Two requests (whole datasets: 22 districts, 2.5 MB of polygons; 347 landmarks, 0.13 MB), only when either date moves (`vgpk-2scb` last changed 2025-02-16, `25e8-s5xx` 2026-11-10). `build.py` serves it as `historic-data.js` (41 KB), like `basins-data.js`, so browsers cache it.
+- Why `vgpk-2scb` and not the newer "Local Historic District" `hea7-kccz` (updated 2026-07-09): the newer one returns the same 22 names with no geometry through the API (`the_geom` is null on every row), and has no `control` or `jurisdiction`.
+- `d`: `{n: name, c: 1 full control / 0 partial, j: commission, r: rings}`; rings are delta-encoded in map units × `q` (4, about 5 m), simplified with Douglas–Peucker at 3 m (`addons.enc_geom`). `lm`: `[x, y, name, address, architect ('' when "Unknown"), date, 1 designated / 0 nominated]`.
+- The page tests permits against the outlines in the browser; a permit within a few meters of a line may land on either side.
+
+### `data/zoning.json`: zoning districts (`bizp-xi7c`, planning cases map)
+
+- One request (whole dataset: 1,496 polygons, 4.9 MB as GeoJSON), only when its date moves (last 2026-10-18). Served as `zoning-data.js`: 186 KB (about 60 KB gzipped) after simplifying outlines with Douglas–Peucker at 5 m and delta-encoding them in map units × 4.
+- `Z`: district codes (sorted); `zd`: the City's description for each code (its most common one: the dataset spells some differently from row to row); `zg`: each code's broad group in `G` (`addons.zone_group`: residential, commercial and mixed use, downtown CBD, industrial, campus and planned, open space; the site's grouping, not the City's); `f`: `[code index, rings]`.
+- Not used: "Conditional Use" `ecst-qwxv` (1,458 polygons). Conditional uses are already planning cases on the same map.
+
+### `data/fines.json`: code enforcement fines and fees (`f5zm-xkyr`, blight page "Fines" tab)
+
+- One aggregate request when the dataset's date moves (nightly, so about once a day; 0.1 MB, about 1,100 groups): `count(*)` and `sum(amount)` grouped by `date_extract_y(d_create)`, `type`, `ispaid` and `o_c`. No rows are downloaded (about 225,000).
+- Kept fee types (`addons.FINE_TYPES`), in three kinds: fines (one-time, daily); court and administrative costs (court costs, administrative, recorder of mortgages, notarial archives, CE lien filing, curator, research, notice, OPSO and similar); abatement and demolition costs (grass cutting and lot work, graffiti, demolition, correction and contract work). Every "OSS …" type (One Stop Shop: permits, zoning, HDLC, VCC, STR), GTB, fire inspection, MVIB, booting, dumpster and other types are left out: 25 types, about 10,700 fees (`otherRows`).
+- `by[kind][year][status] = [fees, dollars]`, years from 2012 to the newest, plus one last slot for earlier years and placeholder dates. Status: paid (`ispaid`), not paid on an open case, not paid on a closed case (`o_c`, which carries a trailing space in "Closed ").
+- `d_create` is 2000-01-01 on about 129,500 kept fees (`placeholder`): 99.9% are on cases established 2009–2012, the records moved from the old system. They go in the "before 2012, or no date" slot.
+- The dataset has no field saying why a fee is unpaid (waived, reduced, liened, appealed, owed), so the page says only paid / not paid and whether the case is open.
