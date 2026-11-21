@@ -43,6 +43,7 @@ PAGES = {'drone': ('NOPD drone flights', {'drone': 'drone.json'}),
          'drain': ('Drainage', {'dr': 'drainreq.json', 'cb': 'basins.json'}),
          # src/streets.js is this page's script (inlined into streets.html); site/streets.js is the shared street base map
          'streets': ('Streets', {'sq': 'streetreq.json', 'rw': 'roadwork.json'}),
+         'land': ('Vacant Land', {'land': 'land.json'}),
          'biz': ('New Businesses', {'biz': 'biz.json'})}
 EXTRA = {'about': 'About'}
 # Pages still built (so old links keep working and they can come back) but left out of the header and home-page

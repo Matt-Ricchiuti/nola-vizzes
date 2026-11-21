@@ -1540,6 +1540,222 @@ def build_basins(api, nbp):
             'total': n, 'noLoc': no_loc}
 
 
+# ---------------------------------------------------------------- vacant and public land
+# NORA's list of lots not committed to a buyer or program, the City's public land list, and NORA's past sales. The NORA
+# list has no coordinates: each lot is placed inside its parcel, found by geopin in the City's parcel layer (one request
+# for just those parcels). Public land rows carry their own outlines; a sale carries a geocoded point, and the few
+# without one are placed by parcel too.
+LAND_INV, LAND_SOLD, LAND_PUB, PARCELS = '5ktx-e9wc', 'hpm5-48nj', 'bsqt-btyi', 'v9q5-fz7t'
+# public land types (the City's own, spelled one way) -> map groups
+LAND_GROUPS = ['Vacant land', 'Parks, greenspace and landmarks', 'Buildings and facilities', 'Housing', 'Utilities, drainage and right of way', 'Type not given']
+LAND_TYPE_GROUP = {'Vacant Land': 0, 'Recreation': 1, 'Linear Park': 1, 'Greenspace': 1, 'Park/Greenspace': 1, 'Playground/Playspot': 1,
+                   'Square/Plaza': 1, 'Cemetery': 1, 'Landmark': 1, 'Public Facility': 2, 'Emergency Facility': 2, 'Office Space': 2,
+                   'Warehouse': 2, 'Commercial': 2, 'Residential': 3, 'Utility ROW': 4, 'Utility/Drainage': 4, 'ROW': 4, 'Utility': 4}
+LAND_TYPE_NAME = {'Utility Right of Way': 'Utility ROW'}
+# agencies as the list spells them -> one name each
+LAND_AGENCY = {'nora': 'NORA', 'property management': 'City Property Management', 'city of new orleans': 'City of New Orleans',
+               'housing authority of new orleans': 'Housing Authority (HANO)', 'hano': 'Housing Authority (HANO)',
+               'parks & parkways': 'Parks & Parkways', 'nord': 'NORD', 'nordc': 'NORD',
+               'orleans school board': 'School board (NOLA Public Schools)', 'nola public school board': 'School board (NOLA Public Schools)',
+               'opsb': 'School board (NOLA Public Schools)', 'sewerage & waterboard': 'Sewerage & Water Board', 'swbno': 'Sewerage & Water Board',
+               'sewerage & water board new orleans': 'Sewerage & Water Board', 'orleans sheriff': "Orleans Parish Sheriff's Office",
+               'nobc': 'New Orleans Building Corporation', 'french market corperation': 'French Market Corporation',
+               'french market corpertation': 'French Market Corporation', 'french market corporation': 'French Market Corporation',
+               'nopl': 'New Orleans Public Library', 'rta': 'Regional Transit Authority', 'regional transit authority': 'Regional Transit Authority',
+               'nofd': 'NOFD', 'nopd': 'NOPD', 'ems': 'EMS', 'ddd': 'Downtown Development District', 'audubon': 'Audubon'}
+# the City's notes are mostly deed references; only these statuses are shown
+LAND_NOTES = {'vacant': 'Vacant', '*to be listed for sale': 'To be listed for sale', '*currently for sale': 'Currently for sale',
+              '*scheduled for development': 'Scheduled for development'}
+LAND_CHANNELS = ['Auction', 'Lot Next Door', 'Development', 'Alternative Land Use', 'Other']   # Special Transfer and Affordable Housing Development: Other
+LAND_SIZES = [3000, 5000, 10000, 43560]   # square feet: under 3,000, 3,000-5,000, 5,000-10,000, 10,000 to an acre, over an acre
+LAND_YEAR0 = 2000   # the per-year chart starts here; the few earlier sales (1980-1999) are counted in `pre`
+SQFT_PER_ACRE = 43560
+
+
+def agency(s):
+    s = re.sub(r'\s+', ' ', (s or '').strip())
+    return LAND_AGENCY.get(s.lower(), s) if s else None
+
+
+def ring_point(rings):
+    """A point inside a polygon (outer ring first, then holes; lon/lat): the area centroid of the outer ring when it
+    falls inside, else the middle of the widest stretch of the polygon along the centroid's latitude."""
+    def inside(x, y):
+        c = False
+        for r in rings:
+            for (x1, y1), (x2, y2) in zip(r, r[1:] + r[:1]):
+                if (y1 > y) != (y2 > y) and x < (x2 - x1) * (y - y1) / (y2 - y1) + x1:
+                    c = not c
+        return c
+    r = rings[0]
+    a = cx = cy = 0.0
+    x0, y0 = r[0]
+    for (x1, y1), (x2, y2) in zip(r, r[1:] + r[:1]):
+        f = (x1 - x0) * (y2 - y0) - (x2 - x0) * (y1 - y0)
+        a += f
+        cx += (x1 + x2 - 2 * x0) * f
+        cy += (y1 + y2 - 2 * y0) * f
+    if abs(a) < 1e-18:
+        return r[0]
+    cx, cy = x0 + cx / (3 * a), y0 + cy / (3 * a)
+    if inside(cx, cy):
+        return cx, cy
+    xs = sorted((x2 - x1) * (cy - y1) / (y2 - y1) + x1 for ring in rings for (x1, y1), (x2, y2) in zip(ring, ring[1:] + ring[:1]) if (y1 > cy) != (y2 > cy))
+    spans = [(xs[k + 1] - xs[k], (xs[k] + xs[k + 1]) / 2) for k in range(0, len(xs) - 1, 2)]
+    return (max(spans)[1], cy) if spans else r[0]
+
+
+def poly_place(geom):
+    """(lon, lat, square feet) of a (Multi)Polygon: a point inside its largest part, and its whole area. None if empty."""
+    if not geom or not geom.get('coordinates'):
+        return None
+    polys = geom['coordinates'] if geom.get('type') == 'MultiPolygon' else [geom['coordinates']]
+    kx, ky = 364000 * math.cos(math.radians(29.97)), 364000   # feet per degree, near enough at New Orleans
+
+    def area(r):
+        return abs(sum((x1 * y2 - x2 * y1) for (x1, y1), (x2, y2) in zip(r, r[1:] + r[:1]))) / 2 * kx * ky
+    parts = [[[[float(p[0]), float(p[1])] for p in ring] for ring in poly if len(ring) >= 3] for poly in polys if poly]
+    parts = [p for p in parts if p]
+    if not parts:
+        return None
+    sizes = [area(p[0]) - sum(area(h) for h in p[1:]) for p in parts]
+    big = max(range(len(parts)), key=lambda k: sizes[k])
+    lon, lat = ring_point(parts[big])
+    return lon, lat, sum(sizes)
+
+
+def land_parcels(api, pins):
+    """geopin -> (lon, lat) for these parcels, from the City's parcel layer: one request per 300 parcels."""
+    out, pins = {}, sorted(pins)
+    for k in range(0, len(pins), 300):
+        chunk = pins[k:k + 300]
+        rows = api.get(f'/resource/{PARCELS}.json', {'$select': 'geopin,the_geom', '$where': 'geopin in (' + ','.join(f"'{p}'" for p in chunk) + ')',
+                                                      '$order': ':id', '$limit': 5000})
+        for r in rows:
+            p = poly_place(r.get('the_geom'))
+            if p and r.get('geopin') not in out:
+                out[r['geopin']] = p[:2]
+    return out
+
+
+def size_bucket(sqft):
+    return -1 if sqft is None else sum(sqft >= b for b in LAND_SIZES)
+
+
+def build_land(api, nbp, pub_date):
+    api.require_columns(LAND_INV, ['property_type', 'property_address', 'zoning', 'square_footage', 'geopin_2'], 'NORA uncommitted inventory')
+    api.require_columns(LAND_SOLD, ['sale_date', 'disposition_channel', 'property_address', 'geopin', 'geocoded_column'], 'NORA sold properties')
+    api.require_columns(LAND_PUB, ['the_geom', 'site_address', 'site_name', 'type', 'managing_department', 'owned_by', 'used_by',
+                                   'leased_by', 'acerage', 'geopin', 'notes'], 'Public land')
+    api.require_columns(PARCELS, ['geopin', 'the_geom'], 'Parcels')
+    inv = fetch_all(api, LAND_INV, 'property_type,property_address,address_number,street_name,zip_code,zoning,square_footage,city_planning_neighborhood,council_district,identifier,geopin_2')
+    sold = fetch_all(api, LAND_SOLD, 'sale_date,disposition_channel,property_address,geopin,zip_code,council_district,identifier,geocoded_column')
+    pub = fetch_all(api, LAND_PUB, 'the_geom,site_address,site_name,secondary_name,type,managing_department,owned_by,used_by,leased_by,acerage,geopin,council_district,notes')
+    need(len(inv) > 20, f'NORA uncommitted inventory: only {len(inv)} rows')
+    need(len(sold) > 3000, f'NORA sold properties: only {len(sold)} rows')
+    need(len(pub) > 1000, f'Public land: only {len(pub)} rows')
+    pin = lambda s: (s or '').strip()
+    lab = lambda s: re.sub(r'\s+', ' ', (s or '').strip()) or None
+
+    def sold_point(r):
+        g = r.get('geocoded_column') or {}
+        return fnum(g.get('longitude')), fnum(g.get('latitude'))
+    inv_pins = {pin(r.get('geopin_2')) for r in inv}
+    want = inv_pins | {pin(r.get('geopin')) for r in sold if None in sold_point(r)}
+    parcel = land_parcels(api, {p for p in want if re.fullmatch(r'\d{6,}', p)})
+
+    def place(lon, lat):
+        xy = dot_xy(lon, lat)
+        return (int(nbp.lookup([lon], [lat])[0]) if xy else -1), xy
+
+    # sales: one dot each; each parcel's newest sale also goes into the land dots' tooltips
+    srecs, last_sale, years, pre, s_parcel, s_none = [], {}, Counter(), 0, 0, 0
+    for r in sold:
+        day = dt.date.fromisoformat(r['sale_date'][:10]) if r.get('sale_date') else None
+        ch = lab(r.get('disposition_channel')) or 'Not stated'
+        c = LAND_CHANNELS.index(ch) if ch in LAND_CHANNELS else len(LAND_CHANNELS) - 1
+        p = pin(r.get('geopin'))
+        if day:
+            if day.year < LAND_YEAR0:
+                pre += 1
+            else:
+                years[(day.year, c)] += 1
+            if p and (p not in last_sale or day >= last_sale[p][0]):
+                last_sale[p] = (day, ch)
+        lon, lat = sold_point(r)
+        by_parcel = (lon is None or lat is None) and p in parcel
+        if by_parcel:
+            lon, lat = parcel[p]
+        nb, xy = place(lon, lat)
+        if nb < 0:
+            s_none += 1
+            continue
+        s_parcel += by_parcel
+        srecs.append({'day': day, 'x': xy[0], 'y': xy[1], 'nb': nb, 'c': c, 'ad': clean_addr(r.get('property_address')) or None,
+                      'ch': ch, 'i': 1 if p in inv_pins else 0})
+    CHX = ranked(Counter(r['ch'] for r in srecs))   # the exact channel, for tooltips
+    for r in srecs:
+        r['e'] = CHX.index(r['ch'])
+    sdots = dot_addresses(srecs, ['c', 'e', 'i'])
+    sdated = [r['day'] for r in srecs if r['day']]
+
+    # available and public land: NORA's lots, then the public land rows not already among them (the same parcel)
+    pub_by_pin = {}
+    for r in pub:
+        if pin(r.get('geopin')):
+            pub_by_pin.setdefault(pin(r.get('geopin')), r)
+    lrecs, i_none, p_none, merged = [], 0, 0, 0
+
+    def add(lon, lat, src, r, pr, sqft, addr):
+        nb, xy = place(lon, lat)
+        if nb < 0:
+            return False
+        t = re.sub(r'\s*/\s*', '/', lab(pr.get('type')) or '') if pr else ''
+        t = LAND_TYPE_NAME.get(t, t) or None
+        p = pin(r.get('geopin_2')) if r else pin(pr.get('geopin'))
+        sale = last_sale.get(p)
+        lrecs.append({'day': None, 'x': xy[0], 'y': xy[1], 'nb': nb, 'src': src,
+                      'g': LAND_TYPE_GROUP.get(t, len(LAND_GROUPS) - 1) if pr else 0,   # a NORA lot not on the City's list: vacant land
+                      'tn': t, 'zn': lab(r.get('zoning')) if r else None, 'mg': agency(pr.get('managing_department')) if pr else 'NORA',
+                      'ob': agency(pr.get('owned_by')) if pr else None, 'ub': agency(pr.get('used_by')) if pr else None,
+                      'lb': agency(pr.get('leased_by')) if pr else None, 'nn': lab(pr.get('site_name')) if pr else None,
+                      'no': LAND_NOTES.get((lab(pr.get('notes')) or '').lower()) if pr else None,
+                      'sf': None if sqft is None else round(sqft), 'ad': addr or None,
+                      'sd': (sale[0] - DOT_EPOCH).days if sale else -1, 'sc': sale[1] if sale else None})
+        return True
+
+    for r in inv:
+        p = pin(r.get('geopin_2'))
+        pr = pub_by_pin.get(p)
+        merged += pr is not None
+        sq = fnum(r.get('square_footage'))
+        ok = p in parcel and add(*parcel[p], 0, r, pr, sq if sq and sq > 0 else None, clean_addr(r.get('property_address')))
+        i_none += not ok
+    for r in pub:
+        if pin(r.get('geopin')) in inv_pins:
+            continue
+        pl = poly_place(r.get('the_geom'))
+        ac = fnum(r.get('acerage'))
+        sq = ac * SQFT_PER_ACRE if ac and ac > 0 else (pl[2] if pl else None)
+        ok = pl is not None and add(pl[0], pl[1], 1, None, r, sq, clean_addr(r.get('site_address')))
+        p_none += not ok
+    TY, Z, M, N, NT, SC = (ranked(Counter(r[k] for r in lrecs if r[k])) for k in ('tn', 'zn', 'mg', 'nn', 'no', 'sc'))
+    O = ranked(Counter(r[k] for r in lrecs for k in ('ob', 'ub', 'lb') if r[k]))
+    ix = lambda L, v: L.index(v) if v else -1
+    for r in lrecs:
+        r.update(t=ix(TY, r['tn']), z=ix(Z, r['zn']), m=ix(M, r['mg']), o=ix(O, r['ob']), u=ix(O, r['ub']), l=ix(O, r['lb']),
+                 nm=ix(N, r['nn']), k=ix(NT, r['no']), s=-1 if r['sf'] is None else r['sf'], sb=size_bucket(r['sf']), c=ix(SC, r['sc']))
+    ldots = dot_addresses(lrecs, ['src', 'g', 't', 'z', 'm', 'o', 'u', 'l', 'nm', 'k', 's', 'sb', 'sd', 'c'])
+    y1 = max(y for y, _ in years)
+    return {'invDs': LAND_INV, 'soldDs': LAND_SOLD, 'pubDs': LAND_PUB, 'parcelDs': PARCELS, 'pubDate': pub_date,
+            'G': LAND_GROUPS, 'TY': TY, 'Z': Z, 'M': M, 'O': O, 'N': N, 'NT': NT, 'SC': SC, 'sizes': LAND_SIZES,
+            'CH': LAND_CHANNELS, 'CHX': CHX, 'land': ldots, 'sold': sdots,
+            'years': list(range(LAND_YEAR0, y1 + 1)), 'yc': [[years[(y, c)] for c in range(len(LAND_CHANNELS))] for y in range(LAND_YEAR0, y1 + 1)],
+            'pre': pre, 'first': min(sdated).isoformat(), 'last': max(sdated).isoformat(),
+            'inv': len(inv), 'invNoLoc': i_none, 'pub': len(pub), 'pubNoLoc': p_none, 'merged': merged,
+            'total': len(sold), 'noLoc': s_none, 'byParcel': s_parcel}
+
+
 # ---------------------------------------------------------------- short-term rentals
 STR_ACTIVE, STR_APPS, STR_NC = 'ufdg-ajws', 'en36-xvxg', '2ei9-wqw2'
 # active licenses that are rentals (operator permits are people, not places, and are counted separately)
@@ -2037,7 +2253,7 @@ def build_biz(api, nbp):
 
 # Data files of the pages added with the 311 / housing / business set, and when each counts as stale
 # (file, label, field holding its newest record date, days without a new record before warning).
-NEW_FILES = ['311.json', 'treereq.json', 'drainreq.json', 'basins.json', 'streetreq.json', 'roadwork.json', 'str.json', 'blight.json', 'permits.json', 'biz.json']
+NEW_FILES = ['311.json', 'treereq.json', 'drainreq.json', 'basins.json', 'streetreq.json', 'roadwork.json', 'land.json', 'str.json', 'blight.json', 'permits.json', 'biz.json']
 STALE = [('311.json', '311 calls', 'last', 7), ('str.json', 'Short-term rental permit applications', 'last', 14),
          ('blight.json', 'Code enforcement cases', 'last', 14), ('permits.json', 'Permits', 'last', 14),
          ('biz.json', 'Business license applications', 'last', 14)]
@@ -2072,6 +2288,10 @@ DATASETS = {
     CBW_DS: ('Catch basin cleanings', 'daily', None),           # reloaded every night; newest dated record January 2025
     RW_DPW: ('RoadWork DPW projects', 'daily', None),           # updated nightly; no limit, the page shows its date
     RW_SWB: ('RoadWork SWB projects', 'daily', None),
+    LAND_INV: ('NORA uncommitted property inventory', 'daily', None),   # the NORA lists and public land: updated a few times a year
+    LAND_SOLD: ('NORA sold properties', 'daily', None),
+    LAND_PUB: ('Public land', 'daily', None),
+    PARCELS: ('Parcels', 'daily', None),                         # only read when the land file is rebuilt (to place NORA's lots)
 }
 CFS_MAX_DAYS = 5   # the current year's Calls for Service dataset is reloaded every night
 
@@ -2153,6 +2373,14 @@ def validate(name, obj, prev, same_year=True):
         need(len(obj['yw']) == len(obj['years']), 'basins: shape')
         check_not_collapsed('catch basins', obj['total'], prev and prev.get('total'))
         dots_ok('catch basins', obj['dots'], 50000)
+    elif name == 'land.json':
+        need(len(obj['yc']) == len(obj['years']) and all(len(r) == len(obj['CH']) for r in obj['yc']), 'land: shape')
+        need(obj['invNoLoc'] <= 0.2 * obj['inv'], f"land: {obj['invNoLoc']} of {obj['inv']} NORA lots matched no parcel")
+        need(obj['pubNoLoc'] < 0.1 * obj['pub'] and obj['noLoc'] < 0.1 * obj['total'], 'land: most public land or sales failed to map')
+        check_not_collapsed('NORA sales', obj['total'], prev and prev.get('total'))
+        check_not_collapsed('public land sites', obj['pub'], prev and prev.get('pub'), floor=0.8)
+        dots_ok('land', obj['land'], 1000)
+        dots_ok('NORA sales', obj['sold'], 3000)
     elif name == 'str.json':
         need(len(obj['nby']) == 72 and len(obj['yr']) == len(obj['years']) and all(len(p) == 9 for p in obj['pts']), 'str: shape')
         need(obj['total'] > 500 and len(obj['nc']['rows']) > 100, 'str: suspiciously few licenses')
@@ -2383,6 +2611,13 @@ def main():
             out['basins.json'] = build_basins(api, P()[0])
     print('catch basins ...', flush=True)
     attempt(['basins.json'], basins)
+
+    def land():  # NORA's two lists and the City's public land; the parcel layer is read only on a rebuild, so it isn't in the key
+        vers = [api.version(d) for d in (LAND_INV, LAND_SOLD, LAND_PUB)]
+        if not unchanged('land.json', '|'.join(vers + [geo_key])):
+            out['land.json'] = build_land(api, P()[0], central_date(vers[2]).isoformat())
+    print('vacant and public land ...', flush=True)
+    attempt(['land.json'], land)
 
     def strs():
         if not unchanged('str.json', '|'.join([api.version(d) for d in (STR_ACTIVE, STR_APPS, STR_NC)] + [geo_key])):
