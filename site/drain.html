@@ -370,6 +370,13 @@ const NOLA = (() => {
     hide() { tipEl.style.opacity = 0; }
   };
   const row = (k, v) => `<div class="r"><span>${k}</span><span>${v}</span></div>`;
+  // descending(vals, names): the indices of the nonzero values, largest first, for a tooltip's breakdown rows;
+  // catch-alls ("Other…", "Not stated", "Not recorded") go last. For types, sectors and reasons; not for ordered
+  // categories such as status, age or phase, whose rows keep the bars' order.
+  const descending = (vals, names = []) => {
+    const last = k => /^(other|not (stated|recorded)$|unknown$)/i.test(names[k] || '') ? 1 : 0;
+    return vals.map((v, k) => k).filter(k => vals[k] > 0).sort((a, b) => last(a) - last(b) || vals[b] - vals[a] || a - b);
+  };
 
   // ---------- geography ----------
   const decode = r => { const o = []; let x = 0, y = 0; for (let i = 0; i < r.length; i += 2) { x += r[i]; y += r[i + 1]; o.push([x, y]); } return o; };
@@ -1257,7 +1264,7 @@ const NOLA = (() => {
   }
   const legendHTML = items => '<div class="legend">' + items.map(([c, l, round]) => `<span><i style="background:${c}${round ? ';border-radius:50%' : ''}"></i>${l}</span>`).join('') + '</div>';
 
-  return { css, S, fmt, pct, tip, row, setGeo, views, hashState, legendHTML, stage, fsec, flist, seg, ftabs, nbPick, kv, mapChecks, heatToggle, heatKey, orgList, dotData, addrRow, PERIODS, inPeriod, periodSeg, dotR, phoneToggle, popOf, perK, fmtRate, POP_NOTE, basisChips, shown, nbList, nbSelect, get FULL() { return FULL; }, get GEO() { return GEO; }, map, mapButtons, panelInset, seqVar, seqLegend, classes, stepLegend, short, frame, yGrid, chips, months, monthsLong,
+  return { css, S, fmt, pct, tip, row, descending, setGeo, views, hashState, legendHTML, stage, fsec, flist, seg, ftabs, nbPick, kv, mapChecks, heatToggle, heatKey, orgList, dotData, addrRow, PERIODS, inPeriod, periodSeg, dotR, phoneToggle, popOf, perK, fmtRate, POP_NOTE, basisChips, shown, nbList, nbSelect, get FULL() { return FULL; }, get GEO() { return GEO; }, map, mapButtons, panelInset, seqVar, seqLegend, classes, stepLegend, short, frame, yGrid, chips, months, monthsLong,
     setYear, get YEAR() { return YEAR; }, monthTicks, doyTime, doyDate, doyISO, doyMonth, monthStarts, isoDate, share, numWord, cap, setText, setHTML, title };
 })();
 </script>
@@ -1432,7 +1439,7 @@ const NOLA = (() => {
       const last = CB.years.length - 1;
       bars(plot, CB.years, CB.yw, WC, k => k === last, k => 'to ' + logEnd.replace(/, \d+$/, ''),
         k => `<b>${CB.years[k]}${k === last ? ', through ' + logEnd.replace(/, \d+$/, '') + ' (the log ends)' : ''}</b>`
-          + CB.W.map((w, s) => row(sw(WC[s]) + w, fmt(CB.yw[k][s]))).join(''));
+          + NOLA.descending(CB.W.map((w, s) => CB.yw[k][s]), CB.W).map(s => row(sw(WC[s]) + CB.W[s], fmt(CB.yw[k][s]))).join(''));
     } else {
       NOLA.nbPick(NOLA.fsec(panel, 'Neighborhood'), st.nb, v => set('nb', v));
       const gCnt = new Array(NG).fill(0), filed = RY.map(() => 0), open = RY.map(() => 0), days = RY.map(() => []);

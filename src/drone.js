@@ -86,7 +86,7 @@
       .attr('x', d => xw(d.wi)).attr('width', xw.bandwidth()).attr('y', d => yw(d.y1) + 1).attr('height', d => Math.max(0.5, yw(d.y0) - yw(d.y1) - 1))
       .attr('fill', d => CATS[d.ci].color).attr('rx', 1.5).attr('opacity', d => (st.cat < 0 || d.ci === st.cat ? 1 : .18) * (d.wi === partial ? .45 : 1));
     tl.g.append('g').selectAll('rect').data(weeks).join('rect').attr('x', (d, i) => xw(i) - 1).attr('width', xw.step()).attr('height', tl.ih).attr('fill', 'transparent')
-      .on('mousemove', (ev, w) => tip.show(`<b>Week of ${NOLA.doyDate(weeks.indexOf(w) * 7)}</b>` + (weeks.indexOf(w) === partial ? `<div style="color:var(--ink2)">Partial week: data ends ${NOLA.doyDate(LAST)}</div>` : '') + row('Flights', d3.sum(w)) + CATS.map((c, ci) => w[ci] ? row(sw(c.color) + c.n, w[ci]) : '').join(''), ev))
+      .on('mousemove', (ev, w) => tip.show(`<b>Week of ${NOLA.doyDate(weeks.indexOf(w) * 7)}</b>` + (weeks.indexOf(w) === partial ? `<div style="color:var(--ink2)">Partial week: data ends ${NOLA.doyDate(LAST)}</div>` : '') + row('Flights', d3.sum(w)) + NOLA.descending(CATS.map((c, ci) => w[ci]), CATS.map(c => c.n)).map(ci => row(sw(CATS[ci].color) + CATS[ci].n, w[ci])).join(''), ev))
       .on('mouseleave', tip.hide);
     tl.g.append('g').selectAll('text').data(NOLA.monthTicks(mStarts, d => xw(Math.floor(d / 7)), tl.iw)).join('text').attr('x', d => d.x).attr('y', tl.ih + 18).text(d => d.label);
     tl.g.append('line').attr('x1', 0).attr('x2', tl.iw).attr('y1', tl.ih).attr('y2', tl.ih).attr('stroke', 'var(--axis)');
@@ -151,7 +151,7 @@
         const days = d3.extent(d.fs, f => f.day), dr = [...new Set(d.fs.map(f => D.drones[f.drone]))];
         tip.show(`<b>${nb}</b>` + row('Flights', d.n) + row('Dates', days[0] === days[1] ? NOLA.doyDate(days[0]) : NOLA.doyDate(days[0]) + ' – ' + NOLA.doyDate(days[1]))
           + row('Median flight', Math.round(med(d.fs)) + ' min') + row('Drones', dr.length > 3 ? dr.length : dr.join(', ')) + '<div style="margin-top:4px"></div>'
-          + CATS.map((c, ci) => d.counts[ci] ? row(sw(c.color) + c.n, d.counts[ci]) : '').join(''), ev);
+          + NOLA.descending(CATS.map((c, ci) => d.counts[ci]), CATS.map(c => c.n)).map(ci => row(sw(CATS[ci].color) + CATS[ci].n, d.counts[ci])).join(''), ev);
       }).on('mouseleave', tip.hide);
   }
 

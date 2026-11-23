@@ -169,7 +169,7 @@
       const last = CB.years.length - 1;
       bars(plot, CB.years, CB.yw, WC, k => k === last, k => 'to ' + logEnd.replace(/, \d+$/, ''),
         k => `<b>${CB.years[k]}${k === last ? ', through ' + logEnd.replace(/, \d+$/, '') + ' (the log ends)' : ''}</b>`
-          + CB.W.map((w, s) => row(sw(WC[s]) + w, fmt(CB.yw[k][s]))).join(''));
+          + NOLA.descending(CB.W.map((w, s) => CB.yw[k][s]), CB.W).map(s => row(sw(WC[s]) + CB.W[s], fmt(CB.yw[k][s]))).join(''));
     } else {
       NOLA.nbPick(NOLA.fsec(panel, 'Neighborhood'), st.nb, v => set('nb', v));
       const gCnt = new Array(NG).fill(0), filed = RY.map(() => 0), open = RY.map(() => 0), days = RY.map(() => []);

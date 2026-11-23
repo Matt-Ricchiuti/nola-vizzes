@@ -196,7 +196,7 @@
     f.g.selectAll('rect.h').data(YS).join('rect').attr('class', 'h').attr('x', yy => x(yy) - x.step() * x.paddingInner() / 2).attr('width', x.step()).attr('height', f.ih).attr('fill', 'transparent')
       .on('mousemove', (ev, yy) => { const k = YS.indexOf(yy);
         tip.show(`<b>${yy}${partial(k) ? ', through ' + lastShort : ''}</b>` + (st.nb >= 0 ? `<div style="color:var(--ink2)">${nbName(st.nb)}</div>` : '')
-          + LD.CH.map((c, s) => st.ch < 0 || s === st.ch ? row(sw(CH_COLORS[s]) + c, fmt(stacks[k][s])) : '').join('')
+          + NOLA.descending(LD.CH.map((c, s) => st.ch < 0 || s === st.ch ? stacks[k][s] : 0), LD.CH).map(s => row(sw(CH_COLORS[s]) + LD.CH[s], fmt(stacks[k][s]))).join('')
           + (st.ch < 0 ? row('All sales', fmt(tot(k))) : ''), ev); })
       .on('mouseleave', tip.hide);
     const step = f.iw < 520 ? 3 : f.iw < 900 ? 2 : 1;

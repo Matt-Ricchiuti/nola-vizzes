@@ -121,7 +121,7 @@
       let x0 = 0; r.a.forEach((v, w) => { if (!v) return; f.g.append('rect').attr('x', x(x0)).attr('width', Math.max(.5, x(x0 + v) - x(x0) - .5)).attr('y', cy - 8).attr('height', 16).attr('fill', WH[w][1]); x0 += v; });
       f.g.append('text').attr('x', x(r.n) + 6).attr('y', cy + 4).style('fill', 'var(--ink2)').text(fmt(r.n));
       f.g.append('rect').attr('x', narrow ? 0 : -f.m.l).attr('width', f.iw + (narrow ? 0 : f.m.l)).attr('y', y0).attr('height', rh).attr('fill', 'transparent')
-        .on('mousemove', ev => tip.show(`<b>${r.name}</b>${st.nb >= 0 ? `<div style="color:var(--ink2)">${nbName(st.nb)}</div>` : ''}` + row('Licenses', fmt(r.n)) + WH.map(([l, c], w) => r.a[w] ? row(sw(c) + l, fmt(r.a[w])) : '').join(''), ev)).on('mouseleave', tip.hide);
+        .on('mousemove', ev => tip.show(`<b>${r.name}</b>${st.nb >= 0 ? `<div style="color:var(--ink2)">${nbName(st.nb)}</div>` : ''}` + row('Licenses', fmt(r.n)) + NOLA.descending(WH.map((x, w) => r.a[w]), WH.map(x => x[0])).map(w => row(sw(WH[w][1]) + WH[w][0], fmt(r.a[w]))).join(''), ev)).on('mouseleave', tip.hide);
     });
   }
 

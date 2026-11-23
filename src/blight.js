@@ -200,7 +200,7 @@
     D.hear.forEach((d, k) => { if (partialYear(D.years[k])) f.g.append('text').attr('class', 'halo').attr('x', x(D.years[k]) + x.bandwidth()).attr('y', y(d3.sum(d)) - 5).attr('text-anchor', 'end').style('fill', 'var(--ink2)').text('to ' + lastLabel); });
     f.g.selectAll('rect.h').data(D.years).join('rect').attr('class', 'h').attr('x', yy => x(yy) - x.step() * x.paddingInner() / 2).attr('width', x.step()).attr('height', f.ih).attr('fill', 'transparent')
       .on('mousemove', (ev, yy) => { const d = D.hear[D.years.indexOf(yy)];
-        tip.show(`<b>Hearings in ${yy}${partialYear(yy) ? ', through ' + lastLabel : ''}</b>` + row('Total', fmt(d3.sum(d))) + D.hearGroups.map((g, k) => d[k] ? row(sw(HEAR_C[k]) + (HEAR_L[g] || g), fmt(d[k])) : '').join(''), ev); }).on('mouseleave', tip.hide);
+        tip.show(`<b>Hearings in ${yy}${partialYear(yy) ? ', through ' + lastLabel : ''}</b>` + row('Total', fmt(d3.sum(d))) + NOLA.descending(D.hearGroups.map((g, k) => d[k]), D.hearGroups).map(k => row(sw(HEAR_C[k]) + (HEAR_L[D.hearGroups[k]] || D.hearGroups[k]), fmt(d[k]))).join(''), ev); }).on('mouseleave', tip.hide);
     f.g.selectAll('text.x').data(D.years).join('text').attr('class', 'x').attr('x', yy => x(yy) + x.bandwidth() / 2).attr('y', f.ih + 18).attr('text-anchor', 'middle').text(yy => f.iw < 420 ? "'" + String(yy).slice(2) : yy);
     f.g.append('line').attr('x1', 0).attr('x2', f.iw).attr('y1', f.ih).attr('y2', f.ih).attr('stroke', 'var(--axis)');
   }
@@ -234,7 +234,7 @@
     imon.forEach(d => { let y0 = 0; d.a.forEach((v, g) => { if (!v || !show(g)) return;
       f.g.append('rect').attr('x', x(d.k)).attr('width', x.bandwidth()).attr('y', y(y0 + v)).attr('height', Math.max(.5, y(y0) - y(y0 + v))).attr('fill', INSP_C[g]).attr('opacity', d.k === imon.length - 1 && lastMonthPartial ? .45 : 1); y0 += v; }); });
     f.g.selectAll('rect.h').data(imon).join('rect').attr('class', 'h').attr('x', d => x(d.k)).attr('width', x.step()).attr('height', f.ih).attr('fill', 'transparent')
-      .on('mousemove', (ev, d) => tip.show(`<b>${NOLA.monthsLong[d.mo]} ${d.y}${d.k === imon.length - 1 && lastMonthPartial ? ', through ' + lastLabel : ''}</b>` + row('Inspections', fmt(tot(d))) + D.inspGroups.map((g, k) => show(k) && d.a[k] ? row(sw(INSP_C[k]) + g, fmt(d.a[k])) : '').join(''), ev)).on('mouseleave', tip.hide);
+      .on('mousemove', (ev, d) => tip.show(`<b>${NOLA.monthsLong[d.mo]} ${d.y}${d.k === imon.length - 1 && lastMonthPartial ? ', through ' + lastLabel : ''}</b>` + row('Inspections', fmt(tot(d))) + NOLA.descending(D.inspGroups.map((g, k) => show(k) ? d.a[k] : 0), D.inspGroups).map(k => row(sw(INSP_C[k]) + D.inspGroups[k], fmt(d.a[k]))).join(''), ev)).on('mouseleave', tip.hide);
     const step = f.iw < 500 ? 2 : 1;
     f.g.selectAll('text.x').data(imon.filter(d => d.mo === 0 && d.y % step === 0)).join('text').attr('class', 'x').attr('x', d => x(d.k)).attr('y', f.ih + 18).text(d => d.y);
     f.g.append('line').attr('x1', 0).attr('x2', f.iw).attr('y1', f.ih).attr('y2', f.ih).attr('stroke', 'var(--axis)');

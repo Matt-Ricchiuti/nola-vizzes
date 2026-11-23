@@ -370,6 +370,13 @@ const NOLA = (() => {
     hide() { tipEl.style.opacity = 0; }
   };
   const row = (k, v) => `<div class="r"><span>${k}</span><span>${v}</span></div>`;
+  // descending(vals, names): the indices of the nonzero values, largest first, for a tooltip's breakdown rows;
+  // catch-alls ("Other…", "Not stated", "Not recorded") go last. For types, sectors and reasons; not for ordered
+  // categories such as status, age or phase, whose rows keep the bars' order.
+  const descending = (vals, names = []) => {
+    const last = k => /^(other|not (stated|recorded)$|unknown$)/i.test(names[k] || '') ? 1 : 0;
+    return vals.map((v, k) => k).filter(k => vals[k] > 0).sort((a, b) => last(a) - last(b) || vals[b] - vals[a] || a - b);
+  };
 
   // ---------- geography ----------
   const decode = r => { const o = []; let x = 0, y = 0; for (let i = 0; i < r.length; i += 2) { x += r[i]; y += r[i + 1]; o.push([x, y]); } return o; };
@@ -1257,7 +1264,7 @@ const NOLA = (() => {
   }
   const legendHTML = items => '<div class="legend">' + items.map(([c, l, round]) => `<span><i style="background:${c}${round ? ';border-radius:50%' : ''}"></i>${l}</span>`).join('') + '</div>';
 
-  return { css, S, fmt, pct, tip, row, setGeo, views, hashState, legendHTML, stage, fsec, flist, seg, ftabs, nbPick, kv, mapChecks, heatToggle, heatKey, orgList, dotData, addrRow, PERIODS, inPeriod, periodSeg, dotR, phoneToggle, popOf, perK, fmtRate, POP_NOTE, basisChips, shown, nbList, nbSelect, get FULL() { return FULL; }, get GEO() { return GEO; }, map, mapButtons, panelInset, seqVar, seqLegend, classes, stepLegend, short, frame, yGrid, chips, months, monthsLong,
+  return { css, S, fmt, pct, tip, row, descending, setGeo, views, hashState, legendHTML, stage, fsec, flist, seg, ftabs, nbPick, kv, mapChecks, heatToggle, heatKey, orgList, dotData, addrRow, PERIODS, inPeriod, periodSeg, dotR, phoneToggle, popOf, perK, fmtRate, POP_NOTE, basisChips, shown, nbList, nbSelect, get FULL() { return FULL; }, get GEO() { return GEO; }, map, mapButtons, panelInset, seqVar, seqLegend, classes, stepLegend, short, frame, yGrid, chips, months, monthsLong,
     setYear, get YEAR() { return YEAR; }, monthTicks, doyTime, doyDate, doyISO, doyMonth, monthStarts, isoDate, share, numWord, cap, setText, setHTML, title };
 })();
 </script>
@@ -1459,7 +1466,7 @@ const NOLA = (() => {
     f.g.selectAll('rect.h').data(YS).join('rect').attr('class', 'h').attr('x', yy => x(yy) - x.step() * x.paddingInner() / 2).attr('width', x.step()).attr('height', f.ih).attr('fill', 'transparent')
       .on('mousemove', (ev, yy) => { const k = YS.indexOf(yy);
         tip.show(`<b>${yy}${partial(k) ? ', through ' + lastShort : ''}</b>` + (st.nb >= 0 ? `<div style="color:var(--ink2)">${nbName(st.nb)}</div>` : '')
-          + LD.CH.map((c, s) => st.ch < 0 || s === st.ch ? row(sw(CH_COLORS[s]) + c, fmt(stacks[k][s])) : '').join('')
+          + NOLA.descending(LD.CH.map((c, s) => st.ch < 0 || s === st.ch ? stacks[k][s] : 0), LD.CH).map(s => row(sw(CH_COLORS[s]) + LD.CH[s], fmt(stacks[k][s]))).join('')
           + (st.ch < 0 ? row('All sales', fmt(tot(k))) : ''), ev); })
       .on('mouseleave', tip.hide);
     const step = f.iw < 520 ? 3 : f.iw < 900 ? 2 : 1;

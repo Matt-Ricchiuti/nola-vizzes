@@ -117,7 +117,7 @@
     f.g.selectAll('rect.h').data(D.years).join('rect').attr('class', 'h').attr('x', yy => x(yy) - x.step() * x.paddingInner() / 2).attr('width', x.step()).attr('height', f.ih).attr('fill', 'transparent')
       .on('mousemove', (ev, yy) => { const d = D.yr[D.years.indexOf(yy)];
         tip.show(`<b>Issued in ${yy}${partialYear(yy) ? ', through ' + lastLabel : ''}</b>` + (st.cat >= 0 ? `<div style="color:var(--ink2)">${D.cats[st.cat]}</div>` : '') + row('Permits', fmt(tot(d)))
-          + (st.cat < 0 ? D.cats.map((c, k) => d[k] ? row(sw(CCOL[k]) + c, fmt(d[k])) : '').join('') : ''), ev); }).on('mouseleave', tip.hide);
+          + (st.cat < 0 ? NOLA.descending(D.cats.map((c, k) => d[k]), D.cats).map(k => row(sw(CCOL[k]) + D.cats[k], fmt(d[k]))).join('') : ''), ev); }).on('mouseleave', tip.hide);
     f.g.selectAll('text.x').data(D.years).join('text').attr('class', 'x').attr('x', yy => x(yy) + x.bandwidth() / 2).attr('y', f.ih + 18).attr('text-anchor', 'middle').text(yy => f.iw < 520 ? "'" + String(yy).slice(2) : yy);
     f.g.append('line').attr('x1', 0).attr('x2', f.iw).attr('y1', f.ih).attr('y2', f.ih).attr('stroke', 'var(--axis)');
   }
