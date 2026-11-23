@@ -1367,7 +1367,12 @@ const NOLA = (() => {
     if (st.nb < 0 && st.sec < 0) NOLA.kv(NOLA.fsec(panel, 'Home-based'), [['Yes', null, fmt(d3.sum(D.home, h => h[0]))], ['No', null, fmt(d3.sum(D.home, h => h[1]))]]);
     stacked(plot, data, D.S.map(colorOf), s => st.sec < 0 || s === st.sec, (yy, d, tot) => `<b>Filed in ${yy}${partialYear(yy) ? ', through ' + lastLabel : ''}</b>`
       + [st.sec >= 0 ? nm(D.S[st.sec]) : '', st.nb >= 0 ? nbName(st.nb) : ''].filter(Boolean).map(s => `<div style="color:var(--ink2)">${s}</div>`).join('') + row('Applications', fmt(tot))
-      + (st.sec < 0 ? D.S.map((s, k) => d[k] ? row(sw(colorOf(s)) + nm(s), fmt(d[k])) : '').join('') : ''));
+      + (st.sec < 0 ? bySize(d).map(k => row(sw(colorOf(D.S[k])) + nm(D.S[k]), fmt(d[k]))).join('') : ''));
+  }
+  // a year's sectors, largest first; the catch-alls ("Other sectors", "Not stated") stay at the bottom
+  function bySize(d) {
+    const last = k => D.S[k] === 'Other sectors' ? 1 : D.S[k] === 'Not stated' ? 2 : 0;
+    return D.S.map((s, k) => k).filter(k => d[k]).sort((a, b) => last(a) - last(b) || d[b] - d[a]);
   }
   function stacked(plot, data, colors, show, tipFor) {
     plot.innerHTML = '';
