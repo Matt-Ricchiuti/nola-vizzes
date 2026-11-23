@@ -33,7 +33,7 @@
   st.per = ['1', '6', '12', 'all'].includes(H.p) ? H.p : '12';
   st.since = ['12', '60'].includes(H.since) ? H.since : 'all';
   st.out = H.out != null && +H.out >= 0 && +H.out < D.out.length ? +H.out : -1;
-  st.home = ['1', '0'].includes(H.home) ? +H.home : -1;
+  st.home = H.home === '1' ? 1 : H.home === 'all' ? -1 : 0; // opens on applications not marked home-based
   st.heat = H.heat === '1';
   const isNew = () => st.measure !== 'now';
   const P = () => isNew() ? PA : PW, SEC = () => isNew() ? D.S : D.S2, sk = () => isNew() ? 'sec' : 'sec2';
@@ -46,7 +46,6 @@
   const perL = { 1: 'past month', 6: 'past 6 months', 12: 'past 12 months', all: '' };
   const mapLabel = () => isNew() ? (st.per === 'all' ? `Business license applications since ${D.years[0]}` : `New business license applications in the ${perL[st.per]}`) : 'Businesses licensed now';
   const keyLabel = () => (isNew() ? 'Applications shown' : 'Businesses shown') + ', by neighborhood';
-  const HOME_L = { 1: 'Yes', 0: 'No', '-1': 'Not stated' };
 
   let m;
   function drawMap(pane, first) {
@@ -86,7 +85,7 @@
   function dotTip(i) {
     const p = P(), sec = SEC()[p.s[i]];
     const head = `<b>${esc(p.T[p.t[i]])}</b><div style="color:var(--ink2)">${sw(colorOf(sec))}${esc(nm(sec))}</div>`;
-    if (isNew()) return head + NOLA.addrRow(PA, i, 'Not shown for home-based businesses') + row('Filed', NOLA.isoDate(PA.iso(PA.day[i]))) + row('Status now', D.out[PA.o[i]]) + row('Home-based', HOME_L[PA.h[i]]) + row('Neighborhood', nbName(PA.nb[i]));
+    if (isNew()) return head + (PA.a && PA.a[i] >= 0 ? NOLA.addrRow(PA, i) : '') + row('Filed', NOLA.isoDate(PA.iso(PA.day[i]))) + row('Status now', D.out[PA.o[i]]) + row('Neighborhood', nbName(PA.nb[i]));
     // licensed now: the business name as the title, its license type below (name and address withheld where it may be a home)
     const m = PW.m ? PW.m[i] : -1, type = `<div>${esc(PW.T[PW.t[i]])}</div>`;
     const top = (m >= 0 ? `<b>${esc(PW.M[m])}</b>${type}` : `<b>${esc(PW.T[PW.t[i]])}</b>`) + `<div style="color:var(--ink2)">${sw(colorOf(sec))}${esc(nm(sec))}</div>`;
@@ -150,5 +149,5 @@
     { id: 'outcomes', label: 'License applications per year, by current status', tab: 'Status', draw: drawOut },
   ], { ds: [D.ds[0], 'Occupational Business License Data'],
        state: () => ({ measure: st.measure !== 'new' ? st.measure : null, sec: st.sec >= 0 ? st.sec : null, sec2: st.sec2 >= 0 ? st.sec2 : null, nb: st.nb >= 0 ? st.nb : null,
-                       p: st.per !== '12' ? st.per : null, since: st.since !== 'all' ? st.since : null, out: st.out >= 0 ? st.out : null, home: st.home >= 0 ? st.home : null, heat: st.heat ? 1 : null }) });
+                       p: st.per !== '12' ? st.per : null, since: st.since !== 'all' ? st.since : null, out: st.out >= 0 ? st.out : null, home: st.home === 0 ? null : st.home < 0 ? 'all' : 1, heat: st.heat ? 1 : null }) });
 })();

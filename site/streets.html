@@ -120,7 +120,8 @@ svg.shaded .st0{stroke:color-mix(in srgb,var(--surface) 85%,transparent)}
 .tip{position:fixed;pointer-events:none;background:var(--surface);color:var(--ink);border:1px solid var(--ring);box-shadow:0 6px 24px rgba(0,0,0,.14);border-radius:10px;padding:9px 11px;font-size:12.5px;max-width:300px;z-index:20;opacity:0;transition:opacity .08s}
 .tip b{font-size:13px}
 .tip .r{display:flex;justify-content:space-between;gap:14px;color:var(--ink2)}
-.tip .r span:last-child{color:var(--ink);font-variant-numeric:tabular-nums}
+.tip .r span:first-child{flex:none}
+.tip .r span:last-child{color:var(--ink);font-variant-numeric:tabular-nums;text-align:right}
 .tip .more{color:var(--ink2);margin-top:4px;padding-top:4px;border-top:1px solid var(--grid)}
 table{border-collapse:collapse;width:100%;font-size:13px}
 th{font-weight:600;text-align:left;color:var(--ink2);border-bottom:1px solid var(--axis);padding:6px 8px;cursor:pointer;white-space:nowrap;user-select:none}

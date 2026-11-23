@@ -120,7 +120,8 @@ svg.shaded .st0{stroke:color-mix(in srgb,var(--surface) 85%,transparent)}
 .tip{position:fixed;pointer-events:none;background:var(--surface);color:var(--ink);border:1px solid var(--ring);box-shadow:0 6px 24px rgba(0,0,0,.14);border-radius:10px;padding:9px 11px;font-size:12.5px;max-width:300px;z-index:20;opacity:0;transition:opacity .08s}
 .tip b{font-size:13px}
 .tip .r{display:flex;justify-content:space-between;gap:14px;color:var(--ink2)}
-.tip .r span:last-child{color:var(--ink);font-variant-numeric:tabular-nums}
+.tip .r span:first-child{flex:none}
+.tip .r span:last-child{color:var(--ink);font-variant-numeric:tabular-nums;text-align:right}
 .tip .more{color:var(--ink2);margin-top:4px;padding-top:4px;border-top:1px solid var(--grid)}
 table{border-collapse:collapse;width:100%;font-size:13px}
 th{font-weight:600;text-align:left;color:var(--ink2);border-bottom:1px solid var(--axis);padding:6px 8px;cursor:pointer;white-space:nowrap;user-select:none}
@@ -1289,7 +1290,7 @@ const NOLA = (() => {
   st.per = ['1', '6', '12', 'all'].includes(H.p) ? H.p : '12';
   st.since = ['12', '60'].includes(H.since) ? H.since : 'all';
   st.out = H.out != null && +H.out >= 0 && +H.out < D.out.length ? +H.out : -1;
-  st.home = ['1', '0'].includes(H.home) ? +H.home : -1;
+  st.home = H.home === '1' ? 1 : H.home === 'all' ? -1 : 0; // opens on applications not marked home-based
   st.heat = H.heat === '1';
   const isNew = () => st.measure !== 'now';
   const P = () => isNew() ? PA : PW, SEC = () => isNew() ? D.S : D.S2, sk = () => isNew() ? 'sec' : 'sec2';
@@ -1302,7 +1303,6 @@ const NOLA = (() => {
   const perL = { 1: 'past month', 6: 'past 6 months', 12: 'past 12 months', all: '' };
   const mapLabel = () => isNew() ? (st.per === 'all' ? `Business license applications since ${D.years[0]}` : `New business license applications in the ${perL[st.per]}`) : 'Businesses licensed now';
   const keyLabel = () => (isNew() ? 'Applications shown' : 'Businesses shown') + ', by neighborhood';
-  const HOME_L = { 1: 'Yes', 0: 'No', '-1': 'Not stated' };
 
   let m;
   function drawMap(pane, first) {
@@ -1342,7 +1342,7 @@ const NOLA = (() => {
   function dotTip(i) {
     const p = P(), sec = SEC()[p.s[i]];
     const head = `<b>${esc(p.T[p.t[i]])}</b><div style="color:var(--ink2)">${sw(colorOf(sec))}${esc(nm(sec))}</div>`;
-    if (isNew()) return head + NOLA.addrRow(PA, i, 'Not shown for home-based businesses') + row('Filed', NOLA.isoDate(PA.iso(PA.day[i]))) + row('Status now', D.out[PA.o[i]]) + row('Home-based', HOME_L[PA.h[i]]) + row('Neighborhood', nbName(PA.nb[i]));
+    if (isNew()) return head + (PA.a && PA.a[i] >= 0 ? NOLA.addrRow(PA, i) : '') + row('Filed', NOLA.isoDate(PA.iso(PA.day[i]))) + row('Status now', D.out[PA.o[i]]) + row('Neighborhood', nbName(PA.nb[i]));
     // licensed now: the business name as the title, its license type below (name and address withheld where it may be a home)
     const m = PW.m ? PW.m[i] : -1, type = `<div>${esc(PW.T[PW.t[i]])}</div>`;
     const top = (m >= 0 ? `<b>${esc(PW.M[m])}</b>${type}` : `<b>${esc(PW.T[PW.t[i]])}</b>`) + `<div style="color:var(--ink2)">${sw(colorOf(sec))}${esc(nm(sec))}</div>`;
@@ -1406,7 +1406,7 @@ const NOLA = (() => {
     { id: 'outcomes', label: 'License applications per year, by current status', tab: 'Status', draw: drawOut },
   ], { ds: [D.ds[0], 'Occupational Business License Data'],
        state: () => ({ measure: st.measure !== 'new' ? st.measure : null, sec: st.sec >= 0 ? st.sec : null, sec2: st.sec2 >= 0 ? st.sec2 : null, nb: st.nb >= 0 ? st.nb : null,
-                       p: st.per !== '12' ? st.per : null, since: st.since !== 'all' ? st.since : null, out: st.out >= 0 ? st.out : null, home: st.home >= 0 ? st.home : null, heat: st.heat ? 1 : null }) });
+                       p: st.per !== '12' ? st.per : null, since: st.since !== 'all' ? st.since : null, out: st.out >= 0 ? st.out : null, home: st.home === 0 ? null : st.home < 0 ? 'all' : 1, heat: st.heat ? 1 : null }) });
 })();
 </script>
 </body></html>
